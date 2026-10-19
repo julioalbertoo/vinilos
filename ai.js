@@ -47,30 +47,40 @@ function hasExpectedShape(data) {
   return Boolean(data) && RESPONSE_FIELDS.every((field) => field in data);
 }
 
+const MODEL_TIMEOUT_MS = 45000;
+
 async function callModel(model, githubToken, imageDataUrl) {
-  return fetch(CONFIG.AI_PROVIDER.workerUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${githubToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: buildMessages(imageDataUrl),
-      temperature: 0.1,
-      max_tokens: 500,
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+  try {
+    return await fetch(CONFIG.AI_PROVIDER.workerUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: buildMessages(imageDataUrl),
+        temperature: 0.1,
+        max_tokens: 500,
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-export async function identify(imageDataUrl, githubToken) {
+export async function identify(imageDataUrl, githubToken, onAttempt) {
   const models = [CONFIG.AI_PROVIDER.primaryModel, CONFIG.AI_PROVIDER.fallbackModel];
   for (const model of models) {
+    if (onAttempt) onAttempt(model);
     let response;
     try {
       response = await callModel(model, githubToken, imageDataUrl);
     } catch {
-      continue;
+      continue; // tiempo agotado o error de red: probamos con el siguiente modelo
     }
     if (!response.ok) continue;
     const payload = await response.json();

@@ -199,9 +199,10 @@ function initCapture() {
 
   identifyButton.addEventListener("click", async () => {
     if (!preparedImage) return;
-    status.textContent = "Identificando (puede tardar unos segundos)...";
     rawJson.hidden = true;
-    const result = await identify(preparedImage, getGithubToken());
+    const result = await identify(preparedImage, getGithubToken(), (model) => {
+      status.textContent = `Probando con ${model} (puede tardar hasta 45 segundos)...`;
+    });
     if (result.ok) {
       status.textContent = `Hecho (modelo: ${result.modelUsed}).`;
       rawJson.textContent = JSON.stringify(result.data, null, 2);
