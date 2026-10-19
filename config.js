@@ -1,6 +1,6 @@
 export const CONFIG = {
   AI_PROVIDER: {
-    workerUrl: "", // se rellena al desplegar el Cloudflare Worker (Paso 3)
+    workerUrl: "https://vinilos-proxy.julioalbertoo.workers.dev",
     primaryModel: "meta/Llama-4-Scout-17B-16E-Instruct", // confirmar nombre exacto en el catálogo antes del Paso 4
     fallbackModel: "openai/gpt-4o-mini",
   },
