@@ -449,9 +449,12 @@ function initCapture() {
   const rawJson = document.getElementById("capture-raw-json");
 
   let preparedImage = null;
+  // Si la foto viene del botón del escáner, se identifica sin esperar a que pulses «Identificar».
+  let autoIdentify = false;
 
   async function handleFile(file) {
     if (!file) {
+      autoIdentify = false;
       status.textContent = "No se ha recibido ninguna foto (¿se canceló la cámara?).";
       return;
     }
@@ -463,7 +466,12 @@ function initCapture() {
       preview.hidden = false;
       identifyButton.hidden = false;
       status.textContent = "";
+      if (autoIdentify) {
+        autoIdentify = false;
+        identifyButton.click();
+      }
     } catch (err) {
+      autoIdentify = false;
       status.textContent = `❌ No se pudo preparar la imagen: ${err && err.message ? err.message : err}`;
     }
   }
@@ -553,6 +561,8 @@ function initCapture() {
     resetCapture();
     const session = ++scanSession;
     document.getElementById("scanner").hidden = false;
+    const scannerPhoto = document.getElementById("scanner-photo");
+    scannerPhoto.hidden = true;
     const scannerStatus = document.getElementById("scanner-status");
     scannerStatus.textContent = "Abriendo la cámara...";
     scanButton.disabled = true;
@@ -577,7 +587,9 @@ function initCapture() {
         stopActiveScanner = stop;
         scannerStatus.textContent = "Apunta la cámara al código de barras de la contraportada.";
         scanTipTimer = setTimeout(() => {
-          if (session === scanSession) scannerStatus.textContent = SCAN_TIP;
+          if (session !== scanSession) return;
+          scannerStatus.textContent = SCAN_TIP;
+          scannerPhoto.hidden = false;
         }, SCAN_TIP_DELAY_MS);
       }
     } catch (err) {
@@ -590,6 +602,11 @@ function initCapture() {
     }
   });
   document.getElementById("scanner-cancel").addEventListener("click", stopScanner);
+  document.getElementById("scanner-photo").addEventListener("click", () => {
+    stopScanner();
+    autoIdentify = true;
+    cameraInput.click();
+  });
 
   return resetCapture;
 }
@@ -609,10 +626,10 @@ function barcodeClues(code) {
   };
 }
 
-const SCAN_TIP_DELAY_MS = 8000;
+const SCAN_TIP_DELAY_MS = 6000;
 const SCAN_TIP =
   "¿No lo lee? Acércate hasta que el código ocupe casi todo el ancho del visor e inclina un poco el disco para quitar reflejos. " +
-  "También puedes usar «Hacer foto» con la contraportada: la IA lee el código.";
+  "O pulsa el botón de abajo: haces una foto y la IA lee los números impresos del código.";
 
 let scanSession = 0;
 let stopActiveScanner = null;

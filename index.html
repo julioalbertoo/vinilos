@@ -4,20 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>Vinilos</title>
-  <link rel="stylesheet" href="styles.css?v=0.7.1">
+  <link rel="stylesheet" href="styles.css?v=0.7.2">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=0.7.1",
-        "./tokens.js": "./tokens.js?v=0.7.1",
-        "./guide.js": "./guide.js?v=0.7.1",
-        "./ai.js": "./ai.js?v=0.7.1",
-        "./discogs.js": "./discogs.js?v=0.7.1",
-        "./imaging.js": "./imaging.js?v=0.7.1",
-        "./scoring.js": "./scoring.js?v=0.7.1",
-        "./barcode.js": "./barcode.js?v=0.7.1",
-        "./history.js": "./history.js?v=0.7.1"
+        "./config.js": "./config.js?v=0.7.2",
+        "./tokens.js": "./tokens.js?v=0.7.2",
+        "./guide.js": "./guide.js?v=0.7.2",
+        "./ai.js": "./ai.js?v=0.7.2",
+        "./discogs.js": "./discogs.js?v=0.7.2",
+        "./imaging.js": "./imaging.js?v=0.7.2",
+        "./scoring.js": "./scoring.js?v=0.7.2",
+        "./barcode.js": "./barcode.js?v=0.7.2",
+        "./history.js": "./history.js?v=0.7.2"
       }
     }
   </script>
@@ -25,7 +25,7 @@
 <body>
   <header class="app-header">
     <h1>🎵 Vinilos</h1>
-    <p class="app-version">v0.7.1</p>
+    <p class="app-version">v0.7.2</p>
   </header>
 
   <main id="app">
@@ -96,6 +96,7 @@
       <div id="scanner" class="scanner" hidden>
         <video id="scanner-video" playsinline muted autoplay></video>
         <p id="scanner-status" class="status">Apunta la cámara al código de barras de la contraportada.</p>
+        <button type="button" id="scanner-photo" hidden>📷 Leer el número con una foto</button>
         <button type="button" id="scanner-cancel" class="secondary">Cancelar</button>
       </div>
 
@@ -148,6 +149,6 @@
     <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=0.7.1"></script>
+  <script type="module" src="app.js?v=0.7.2"></script>
 </body>
 </html>
