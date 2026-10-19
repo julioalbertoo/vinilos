@@ -11,7 +11,9 @@ export const CONFIG = {
   STORAGE_KEYS: {
     githubToken: "vinilos_github_token",
     githubTokenSavedAt: "vinilos_github_token_saved_at",
+    githubVerified: "vinilos_github_verified",
     discogsToken: "vinilos_discogs_token",
+    discogsVerified: "vinilos_discogs_verified",
     history: "vinilos_history",
   },
   IMAGE: {

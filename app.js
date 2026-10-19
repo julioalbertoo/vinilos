@@ -7,6 +7,9 @@ import {
   clearDiscogsToken,
   getGithubTokenAgeDays,
   hasTokens,
+  markGithubVerified,
+  markDiscogsVerified,
+  areTokensVerified,
 } from "./tokens.js";
 import { GUIDE_TEXT, isValidGithubTokenFormat } from "./guide.js";
 import { testGithubConnection, identify } from "./ai.js";
@@ -155,6 +158,7 @@ function initSettings() {
     const result = document.getElementById("settings-test-github-status");
     result.textContent = "Probando...";
     const { ok, reason } = await testGithubConnection(getGithubToken());
+    markGithubVerified(ok);
     result.textContent = `${ok ? "✅" : "❌"} ${reason}`;
   });
 
@@ -162,6 +166,7 @@ function initSettings() {
     const result = document.getElementById("settings-test-discogs-status");
     result.textContent = "Probando...";
     const { ok, reason } = await testDiscogsConnection(getDiscogsToken());
+    markDiscogsVerified(ok);
     result.textContent = `${ok ? "✅" : "❌"} ${reason}`;
   });
 }
@@ -237,4 +242,6 @@ populateGuideText();
 initGuideNavigation();
 initSettings();
 initCapture();
-showView(hasTokens() ? "settings" : "guide");
+if (areTokensVerified()) showView("capture");
+else if (hasTokens()) showView("settings");
+else showView("guide");
