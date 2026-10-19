@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>Vinilos</title>
-  <link rel="stylesheet" href="styles.css?v=0.4.2">
+  <link rel="stylesheet" href="styles.css?v=0.4.3">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=0.4.2",
-        "./tokens.js": "./tokens.js?v=0.4.2",
-        "./guide.js": "./guide.js?v=0.4.2",
-        "./ai.js": "./ai.js?v=0.4.2",
-        "./discogs.js": "./discogs.js?v=0.4.2",
-        "./imaging.js": "./imaging.js?v=0.4.2"
+        "./config.js": "./config.js?v=0.4.3",
+        "./tokens.js": "./tokens.js?v=0.4.3",
+        "./guide.js": "./guide.js?v=0.4.3",
+        "./ai.js": "./ai.js?v=0.4.3",
+        "./discogs.js": "./discogs.js?v=0.4.3",
+        "./imaging.js": "./imaging.js?v=0.4.3"
       }
     }
   </script>
@@ -22,7 +22,7 @@
 <body>
   <header class="app-header">
     <h1>🎵 Vinilos</h1>
-    <p class="app-version">v0.4.2</p>
+    <p class="app-version">v0.4.3</p>
   </header>
 
   <main id="app">
@@ -33,16 +33,16 @@
         <button type="button" id="guide-intro-next"></button>
       </div>
 
-      <div id="guide-screen-github" class="guide-screen" hidden>
-        <h2 id="guide-github-title"></h2>
-        <ol id="guide-github-steps"></ol>
-        <a id="guide-github-link" class="guide-link" target="_blank" rel="noopener"></a>
-        <p id="guide-github-notice" class="notice"></p>
-        <label id="guide-github-paste-label" for="guide-github-input"></label>
-        <input type="password" id="guide-github-input">
-        <p id="guide-github-hint" class="hint"></p>
-        <button type="button" id="guide-github-save"></button>
-        <button type="button" id="guide-github-back" class="secondary">← Atrás</button>
+      <div id="guide-screen-ai" class="guide-screen" hidden>
+        <h2 id="guide-ai-title"></h2>
+        <ol id="guide-ai-steps"></ol>
+        <a id="guide-ai-link" class="guide-link" target="_blank" rel="noopener"></a>
+        <p id="guide-ai-notice" class="notice"></p>
+        <label id="guide-ai-paste-label" for="guide-ai-input"></label>
+        <input type="password" id="guide-ai-input">
+        <p id="guide-ai-hint" class="hint"></p>
+        <button type="button" id="guide-ai-save"></button>
+        <button type="button" id="guide-ai-back" class="secondary">← Atrás</button>
       </div>
 
       <div id="guide-screen-discogs" class="guide-screen" hidden>
@@ -61,8 +61,8 @@
       <h2>Ajustes</h2>
       <p class="notice">🔒 Tus llaves se guardan solo en este navegador. No las compartas ni hagas capturas de esta pantalla.</p>
 
-      <label for="github-token-input">Token de GitHub</label>
-      <input type="password" id="github-token-input" placeholder="github_pat_...">
+      <label for="ai-key-input">Llave de Google Gemini</label>
+      <input type="password" id="ai-key-input" placeholder="AIza...">
 
       <label for="discogs-token-input">Token de Discogs</label>
       <input type="password" id="discogs-token-input" placeholder="Tu token personal de Discogs">
@@ -70,10 +70,9 @@
       <button type="button" id="settings-save">Guardar</button>
       <button type="button" id="settings-clear">Borrar llaves</button>
       <p id="settings-status" class="status"></p>
-      <p id="settings-github-age-warning" class="notice" hidden></p>
 
-      <button type="button" id="settings-test-github">Probar conexión GitHub</button>
-      <p id="settings-test-github-status" class="status"></p>
+      <button type="button" id="settings-test-ai">Probar conexión Gemini</button>
+      <p id="settings-test-ai-status" class="status"></p>
 
       <button type="button" id="settings-test-discogs">Probar conexión Discogs</button>
       <p id="settings-test-discogs-status" class="status"></p>
@@ -123,6 +122,6 @@
     <button type="button" data-view="history">Historial</button>
   </nav>
 
-  <script type="module" src="app.js?v=0.4.2"></script>
+  <script type="module" src="app.js?v=0.4.3"></script>
 </body>
 </html>

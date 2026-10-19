@@ -1,23 +1,22 @@
 import {
-  getGithubToken,
-  setGithubToken,
-  clearGithubToken,
+  getAiKey,
+  setAiKey,
+  clearAiKey,
+  markAiVerified,
   getDiscogsToken,
   setDiscogsToken,
   clearDiscogsToken,
-  getGithubTokenAgeDays,
-  hasTokens,
-  markGithubVerified,
   markDiscogsVerified,
+  hasTokens,
   areTokensVerified,
 } from "./tokens.js";
-import { GUIDE_TEXT, isValidGithubTokenFormat } from "./guide.js";
-import { testGithubConnection, identify } from "./ai.js";
+import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
+import { testAiConnection, identify } from "./ai.js";
 import { testDiscogsConnection } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 
 const VIEWS = ["guide", "settings", "capture", "results", "detail", "history"];
-const GUIDE_SCREENS = ["intro", "github", "discogs"];
+const GUIDE_SCREENS = ["intro", "ai", "discogs"];
 
 function showView(name) {
   for (const view of VIEWS) {
@@ -32,6 +31,9 @@ function showGuideScreen(name) {
 }
 
 function openGuide() {
+  // Rellenar con lo ya guardado evita que "Guardar" en la guía borre una llave existente.
+  document.getElementById("guide-ai-input").value = getAiKey();
+  document.getElementById("guide-discogs-input").value = getDiscogsToken();
   showView("guide");
   showGuideScreen("intro");
 }
@@ -40,72 +42,58 @@ function initDebugNav() {
   const nav = document.getElementById("debug-nav");
   nav.addEventListener("click", (event) => {
     const view = event.target.dataset.view;
-    if (view) showView(view);
+    if (view === "guide") openGuide();
+    else if (view) showView(view);
   });
+}
+
+function populateKeyScreen(prefix, text) {
+  document.getElementById(`guide-${prefix}-title`).textContent = text.title;
+  document.getElementById(`guide-${prefix}-steps`).replaceChildren(
+    ...text.steps.map((step) => {
+      const li = document.createElement("li");
+      li.textContent = step;
+      return li;
+    })
+  );
+  const link = document.getElementById(`guide-${prefix}-link`);
+  link.href = text.linkUrl;
+  link.textContent = text.linkLabel;
+  document.getElementById(`guide-${prefix}-notice`).textContent = GUIDE_TEXT.privacyNotice;
+  document.getElementById(`guide-${prefix}-paste-label`).textContent = text.pasteLabel;
+  document.getElementById(`guide-${prefix}-input`).placeholder = text.placeholder;
+  document.getElementById(`guide-${prefix}-save`).textContent = text.saveLabel;
 }
 
 function populateGuideText() {
   document.getElementById("guide-intro-title").textContent = GUIDE_TEXT.intro.title;
   document.getElementById("guide-intro-body").textContent = GUIDE_TEXT.intro.body;
   document.getElementById("guide-intro-next").textContent = GUIDE_TEXT.intro.nextLabel;
-
-  document.getElementById("guide-github-title").textContent = GUIDE_TEXT.github.title;
-  const githubSteps = document.getElementById("guide-github-steps");
-  githubSteps.replaceChildren(
-    ...GUIDE_TEXT.github.steps.map((step) => {
-      const li = document.createElement("li");
-      li.textContent = step;
-      return li;
-    })
-  );
-  const githubLink = document.getElementById("guide-github-link");
-  githubLink.href = GUIDE_TEXT.github.linkUrl;
-  githubLink.textContent = GUIDE_TEXT.github.linkLabel;
-  document.getElementById("guide-github-notice").textContent = GUIDE_TEXT.privacyNotice;
-  document.getElementById("guide-github-paste-label").textContent = GUIDE_TEXT.github.pasteLabel;
-  document.getElementById("guide-github-input").placeholder = GUIDE_TEXT.github.placeholder;
-  document.getElementById("guide-github-save").textContent = GUIDE_TEXT.github.saveLabel;
-
-  document.getElementById("guide-discogs-title").textContent = GUIDE_TEXT.discogs.title;
-  const discogsSteps = document.getElementById("guide-discogs-steps");
-  discogsSteps.replaceChildren(
-    ...GUIDE_TEXT.discogs.steps.map((step) => {
-      const li = document.createElement("li");
-      li.textContent = step;
-      return li;
-    })
-  );
-  const discogsLink = document.getElementById("guide-discogs-link");
-  discogsLink.href = GUIDE_TEXT.discogs.linkUrl;
-  discogsLink.textContent = GUIDE_TEXT.discogs.linkLabel;
-  document.getElementById("guide-discogs-notice").textContent = GUIDE_TEXT.privacyNotice;
-  document.getElementById("guide-discogs-paste-label").textContent = GUIDE_TEXT.discogs.pasteLabel;
-  document.getElementById("guide-discogs-input").placeholder = GUIDE_TEXT.discogs.placeholder;
-  document.getElementById("guide-discogs-save").textContent = GUIDE_TEXT.discogs.saveLabel;
-
+  populateKeyScreen("ai", GUIDE_TEXT.ai);
+  populateKeyScreen("discogs", GUIDE_TEXT.discogs);
   document.getElementById("settings-open-guide").textContent = GUIDE_TEXT.reopenLinkLabel;
 }
 
 function initGuideNavigation() {
   document.getElementById("guide-intro-next").addEventListener("click", () => {
-    showGuideScreen("github");
+    showGuideScreen("ai");
   });
 
-  document.getElementById("guide-github-back").addEventListener("click", () => {
+  document.getElementById("guide-ai-back").addEventListener("click", () => {
     showGuideScreen("intro");
   });
 
-  document.getElementById("guide-github-save").addEventListener("click", () => {
-    const input = document.getElementById("guide-github-input");
-    const hint = document.getElementById("guide-github-hint");
-    hint.textContent = isValidGithubTokenFormat(input.value) ? "" : GUIDE_TEXT.github.formatHint;
-    input.value = setGithubToken(input.value);
-    document.getElementById("github-token-input").value = input.value;
+  document.getElementById("guide-ai-save").addEventListener("click", () => {
+    const input = document.getElementById("guide-ai-input");
+    const hint = document.getElementById("guide-ai-hint");
+    hint.textContent = isValidAiKeyFormat(input.value) ? "" : GUIDE_TEXT.ai.formatHint;
+    input.value = setAiKey(input.value);
+    document.getElementById("ai-key-input").value = input.value;
     showGuideScreen("discogs");
   });
 
   document.getElementById("guide-discogs-back").addEventListener("click", () => {
-    showGuideScreen("github");
+    showGuideScreen("ai");
   });
 
   document.getElementById("guide-discogs-save").addEventListener("click", () => {
@@ -116,49 +104,35 @@ function initGuideNavigation() {
   });
 }
 
-function refreshGithubAgeWarning() {
-  const warning = document.getElementById("settings-github-age-warning");
-  const ageDays = getGithubTokenAgeDays();
-  if (ageDays !== null && ageDays >= 80) {
-    warning.hidden = false;
-    warning.textContent = `⚠️ Tu token de GitHub tiene ${ageDays} días. Caduca a los 90: conviene renovarlo pronto.`;
-  } else {
-    warning.hidden = true;
-  }
-}
-
 function initSettings() {
-  const githubInput = document.getElementById("github-token-input");
+  const aiInput = document.getElementById("ai-key-input");
   const discogsInput = document.getElementById("discogs-token-input");
   const status = document.getElementById("settings-status");
 
-  githubInput.value = getGithubToken();
+  aiInput.value = getAiKey();
   discogsInput.value = getDiscogsToken();
-  refreshGithubAgeWarning();
 
   document.getElementById("settings-save").addEventListener("click", () => {
-    githubInput.value = setGithubToken(githubInput.value);
+    aiInput.value = setAiKey(aiInput.value);
     discogsInput.value = setDiscogsToken(discogsInput.value);
     status.textContent = "Guardado.";
-    refreshGithubAgeWarning();
   });
 
   document.getElementById("settings-clear").addEventListener("click", () => {
-    clearGithubToken();
+    clearAiKey();
     clearDiscogsToken();
-    githubInput.value = "";
+    aiInput.value = "";
     discogsInput.value = "";
     status.textContent = "Llaves borradas.";
-    refreshGithubAgeWarning();
   });
 
   document.getElementById("settings-open-guide").addEventListener("click", openGuide);
 
-  document.getElementById("settings-test-github").addEventListener("click", async () => {
-    const result = document.getElementById("settings-test-github-status");
+  document.getElementById("settings-test-ai").addEventListener("click", async () => {
+    const result = document.getElementById("settings-test-ai-status");
     result.textContent = "Probando...";
-    const { ok, reason } = await testGithubConnection(getGithubToken());
-    markGithubVerified(ok);
+    const { ok, reason } = await testAiConnection(getAiKey());
+    markAiVerified(ok);
     result.textContent = `${ok ? "✅" : "❌"} ${reason}`;
   });
 
@@ -215,7 +189,7 @@ function initCapture() {
     };
     const ticker = setInterval(renderProgress, 1000);
 
-    const result = await identify(preparedImage, getGithubToken(), (model) => {
+    const result = await identify(preparedImage, getAiKey(), (model) => {
       currentModel = model;
       startedAt = Date.now();
       renderProgress();
@@ -244,4 +218,4 @@ initSettings();
 initCapture();
 if (areTokensVerified()) showView("capture");
 else if (hasTokens()) showView("settings");
-else showView("guide");
+else openGuide();

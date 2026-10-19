@@ -3,24 +3,22 @@ export const GUIDE_TEXT = {
     title: "Bienvenido 👋",
     body:
       "Esta web identifica tus discos de vinilo a partir de una foto o un código de barras, y te dice la versión exacta en Discogs.\n\n" +
-      "Para eso hacen falta dos llaves, como el carné de socio de dos bibliotecas: una para la IA que \"lee\" la foto (GitHub) y otra para buscar el disco exacto (Discogs). Cada llave es tuya; la usamos en tu nombre y se queda guardada solo en este navegador.",
+      "Para eso hacen falta dos llaves, como el carné de socio de dos bibliotecas: una para la IA que \"lee\" la foto (Google Gemini) y otra para buscar el disco exacto (Discogs). Cada llave es tuya; la usamos en tu nombre y se queda guardada solo en este navegador.",
     nextLabel: "Empezar →",
   },
-  github: {
-    title: "🔑 Llave de GitHub",
+  ai: {
+    title: "🔑 Llave de Google Gemini",
     steps: [
-      "Abre la página para crear el token (botón de abajo).",
-      'En "Token name" pon, por ejemplo, vinilos-web.',
-      'En "Expiration" elige 90 days.',
-      'En "Repository access" deja la opción mínima (no hace falta ningún repositorio).',
-      'En "Permissions" busca Models y ponlo en Read-only. No actives nada más.',
-      "Pulsa Generate token y cópialo al momento: solo se ve una vez. Empieza por github_pat_.",
+      "Abre Google AI Studio (botón de abajo) e inicia sesión con tu cuenta de Google.",
+      "Si te lo pide, acepta las condiciones de uso.",
+      'Pulsa "Create API key" (Crear clave de API). Si te pregunta por un proyecto, acepta el que te propone.',
+      "Copia la clave que aparece. Empieza por AIza. Es gratis y no pide tarjeta.",
     ],
-    linkLabel: "Abrir página para crear el token de GitHub",
-    linkUrl: "https://github.com/settings/personal-access-tokens/new",
-    pasteLabel: "Pega aquí tu token de GitHub",
-    placeholder: "github_pat_...",
-    formatHint: "Los tokens fine-grained de GitHub empiezan por github_pat_. Revisa que lo copiaste entero.",
+    linkLabel: "Abrir Google AI Studio",
+    linkUrl: "https://aistudio.google.com/apikey",
+    pasteLabel: "Pega aquí tu llave de Google Gemini",
+    placeholder: "AIza...",
+    formatHint: "Las llaves de Google Gemini empiezan por AIza. Revisa que la copiaste entera.",
     saveLabel: "Guardar y continuar",
   },
   discogs: {
@@ -41,6 +39,6 @@ export const GUIDE_TEXT = {
   reopenLinkLabel: "¿Cómo consigo mis llaves?",
 };
 
-export function isValidGithubTokenFormat(value) {
-  return /^github_pat_/.test((value || "").trim());
+export function isValidAiKeyFormat(value) {
+  return /^AIza/.test((value || "").trim());
 }

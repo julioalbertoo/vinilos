@@ -1,17 +1,17 @@
 export const CONFIG = {
   AI_PROVIDER: {
-    workerUrl: "https://vinilos-proxy.julioalbertoo.workers.dev",
-    primaryModel: "meta/Llama-4-Scout-17B-16E-Instruct", // confirmar nombre exacto en el catálogo antes del Paso 4
-    fallbackModel: "openai/gpt-4o",
-    pingModel: "openai/gpt-4o-mini",
+    // Google Gemini mediante su entrada compatible con el formato de OpenAI; admite llamadas directas desde el navegador.
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    primaryModel: "gemini-flash-latest",
+    fallbackModel: "gemini-flash-lite-latest",
+    pingModel: "gemini-flash-lite-latest",
   },
   DISCOGS: {
     baseUrl: "https://api.discogs.com",
   },
   STORAGE_KEYS: {
-    githubToken: "vinilos_github_token",
-    githubTokenSavedAt: "vinilos_github_token_saved_at",
-    githubVerified: "vinilos_github_verified",
+    aiKey: "vinilos_ai_key",
+    aiVerified: "vinilos_ai_verified",
     discogsToken: "vinilos_discogs_token",
     discogsVerified: "vinilos_discogs_verified",
     history: "vinilos_history",

@@ -6,35 +6,27 @@ function clean(value) {
   return (value || "").trim().replace(/\s+/g, "");
 }
 
-export function getGithubToken() {
-  return localStorage.getItem(KEYS.githubToken) || "";
+export function getAiKey() {
+  return localStorage.getItem(KEYS.aiKey) || "";
 }
 
-export function setGithubToken(value) {
+export function setAiKey(value) {
   const cleaned = clean(value);
-  if (cleaned !== getGithubToken()) {
-    localStorage.setItem(KEYS.githubToken, cleaned);
-    localStorage.setItem(KEYS.githubTokenSavedAt, String(Date.now()));
-    localStorage.removeItem(KEYS.githubVerified);
+  if (cleaned !== getAiKey()) {
+    localStorage.setItem(KEYS.aiKey, cleaned);
+    localStorage.removeItem(KEYS.aiVerified);
   }
   return cleaned;
 }
 
-export function clearGithubToken() {
-  localStorage.removeItem(KEYS.githubToken);
-  localStorage.removeItem(KEYS.githubTokenSavedAt);
-  localStorage.removeItem(KEYS.githubVerified);
+export function clearAiKey() {
+  localStorage.removeItem(KEYS.aiKey);
+  localStorage.removeItem(KEYS.aiVerified);
 }
 
-export function getGithubTokenAgeDays() {
-  const savedAt = localStorage.getItem(KEYS.githubTokenSavedAt);
-  if (!savedAt) return null;
-  return Math.floor((Date.now() - Number(savedAt)) / (1000 * 60 * 60 * 24));
-}
-
-export function markGithubVerified(ok) {
-  if (ok) localStorage.setItem(KEYS.githubVerified, "1");
-  else localStorage.removeItem(KEYS.githubVerified);
+export function markAiVerified(ok) {
+  if (ok) localStorage.setItem(KEYS.aiVerified, "1");
+  else localStorage.removeItem(KEYS.aiVerified);
 }
 
 export function getDiscogsToken() {
@@ -61,13 +53,13 @@ export function markDiscogsVerified(ok) {
 }
 
 export function hasTokens() {
-  return Boolean(getGithubToken() && getDiscogsToken());
+  return Boolean(getAiKey() && getDiscogsToken());
 }
 
 export function areTokensVerified() {
   return (
     hasTokens() &&
-    localStorage.getItem(KEYS.githubVerified) === "1" &&
+    localStorage.getItem(KEYS.aiVerified) === "1" &&
     localStorage.getItem(KEYS.discogsVerified) === "1"
   );
 }
