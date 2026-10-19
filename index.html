@@ -19,7 +19,17 @@
 
     <section id="view-settings" class="view">
       <h2>Ajustes</h2>
-      <p>Aquí irán los campos para pegar tus llaves.</p>
+      <p class="notice">🔒 Tus llaves se guardan solo en este navegador. No las compartas ni hagas capturas de esta pantalla.</p>
+
+      <label for="github-token-input">Token de GitHub</label>
+      <input type="password" id="github-token-input" placeholder="github_pat_...">
+
+      <label for="discogs-token-input">Token de Discogs</label>
+      <input type="password" id="discogs-token-input" placeholder="Tu token personal de Discogs">
+
+      <button type="button" id="settings-save">Guardar</button>
+      <button type="button" id="settings-clear">Borrar llaves</button>
+      <p id="settings-status" class="status"></p>
     </section>
 
     <section id="view-capture" class="view">

@@ -57,6 +57,40 @@ html, body {
   color: var(--color-muted);
 }
 
+label {
+  display: block;
+  margin-top: var(--gap);
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+input[type="password"],
+input[type="text"] {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  border: 1px solid #333;
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.notice {
+  font-size: 0.9rem;
+  background: rgba(224, 165, 38, 0.12);
+  border: 1px solid rgba(224, 165, 38, 0.4);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.status {
+  color: var(--color-accent);
+  font-weight: 600;
+  min-height: 1.2em;
+}
+
 button {
   display: block;
   width: 100%;
