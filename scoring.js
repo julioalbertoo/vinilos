@@ -21,7 +21,7 @@ function formatHintMatches(candidate, hint) {
   return tokens.some((t) => formats.some((f) => f.includes(t)));
 }
 
-export function scoreCandidate(candidate, clues) {
+function scoreCandidate(candidate, clues) {
   let score = 0;
   const matches = [];
 
