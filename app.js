@@ -11,6 +11,7 @@ import {
   markDiscogsVerified,
   areTokensVerified,
 } from "./tokens.js";
+import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidGithubTokenFormat } from "./guide.js";
 import { testGithubConnection, identify } from "./ai.js";
 import { testDiscogsConnection } from "./discogs.js";
@@ -237,6 +238,7 @@ function initCapture() {
   });
 }
 
+document.getElementById("app-version").textContent = `v${CONFIG.APP_VERSION}`;
 initDebugNav();
 populateGuideText();
 initGuideNavigation();

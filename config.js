@@ -1,4 +1,5 @@
 export const CONFIG = {
+  APP_VERSION: "0.4.1",
   AI_PROVIDER: {
     workerUrl: "https://vinilos-proxy.julioalbertoo.workers.dev",
     primaryModel: "meta/Llama-4-Scout-17B-16E-Instruct", // confirmar nombre exacto en el catálogo antes del Paso 4
