@@ -8,9 +8,9 @@ const CAMERA = {
   audio: false,
 };
 const NATIVE_SCAN_INTERVAL_MS = 200;
-// Valores de los enums DecodeHintType de @zxing/library, que el paquete del navegador no exporta.
+// Valor de DecodeHintType.POSSIBLE_FORMATS en @zxing/library (el paquete del navegador no exporta el enum).
+// No usar TRY_HARDER: intenta girar la imagen, falla con "Could not create a Canvas element" y detiene el lector.
 const HINT_POSSIBLE_FORMATS = 2;
-const HINT_TRY_HARDER = 3;
 
 let zxingLoading = null;
 
@@ -61,9 +61,9 @@ export function describeCameraError(err) {
   return (err && err.message) || "No se pudo abrir la cámara.";
 }
 
-// Arranca la cámara en `video` y llama a onCode(código) con el primer código leído.
-// Devuelve una función que apaga la cámara.
-export async function startScanner(video, onCode) {
+// Arranca la cámara en `video` y llama a onCode(código) con el primer código leído,
+// o a onFatal(error) si el lector se detiene. Devuelve una función que apaga la cámara.
+export async function startScanner(video, onCode, onFatal) {
   const detector = await createNativeDetector();
   if (detector) {
     const stream = await navigator.mediaDevices.getUserMedia(CAMERA);
@@ -93,16 +93,18 @@ export async function startScanner(video, onCode) {
 
   const ZXing = await loadZxing();
   const formats = ZXing.BarcodeFormat;
-  const hints = new Map([
-    [HINT_POSSIBLE_FORMATS, [formats.EAN_13, formats.EAN_8, formats.UPC_A, formats.UPC_E]],
-    [HINT_TRY_HARDER, true],
-  ]);
+  const hints = new Map([[HINT_POSSIBLE_FORMATS, [formats.EAN_13, formats.EAN_8, formats.UPC_A, formats.UPC_E]]]);
   const reader = new ZXing.BrowserMultiFormatOneDReader(hints, { delayBetweenScanAttempts: 150 });
-  let found = false;
-  const controls = await reader.decodeFromConstraints(CAMERA, video, (result) => {
-    if (result && !found) {
-      found = true;
+  let finished = false;
+  const controls = await reader.decodeFromConstraints(CAMERA, video, (result, error) => {
+    if (finished) return;
+    if (result) {
+      finished = true;
       onCode(normalizeBarcode(result.getText()));
+    } else if (error && typeof error.getKind !== "function") {
+      // Los fotogramas sin código dan errores de ZXing (con getKind); cualquier otro detiene el lector.
+      finished = true;
+      onFatal(error);
     }
   });
   return () => controls.stop();

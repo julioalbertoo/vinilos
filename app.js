@@ -439,12 +439,20 @@ function initCapture() {
     scannerStatus.textContent = "Abriendo la cámara...";
     scanButton.disabled = true;
     try {
-      const stop = await startScanner(document.getElementById("scanner-video"), (code) => {
-        if (session !== scanSession) return;
-        stopScanner();
-        status.textContent = `Código leído: ${code}.`;
-        searchAndShow(barcodeClues(code), "barcode");
-      });
+      const stop = await startScanner(
+        document.getElementById("scanner-video"),
+        (code) => {
+          if (session !== scanSession) return;
+          stopScanner();
+          status.textContent = `Código leído: ${code}.`;
+          searchAndShow(barcodeClues(code), "barcode");
+        },
+        (error) => {
+          if (session !== scanSession) return;
+          stopScanner();
+          status.textContent = `❌ El lector de códigos se ha detenido (${error.message}). Vuelve a intentarlo o usa «Hacer foto» con la contraportada.`;
+        }
+      );
       // Si se canceló o ya se leyó un código mientras arrancaba la cámara, se apaga ya.
       if (session !== scanSession) stop();
       else {
