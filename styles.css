@@ -91,6 +91,52 @@ input[type="text"] {
   min-height: 1.2em;
 }
 
+.hint {
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  margin: 4px 0 0;
+}
+
+.guide-body {
+  white-space: pre-line;
+}
+
+.guide-screen ol {
+  padding-left: 20px;
+  color: var(--color-text);
+}
+
+.guide-screen li {
+  margin-bottom: 8px;
+}
+
+.guide-link {
+  display: block;
+  text-align: center;
+  padding: 14px;
+  margin-top: 10px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: #1a1a1a;
+  text-decoration: none;
+}
+
+button.secondary {
+  background: transparent;
+  border: 1px solid #333;
+  color: var(--color-muted);
+}
+
+.link-like {
+  text-align: center;
+  color: var(--color-accent);
+  margin-top: var(--gap);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 button {
   display: block;
   width: 100%;

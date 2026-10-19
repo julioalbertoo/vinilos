@@ -1,8 +1,8 @@
 export const CONFIG = {
   AI_PROVIDER: {
-    workerUrl: "", // se rellena en el Paso 3, al desplegar el Cloudflare Worker
-    primaryModel: "",
-    fallbackModel: "",
+    workerUrl: "", // se rellena al desplegar el Cloudflare Worker (Paso 3)
+    primaryModel: "meta/Llama-4-Scout-17B-16E-Instruct", // confirmar nombre exacto en el catálogo antes del Paso 4
+    fallbackModel: "openai/gpt-4o-mini",
   },
   DISCOGS: {
     baseUrl: "https://api.discogs.com",

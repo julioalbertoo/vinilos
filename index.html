@@ -13,8 +13,34 @@
 
   <main id="app">
     <section id="view-guide" class="view">
-      <h2>Guía de bienvenida</h2>
-      <p>Aquí irá la guía para conseguir tus dos llaves (GitHub y Discogs).</p>
+      <div id="guide-screen-intro" class="guide-screen">
+        <h2 id="guide-intro-title"></h2>
+        <p id="guide-intro-body" class="guide-body"></p>
+        <button type="button" id="guide-intro-next"></button>
+      </div>
+
+      <div id="guide-screen-github" class="guide-screen" hidden>
+        <h2 id="guide-github-title"></h2>
+        <ol id="guide-github-steps"></ol>
+        <a id="guide-github-link" class="guide-link" target="_blank" rel="noopener"></a>
+        <p id="guide-github-notice" class="notice"></p>
+        <label id="guide-github-paste-label" for="guide-github-input"></label>
+        <input type="password" id="guide-github-input">
+        <p id="guide-github-hint" class="hint"></p>
+        <button type="button" id="guide-github-save"></button>
+        <button type="button" id="guide-github-back" class="secondary">← Atrás</button>
+      </div>
+
+      <div id="guide-screen-discogs" class="guide-screen" hidden>
+        <h2 id="guide-discogs-title"></h2>
+        <ol id="guide-discogs-steps"></ol>
+        <a id="guide-discogs-link" class="guide-link" target="_blank" rel="noopener"></a>
+        <p id="guide-discogs-notice" class="notice"></p>
+        <label id="guide-discogs-paste-label" for="guide-discogs-input"></label>
+        <input type="password" id="guide-discogs-input">
+        <button type="button" id="guide-discogs-save"></button>
+        <button type="button" id="guide-discogs-back" class="secondary">← Atrás</button>
+      </div>
     </section>
 
     <section id="view-settings" class="view">
@@ -30,6 +56,15 @@
       <button type="button" id="settings-save">Guardar</button>
       <button type="button" id="settings-clear">Borrar llaves</button>
       <p id="settings-status" class="status"></p>
+      <p id="settings-github-age-warning" class="notice" hidden></p>
+
+      <button type="button" id="settings-test-github">Probar conexión GitHub</button>
+      <p id="settings-test-github-status" class="status"></p>
+
+      <button type="button" id="settings-test-discogs">Probar conexión Discogs</button>
+      <p id="settings-test-discogs-status" class="status"></p>
+
+      <p id="settings-open-guide" class="link-like"></p>
     </section>
 
     <section id="view-capture" class="view">
