@@ -4,12 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>Vinilos</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=0.4.2">
+  <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "./config.js": "./config.js?v=0.4.2",
+        "./tokens.js": "./tokens.js?v=0.4.2",
+        "./guide.js": "./guide.js?v=0.4.2",
+        "./ai.js": "./ai.js?v=0.4.2",
+        "./discogs.js": "./discogs.js?v=0.4.2",
+        "./imaging.js": "./imaging.js?v=0.4.2"
+      }
+    }
+  </script>
 </head>
 <body>
   <header class="app-header">
     <h1>🎵 Vinilos</h1>
-    <p id="app-version" class="app-version"></p>
+    <p class="app-version">v0.4.2</p>
   </header>
 
   <main id="app">
@@ -110,6 +123,6 @@
     <button type="button" data-view="history">Historial</button>
   </nav>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=0.4.2"></script>
 </body>
 </html>
