@@ -27,7 +27,11 @@ async function discogsGet(path, params, discogsToken) {
   } catch {
     throw new Error("No se pudo contactar con Discogs. Comprueba tu conexión a internet.");
   }
-  if (!response.ok) throw new Error(interpretStatus(response.status));
+  if (!response.ok) {
+    const error = new Error(interpretStatus(response.status));
+    error.authError = response.status === 401 || response.status === 403;
+    throw error;
+  }
   return response.json();
 }
 

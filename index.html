@@ -2,21 +2,22 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>Vinilos</title>
-  <link rel="stylesheet" href="styles.css?v=0.6.4">
+  <link rel="stylesheet" href="styles.css?v=0.7.1">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=0.6.4",
-        "./tokens.js": "./tokens.js?v=0.6.4",
-        "./guide.js": "./guide.js?v=0.6.4",
-        "./ai.js": "./ai.js?v=0.6.4",
-        "./discogs.js": "./discogs.js?v=0.6.4",
-        "./imaging.js": "./imaging.js?v=0.6.4",
-        "./scoring.js": "./scoring.js?v=0.6.4",
-        "./barcode.js": "./barcode.js?v=0.6.4"
+        "./config.js": "./config.js?v=0.7.1",
+        "./tokens.js": "./tokens.js?v=0.7.1",
+        "./guide.js": "./guide.js?v=0.7.1",
+        "./ai.js": "./ai.js?v=0.7.1",
+        "./discogs.js": "./discogs.js?v=0.7.1",
+        "./imaging.js": "./imaging.js?v=0.7.1",
+        "./scoring.js": "./scoring.js?v=0.7.1",
+        "./barcode.js": "./barcode.js?v=0.7.1",
+        "./history.js": "./history.js?v=0.7.1"
       }
     }
   </script>
@@ -24,7 +25,7 @@
 <body>
   <header class="app-header">
     <h1>🎵 Vinilos</h1>
-    <p class="app-version">v0.6.4</p>
+    <p class="app-version">v0.7.1</p>
   </header>
 
   <main id="app">
@@ -127,6 +128,7 @@
 
     <section id="view-detail" class="view">
       <div id="detail-content"></div>
+      <p id="detail-saved" class="status"></p>
       <a id="detail-open" class="guide-link" target="_blank" rel="noopener">Abrir en Discogs ↗</a>
       <button type="button" id="detail-back" class="secondary">← Volver a los candidatos</button>
       <button type="button" id="detail-new" class="secondary">📷 Identificar otro disco</button>
@@ -134,20 +136,18 @@
 
     <section id="view-history" class="view">
       <h2>Historial</h2>
-      <p>Aquí aparecerá la cuadrícula de discos identificados.</p>
+      <p id="history-empty">Aún no has confirmado ningún disco. Cuando pulses «✓ Es este» en un candidato, aparecerá aquí.</p>
+      <div id="history-grid" class="history-grid"></div>
+      <button type="button" id="history-clear" class="secondary" hidden>Borrar todo el historial</button>
     </section>
   </main>
 
-  <nav id="debug-nav" class="debug-nav">
-    <p class="debug-nav-label">Navegación temporal (solo para probar el Paso 1)</p>
-    <button type="button" data-view="guide">Guía</button>
-    <button type="button" data-view="settings">Ajustes</button>
-    <button type="button" data-view="capture">Captura</button>
-    <button type="button" data-view="results">Candidatos</button>
-    <button type="button" data-view="detail">Detalle</button>
-    <button type="button" data-view="history">Historial</button>
+  <nav id="tabbar" class="tabbar">
+    <button type="button" data-view="capture"><span aria-hidden="true">📷</span>Identificar</button>
+    <button type="button" data-view="history"><span aria-hidden="true">🗂️</span>Historial</button>
+    <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=0.6.4"></script>
+  <script type="module" src="app.js?v=0.7.1"></script>
 </body>
 </html>

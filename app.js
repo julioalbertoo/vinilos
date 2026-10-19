@@ -16,6 +16,7 @@ import { testDiscogsConnection, findCandidates, searchByText, getRelease } from 
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
+import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -27,11 +28,30 @@ const SEARCH_STEP_LABELS = {
 
 const VIEWS = ["guide", "settings", "capture", "results", "detail", "history"];
 const GUIDE_SCREENS = ["intro", "ai", "discogs"];
+// Pestaña que se marca en la barra inferior para cada pantalla.
+const TAB_FOR_VIEW = { capture: "capture", results: "capture", detail: "capture", history: "history", settings: "settings" };
 
 function showView(name) {
   if (name !== "capture") stopScanner();
+  if (name === "history") renderHistory();
   for (const view of VIEWS) {
     document.getElementById(`view-${view}`).classList.toggle("active", view === name);
+  }
+  // En la primera visita la guía va sin barra: antes de nada hay que conseguir las llaves.
+  document.body.classList.toggle("no-tabbar", name === "guide" && !hasTokens());
+  for (const tab of document.querySelectorAll("#tabbar button")) {
+    tab.classList.toggle("active", tab.dataset.view === TAB_FOR_VIEW[name]);
+  }
+}
+
+// Muestra un error en `statusEl`; si es un problema de llaves, añade un botón para ir a Ajustes.
+function showError(statusEl, message, authError = false) {
+  statusEl.textContent = `❌ ${message} `;
+  if (authError) {
+    const button = el("button", "inline-link", "Revisar mis llaves en Ajustes");
+    button.type = "button";
+    button.addEventListener("click", () => showView("settings"));
+    statusEl.append(button);
   }
 }
 
@@ -49,12 +69,13 @@ function openGuide() {
   showGuideScreen("intro");
 }
 
-function initDebugNav() {
-  const nav = document.getElementById("debug-nav");
-  nav.addEventListener("click", (event) => {
-    const view = event.target.dataset.view;
-    if (view === "guide") openGuide();
-    else if (view) showView(view);
+function initTabbar() {
+  document.getElementById("tabbar").addEventListener("click", (event) => {
+    const tab = event.target.closest("button");
+    if (tab) {
+      showView(tab.dataset.view);
+      window.scrollTo(0, 0);
+    }
   });
 }
 
@@ -255,11 +276,20 @@ function renderDetail(release) {
 }
 
 let detailRequest = 0;
+let detailReturnView = "results";
 
-async function openDetail(candidate) {
+// fromHistory: se abre desde el historial, así que no se vuelve a guardar y "Volver" lleva allí.
+async function openDetail(candidate, { fromHistory = false } = {}) {
+  detailReturnView = fromHistory ? "history" : "results";
+  document.getElementById("detail-back").textContent = fromHistory
+    ? "← Volver al historial"
+    : "← Volver a los candidatos";
+  const savedNote = document.getElementById("detail-saved");
+  savedNote.textContent = "";
+
   // Mientras llega la ficha completa se enseña lo que ya sabemos del candidato.
   renderDetail({
-    artist: "",
+    artist: candidate.artist || "",
     title: candidate.title,
     year: candidate.year,
     country: candidate.country,
@@ -273,16 +303,94 @@ async function openDetail(candidate) {
   window.scrollTo(0, 0);
 
   const request = ++detailRequest;
+  let release = null;
   try {
-    const release = await getRelease(candidate.id, getDiscogsToken());
+    release = await getRelease(candidate.id, getDiscogsToken());
     if (request === detailRequest) renderDetail(release);
   } catch (err) {
     if (request === detailRequest) {
-      document
-        .getElementById("detail-content")
-        .append(el("p", "status", `❌ No se pudo cargar la ficha completa: ${err.message}`));
+      const note = el("p", "status");
+      showError(note, `No se pudo cargar la ficha completa: ${err.message}`, err.authError);
+      document.getElementById("detail-content").append(note);
     }
   }
+
+  if (!fromHistory) {
+    // Si la ficha no llegó, se guarda con los datos del candidato para no perder la confirmación.
+    try {
+      addToHistory({
+        release_id: candidate.id,
+        artist: release ? release.artist : candidate.artist || "",
+        title: release ? release.title : candidate.title,
+        year: String((release ? release.year : candidate.year) || ""),
+        thumb: (release && release.thumb) || candidate.thumb || "",
+      });
+      if (request === detailRequest) savedNote.textContent = "✓ Guardado en tu historial";
+    } catch {
+      if (request === detailRequest) savedNote.textContent = "❌ No se pudo guardar en el historial (¿memoria del navegador llena?).";
+    }
+  }
+}
+
+function historyItemToCandidate(item) {
+  return {
+    id: item.release_id,
+    artist: item.artist,
+    title: item.title,
+    year: item.year,
+    country: "",
+    label: "",
+    catno: "",
+    formats: [],
+    thumb: item.thumb,
+    url: `https://www.discogs.com/release/${item.release_id}`,
+  };
+}
+
+function renderHistoryItem(item) {
+  const wrapper = el("div", "history-item");
+
+  const open = el("button", "history-open");
+  open.type = "button";
+  if (item.thumb) {
+    const img = el("img", "history-cover");
+    img.src = item.thumb;
+    img.alt = "";
+    img.loading = "lazy";
+    open.append(img);
+  } else {
+    open.append(el("span", "history-cover", "💿"));
+  }
+  open.append(el("span", "history-title", item.title));
+  open.append(el("span", "history-meta", [item.year, item.artist].filter(Boolean).join(" · ")));
+  open.addEventListener("click", () => openDetail(historyItemToCandidate(item), { fromHistory: true }));
+
+  const remove = el("button", "history-remove", "✕");
+  remove.type = "button";
+  remove.setAttribute("aria-label", `Borrar ${item.title} del historial`);
+  remove.addEventListener("click", () => {
+    removeFromHistory(item.release_id);
+    renderHistory();
+  });
+
+  wrapper.append(open, remove);
+  return wrapper;
+}
+
+function renderHistory() {
+  const items = getHistory();
+  document.getElementById("history-grid").replaceChildren(...items.map(renderHistoryItem));
+  document.getElementById("history-empty").hidden = items.length > 0;
+  document.getElementById("history-clear").hidden = items.length === 0;
+}
+
+function initHistory() {
+  document.getElementById("history-clear").addEventListener("click", () => {
+    if (window.confirm("¿Borrar todos los discos del historial? No se puede deshacer.")) {
+      clearHistory();
+      renderHistory();
+    }
+  });
 }
 
 function initResults() {
@@ -312,7 +420,7 @@ function initResults() {
         renderResults(rankCandidates(candidates, lastClues), candidates.length, strategy, lastClues);
       }
     } catch (err) {
-      status.textContent = `❌ ${err.message}`;
+      showError(status, err.message, err.authError);
     } finally {
       searchButton.disabled = false;
     }
@@ -325,7 +433,7 @@ function initResults() {
 }
 
 function initDetail(resetCapture) {
-  document.getElementById("detail-back").addEventListener("click", () => showView("results"));
+  document.getElementById("detail-back").addEventListener("click", () => showView(detailReturnView));
   document.getElementById("detail-new").addEventListener("click", () => {
     resetCapture();
     showView("capture");
@@ -365,19 +473,25 @@ function initCapture() {
 
   identifyButton.addEventListener("click", async () => {
     if (!preparedImage) return;
+    if (!hasTokens()) {
+      openGuide();
+      return;
+    }
     rawJson.hidden = true;
     identifyButton.disabled = true;
 
     let currentModel = "";
+    let fallbackNote = "";
     let startedAt = Date.now();
     const renderProgress = () => {
       const seconds = Math.round((Date.now() - startedAt) / 1000);
-      status.textContent = `Probando con ${currentModel}... ${seconds} s`;
+      status.textContent = `${fallbackNote}Probando con ${currentModel}... ${seconds} s`;
     };
     const ticker = setInterval(renderProgress, 1000);
 
-    const result = await identify(preparedImage, getAiKey(), (model) => {
+    const result = await identify(preparedImage, getAiKey(), (model, previousFailure) => {
       currentModel = model;
+      fallbackNote = previousFailure ? `El modelo principal no respondió (${previousFailure}). Reintento con el de respaldo. ` : "";
       startedAt = Date.now();
       renderProgress();
     });
@@ -386,7 +500,7 @@ function initCapture() {
 
     if (!result.ok) {
       identifyButton.disabled = false;
-      status.textContent = `❌ ${result.reason}`;
+      showError(status, result.reason, result.authError);
       rawJson.textContent = `Diagnóstico:\n${result.attempts.map((a) => `• ${a.model}: ${a.detail}`).join("\n")}`;
       rawJson.hidden = false;
       return;
@@ -414,7 +528,7 @@ function initCapture() {
         renderResults(rankCandidates(candidates, clues), candidates.length, strategy, clues);
       }
     } catch (err) {
-      status.textContent = `❌ ${err.message}`;
+      showError(status, err.message, err.authError);
     }
   }
 
@@ -432,6 +546,10 @@ function initCapture() {
 
   const scanButton = document.getElementById("capture-scan");
   scanButton.addEventListener("click", async () => {
+    if (!getDiscogsToken()) {
+      openGuide();
+      return;
+    }
     resetCapture();
     const session = ++scanSession;
     document.getElementById("scanner").hidden = false;
@@ -510,13 +628,14 @@ function stopScanner() {
   document.getElementById("scanner").hidden = true;
 }
 
-initDebugNav();
+initTabbar();
 populateGuideText();
 initGuideNavigation();
 initSettings();
 const resetCapture = initCapture();
 initResults();
 initDetail(resetCapture);
+initHistory();
 if (areTokensVerified()) showView("capture");
 else if (hasTokens()) showView("settings");
 else openGuide();

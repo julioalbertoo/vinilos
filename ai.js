@@ -60,16 +60,18 @@ function errorMessageFrom(bodyText) {
   }
 }
 
+const INVALID_KEY_MESSAGE = "La llave de Google Gemini no es válida. Revisa que la copiaste entera.";
+
 function describeError(status, bodyText) {
   const message = errorMessageFrom(bodyText);
   if (/api key/i.test(message) || status === 401) {
-    return "La llave de Google Gemini no es válida. Revisa que la copiaste entera.";
+    return INVALID_KEY_MESSAGE;
   }
   if (/location/i.test(message)) {
     return "El plan gratuito de Gemini no está disponible desde tu país.";
   }
   if (status === 429) {
-    return "Se ha agotado el cupo gratuito de Gemini por ahora. Inténtalo más tarde.";
+    return "se ha agotado su cupo gratuito por ahora";
   }
   if (status === 404) {
     return `El modelo no existe en Gemini: ${message.slice(0, 200)}`;
@@ -118,7 +120,8 @@ async function tryModel(model, aiKey, imageDataUrl) {
 
   const body = await response.text();
   if (!response.ok) {
-    return { ok: false, detail: describeError(response.status, body) };
+    const detail = describeError(response.status, body);
+    return { ok: false, detail, authError: detail === INVALID_KEY_MESSAGE, quotaError: response.status === 429 };
   }
 
   let text;
@@ -141,12 +144,28 @@ export async function identify(imageDataUrl, aiKey, onAttempt) {
   const models = [CONFIG.AI_PROVIDER.primaryModel, CONFIG.AI_PROVIDER.fallbackModel];
   const attempts = [];
   for (const model of models) {
-    if (onAttempt) onAttempt(model);
+    if (onAttempt) onAttempt(model, attempts.at(-1)?.detail);
     const result = await tryModel(model, aiKey, imageDataUrl);
     if (result.ok) {
       return { ok: true, data: result.data, modelUsed: model, attempts };
     }
-    attempts.push({ model, detail: result.detail });
+    attempts.push({
+      model,
+      detail: result.detail,
+      authError: Boolean(result.authError),
+      quotaError: Boolean(result.quotaError),
+    });
+  }
+  if (attempts.every((a) => a.authError)) {
+    return { ok: false, reason: INVALID_KEY_MESSAGE, authError: true, attempts };
+  }
+  if (attempts.every((a) => a.quotaError)) {
+    return {
+      ok: false,
+      reason:
+        "Se ha agotado el cupo gratuito de Gemini por ahora. Inténtalo más tarde o usa el escáner de código de barras, que no gasta cupo de IA.",
+      attempts,
+    };
   }
   return {
     ok: false,
