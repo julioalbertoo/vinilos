@@ -4,18 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>Vinilos</title>
-  <link rel="stylesheet" href="styles.css?v=0.6.1">
+  <link rel="stylesheet" href="styles.css?v=0.6.2">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=0.6.1",
-        "./tokens.js": "./tokens.js?v=0.6.1",
-        "./guide.js": "./guide.js?v=0.6.1",
-        "./ai.js": "./ai.js?v=0.6.1",
-        "./discogs.js": "./discogs.js?v=0.6.1",
-        "./imaging.js": "./imaging.js?v=0.6.1",
-        "./scoring.js": "./scoring.js?v=0.6.1"
+        "./config.js": "./config.js?v=0.6.2",
+        "./tokens.js": "./tokens.js?v=0.6.2",
+        "./guide.js": "./guide.js?v=0.6.2",
+        "./ai.js": "./ai.js?v=0.6.2",
+        "./discogs.js": "./discogs.js?v=0.6.2",
+        "./imaging.js": "./imaging.js?v=0.6.2",
+        "./scoring.js": "./scoring.js?v=0.6.2",
+        "./barcode.js": "./barcode.js?v=0.6.2"
       }
     }
   </script>
@@ -23,7 +24,7 @@
 <body>
   <header class="app-header">
     <h1>🎵 Vinilos</h1>
-    <p class="app-version">v0.6.1</p>
+    <p class="app-version">v0.6.2</p>
   </header>
 
   <main id="app">
@@ -90,6 +91,13 @@
       <label class="guide-link" for="capture-gallery-input">🖼️ Elegir de galería</label>
       <input type="file" accept="image/*" id="capture-gallery-input" class="visually-hidden">
 
+      <button type="button" id="capture-scan">▦ Escanear código de barras</button>
+      <div id="scanner" class="scanner" hidden>
+        <video id="scanner-video" playsinline muted autoplay></video>
+        <p id="scanner-status" class="status">Apunta la cámara al código de barras de la contraportada.</p>
+        <button type="button" id="scanner-cancel" class="secondary">Cancelar</button>
+      </div>
+
       <img id="capture-preview" alt="Vista previa de la foto" hidden>
 
       <button type="button" id="capture-identify" hidden>Identificar</button>
@@ -111,7 +119,7 @@
       </div>
 
       <details class="results-clues">
-        <summary>Ver lo que leyó la IA</summary>
+        <summary>Ver las pistas usadas en la búsqueda</summary>
         <pre id="results-clues-json" class="raw-json"></pre>
       </details>
       <button type="button" id="results-back" class="secondary">← Probar con otra foto</button>
@@ -140,6 +148,6 @@
     <button type="button" data-view="history">Historial</button>
   </nav>
 
-  <script type="module" src="app.js?v=0.6.1"></script>
+  <script type="module" src="app.js?v=0.6.2"></script>
 </body>
 </html>

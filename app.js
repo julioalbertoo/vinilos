@@ -15,6 +15,7 @@ import { testAiConnection, identify } from "./ai.js";
 import { testDiscogsConnection, findCandidates, searchByText, getRelease } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
+import { startScanner, describeCameraError } from "./barcode.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -28,6 +29,7 @@ const VIEWS = ["guide", "settings", "capture", "results", "detail", "history"];
 const GUIDE_SCREENS = ["intro", "ai", "discogs"];
 
 function showView(name) {
+  if (name !== "capture") stopScanner();
   for (const view of VIEWS) {
     document.getElementById(`view-${view}`).classList.toggle("active", view === name);
   }
@@ -390,15 +392,21 @@ function initCapture() {
       return;
     }
 
-    const clues = result.data;
+    await searchAndShow(result.data, "foto");
+    identifyButton.disabled = false;
+  });
+
+  async function searchAndShow(clues, source) {
     try {
       const { candidates, strategy } = await findCandidates(clues, getDiscogsToken(), (step) => {
         status.textContent = `Buscando en Discogs ${SEARCH_STEP_LABELS[step]}...`;
       });
       if (candidates.length === 0) {
         status.textContent =
-          "❌ No encontré este disco en Discogs. Prueba a fotografiar el lomo o la galleta central, o escanea el código de barras.";
-        rawJson.textContent = `Lo que leyó la IA:\n${JSON.stringify(clues, null, 2)}`;
+          source === "barcode"
+            ? `❌ El código ${clues.barcode} no está en Discogs. Prueba con una foto de la portada o de la galleta central.`
+            : "❌ No encontré este disco en Discogs. Prueba a fotografiar el lomo o la galleta central, o escanea el código de barras.";
+        rawJson.textContent = `Pistas usadas:\n${JSON.stringify(clues, null, 2)}`;
         rawJson.hidden = false;
       } else {
         status.textContent = "";
@@ -407,12 +415,11 @@ function initCapture() {
       }
     } catch (err) {
       status.textContent = `❌ ${err.message}`;
-    } finally {
-      identifyButton.disabled = false;
     }
-  });
+  }
 
-  return function resetCapture() {
+  function resetCapture() {
+    stopScanner();
     preparedImage = null;
     cameraInput.value = "";
     galleryInput.value = "";
@@ -421,7 +428,68 @@ function initCapture() {
     identifyButton.hidden = true;
     status.textContent = "";
     rawJson.hidden = true;
+  }
+
+  const scanButton = document.getElementById("capture-scan");
+  scanButton.addEventListener("click", async () => {
+    resetCapture();
+    const session = ++scanSession;
+    document.getElementById("scanner").hidden = false;
+    const scannerStatus = document.getElementById("scanner-status");
+    scannerStatus.textContent = "Abriendo la cámara...";
+    scanButton.disabled = true;
+    try {
+      const stop = await startScanner(document.getElementById("scanner-video"), (code) => {
+        if (session !== scanSession) return;
+        stopScanner();
+        status.textContent = `Código leído: ${code}.`;
+        searchAndShow(barcodeClues(code), "barcode");
+      });
+      // Si se canceló o ya se leyó un código mientras arrancaba la cámara, se apaga ya.
+      if (session !== scanSession) stop();
+      else {
+        stopActiveScanner = stop;
+        scannerStatus.textContent = "Apunta la cámara al código de barras de la contraportada.";
+      }
+    } catch (err) {
+      if (session === scanSession) {
+        stopScanner();
+        status.textContent = `❌ ${describeCameraError(err)}`;
+      }
+    } finally {
+      scanButton.disabled = false;
+    }
+  });
+  document.getElementById("scanner-cancel").addEventListener("click", stopScanner);
+
+  return resetCapture;
+}
+
+function barcodeClues(code) {
+  return {
+    artist: null,
+    title: null,
+    label: null,
+    catalog_number: null,
+    barcode: code,
+    country: null,
+    year_hint: null,
+    format_hint: null,
+    visible_text: null,
+    confidence: 1,
   };
+}
+
+let scanSession = 0;
+let stopActiveScanner = null;
+
+function stopScanner() {
+  scanSession++;
+  if (stopActiveScanner) {
+    stopActiveScanner();
+    stopActiveScanner = null;
+  }
+  document.getElementById("scanner").hidden = true;
 }
 
 initDebugNav();

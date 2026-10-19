@@ -159,6 +159,19 @@ button.secondary {
   margin-top: var(--gap);
 }
 
+.scanner {
+  margin-top: var(--gap);
+}
+
+.scanner video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: #000;
+}
+
 .raw-json {
   margin-top: var(--gap);
   padding: 12px;
