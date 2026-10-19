@@ -9,8 +9,9 @@ import {
   hasTokens,
 } from "./tokens.js";
 import { GUIDE_TEXT, isValidGithubTokenFormat } from "./guide.js";
-import { testGithubConnection } from "./ai.js";
+import { testGithubConnection, identify } from "./ai.js";
 import { testDiscogsConnection } from "./discogs.js";
+import { prepareImage } from "./imaging.js";
 
 const VIEWS = ["guide", "settings", "capture", "results", "detail", "history"];
 const GUIDE_SCREENS = ["intro", "github", "discogs"];
@@ -165,8 +166,48 @@ function initSettings() {
   });
 }
 
+function initCapture() {
+  const cameraInput = document.getElementById("capture-camera-input");
+  const galleryInput = document.getElementById("capture-gallery-input");
+  const preview = document.getElementById("capture-preview");
+  const identifyButton = document.getElementById("capture-identify");
+  const status = document.getElementById("capture-status");
+  const rawJson = document.getElementById("capture-raw-json");
+
+  let preparedImage = null;
+
+  async function handleFile(file) {
+    if (!file) return;
+    status.textContent = "Preparando imagen...";
+    rawJson.hidden = true;
+    preparedImage = await prepareImage(file);
+    preview.src = preparedImage;
+    preview.hidden = false;
+    identifyButton.hidden = false;
+    status.textContent = "";
+  }
+
+  cameraInput.addEventListener("change", (event) => handleFile(event.target.files[0]));
+  galleryInput.addEventListener("change", (event) => handleFile(event.target.files[0]));
+
+  identifyButton.addEventListener("click", async () => {
+    if (!preparedImage) return;
+    status.textContent = "Identificando (puede tardar unos segundos)...";
+    rawJson.hidden = true;
+    const result = await identify(preparedImage, getGithubToken());
+    if (result.ok) {
+      status.textContent = `Hecho (modelo: ${result.modelUsed}).`;
+      rawJson.textContent = JSON.stringify(result.data, null, 2);
+      rawJson.hidden = false;
+    } else {
+      status.textContent = `❌ ${result.reason}`;
+    }
+  });
+}
+
 initDebugNav();
 populateGuideText();
 initGuideNavigation();
 initSettings();
+initCapture();
 showView(hasTokens() ? "settings" : "guide");
