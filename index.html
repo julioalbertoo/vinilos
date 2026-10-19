@@ -4,18 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>Vinilos</title>
-  <link rel="stylesheet" href="styles.css?v=0.5.1">
+  <link rel="stylesheet" href="styles.css?v=0.6.1">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=0.5.1",
-        "./tokens.js": "./tokens.js?v=0.5.1",
-        "./guide.js": "./guide.js?v=0.5.1",
-        "./ai.js": "./ai.js?v=0.5.1",
-        "./discogs.js": "./discogs.js?v=0.5.1",
-        "./imaging.js": "./imaging.js?v=0.5.1",
-        "./scoring.js": "./scoring.js?v=0.5.1"
+        "./config.js": "./config.js?v=0.6.1",
+        "./tokens.js": "./tokens.js?v=0.6.1",
+        "./guide.js": "./guide.js?v=0.6.1",
+        "./ai.js": "./ai.js?v=0.6.1",
+        "./discogs.js": "./discogs.js?v=0.6.1",
+        "./imaging.js": "./imaging.js?v=0.6.1",
+        "./scoring.js": "./scoring.js?v=0.6.1"
       }
     }
   </script>
@@ -23,7 +23,7 @@
 <body>
   <header class="app-header">
     <h1>🎵 Vinilos</h1>
-    <p class="app-version">v0.5.1</p>
+    <p class="app-version">v0.6.1</p>
   </header>
 
   <main id="app">
@@ -101,6 +101,15 @@
       <h2>Candidatos</h2>
       <p id="results-summary" class="results-summary"></p>
       <div id="results-list"></div>
+
+      <button type="button" id="results-none" class="secondary">Ninguno es</button>
+      <div id="results-manual" hidden>
+        <label for="results-manual-input">Escribe artista y título, o el número de catálogo</label>
+        <input type="text" id="results-manual-input" enterkeyhint="search">
+        <button type="button" id="results-manual-search">Buscar</button>
+        <p id="results-manual-status" class="status"></p>
+      </div>
+
       <details class="results-clues">
         <summary>Ver lo que leyó la IA</summary>
         <pre id="results-clues-json" class="raw-json"></pre>
@@ -109,8 +118,10 @@
     </section>
 
     <section id="view-detail" class="view">
-      <h2>Detalle</h2>
-      <p>Aquí aparecerá el disco confirmado, con enlace a Discogs.</p>
+      <div id="detail-content"></div>
+      <a id="detail-open" class="guide-link" target="_blank" rel="noopener">Abrir en Discogs ↗</a>
+      <button type="button" id="detail-back" class="secondary">← Volver a los candidatos</button>
+      <button type="button" id="detail-new" class="secondary">📷 Identificar otro disco</button>
     </section>
 
     <section id="view-history" class="view">
@@ -129,6 +140,6 @@
     <button type="button" data-view="history">Historial</button>
   </nav>
 
-  <script type="module" src="app.js?v=0.5.1"></script>
+  <script type="module" src="app.js?v=0.6.1"></script>
 </body>
 </html>

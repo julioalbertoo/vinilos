@@ -12,6 +12,11 @@
   box-sizing: border-box;
 }
 
+/* Sin esto, reglas como `button { display: block }` anulan el atributo hidden. */
+[hidden] {
+  display: none !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -154,10 +159,6 @@ button.secondary {
   margin-top: var(--gap);
 }
 
-#capture-preview[hidden] {
-  display: none;
-}
-
 .raw-json {
   margin-top: var(--gap);
   padding: 12px;
@@ -220,6 +221,55 @@ button.secondary {
   margin-top: 6px;
   font-size: 0.85rem;
   color: var(--color-accent);
+}
+
+.card-body .card-select {
+  margin-top: 8px;
+  padding: 10px;
+  font-size: 0.95rem;
+}
+
+.detail-cover {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius);
+  background: #2a2a2a;
+}
+
+#view-detail h2 {
+  margin: var(--gap) 0 4px;
+  font-size: 1.25rem;
+}
+
+#view-detail h3 {
+  margin: var(--gap) 0 6px;
+  font-size: 1rem;
+}
+
+.view .detail-meta {
+  margin: 4px 0;
+}
+
+.view .detail-color {
+  color: var(--color-accent);
+}
+
+.detail-tracks {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.detail-tracks li {
+  padding: 4px 0;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.detail-tracks .pos {
+  display: inline-block;
+  min-width: 2.5em;
+  color: var(--color-muted);
 }
 
 .results-clues {

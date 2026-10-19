@@ -114,8 +114,42 @@ function buildSearchSteps(clues) {
 }
 
 // Orden de precisión: código de barras → nº de catálogo (+ sello) → artista + título → texto libre.
-export async function findCandidates(clues, discogsToken, onStep) {
-  for (const step of buildSearchSteps(clues)) {
+export function findCandidates(clues, discogsToken, onStep) {
+  return runSearchSteps(buildSearchSteps(clues), discogsToken, onStep);
+}
+
+export function searchByText(text, discogsToken, onStep) {
+  return runSearchSteps([{ by: "text", params: { q: text }, expandMaster: true }], discogsToken, onStep);
+}
+
+export async function getRelease(id, discogsToken) {
+  const r = await discogsGet(`/releases/${id}`, null, discogsToken);
+  const images = r.images || [];
+  const cover = images.find((i) => i.type === "primary") || images[0];
+  return {
+    id: r.id,
+    artist: r.artists_sort || "",
+    title: r.title || "",
+    year: r.year || "",
+    country: r.country || "",
+    labels: (r.labels || []).map((l) => ({ name: l.name, catno: l.catno })),
+    formats: (r.formats || []).map((f) => ({
+      name: f.name,
+      qty: f.qty,
+      descriptions: f.descriptions || [],
+      text: f.text || "",
+    })),
+    image: cover ? cover.uri : r.thumb || "",
+    thumb: r.thumb || "",
+    tracklist: (r.tracklist || [])
+      .filter((t) => t.type_ === "track")
+      .map((t) => ({ position: t.position, title: t.title })),
+    url: r.uri || releaseUrl(r.id),
+  };
+}
+
+async function runSearchSteps(steps, discogsToken, onStep) {
+  for (const step of steps) {
     if (onStep) onStep(step.by);
     const data = await discogsGet(
       "/database/search",
