@@ -2,7 +2,8 @@ export const CONFIG = {
   AI_PROVIDER: {
     workerUrl: "https://vinilos-proxy.julioalbertoo.workers.dev",
     primaryModel: "meta/Llama-4-Scout-17B-16E-Instruct", // confirmar nombre exacto en el catálogo antes del Paso 4
-    fallbackModel: "openai/gpt-4o-mini",
+    fallbackModel: "openai/gpt-4o",
+    pingModel: "openai/gpt-4o-mini",
   },
   DISCOGS: {
     baseUrl: "https://api.discogs.com",

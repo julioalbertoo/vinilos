@@ -200,16 +200,35 @@ function initCapture() {
   identifyButton.addEventListener("click", async () => {
     if (!preparedImage) return;
     rawJson.hidden = true;
+    identifyButton.disabled = true;
+
+    let currentModel = "";
+    let startedAt = Date.now();
+    const renderProgress = () => {
+      const seconds = Math.round((Date.now() - startedAt) / 1000);
+      status.textContent = `Probando con ${currentModel}... ${seconds} s`;
+    };
+    const ticker = setInterval(renderProgress, 1000);
+
     const result = await identify(preparedImage, getGithubToken(), (model) => {
-      status.textContent = `Probando con ${model} (puede tardar hasta 45 segundos)...`;
+      currentModel = model;
+      startedAt = Date.now();
+      renderProgress();
     });
+
+    clearInterval(ticker);
+    identifyButton.disabled = false;
+
+    const attemptLog = result.attempts.map((a) => `• ${a.model}: ${a.detail}`).join("\n");
     if (result.ok) {
       status.textContent = `Hecho (modelo: ${result.modelUsed}).`;
-      rawJson.textContent = JSON.stringify(result.data, null, 2);
-      rawJson.hidden = false;
+      rawJson.textContent =
+        JSON.stringify(result.data, null, 2) + (attemptLog ? `\n\nIntentos fallidos antes:\n${attemptLog}` : "");
     } else {
       status.textContent = `❌ ${result.reason}`;
+      rawJson.textContent = `Diagnóstico:\n${attemptLog}`;
     }
+    rawJson.hidden = false;
   });
 }
 

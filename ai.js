@@ -72,27 +72,56 @@ async function callModel(model, githubToken, imageDataUrl) {
   }
 }
 
+async function tryModel(model, githubToken, imageDataUrl) {
+  let response;
+  try {
+    response = await callModel(model, githubToken, imageDataUrl);
+  } catch (err) {
+    if (err && err.name === "AbortError") {
+      return { ok: false, detail: `tiempo agotado (${MODEL_TIMEOUT_MS / 1000} s)` };
+    }
+    return { ok: false, detail: `error de red: ${err && err.message ? err.message : err}` };
+  }
+
+  const body = await response.text();
+  if (!response.ok) {
+    if (response.status === 429) {
+      return { ok: false, detail: "límite gratuito alcanzado (429)" };
+    }
+    return { ok: false, detail: `error HTTP ${response.status}: ${body.slice(0, 200)}` };
+  }
+
+  let text;
+  try {
+    text = JSON.parse(body)?.choices?.[0]?.message?.content;
+  } catch {
+    return { ok: false, detail: `respuesta inesperada: ${body.slice(0, 200)}` };
+  }
+  const data = extractJson(text);
+  if (!hasExpectedShape(data)) {
+    return { ok: false, detail: `la IA no devolvió el JSON pedido: ${(text || "").slice(0, 200)}` };
+  }
+  if (data.confidence !== null && data.confidence < 0.3) {
+    return { ok: false, detail: `confianza baja (${data.confidence})`, data };
+  }
+  return { ok: true, data };
+}
+
 export async function identify(imageDataUrl, githubToken, onAttempt) {
   const models = [CONFIG.AI_PROVIDER.primaryModel, CONFIG.AI_PROVIDER.fallbackModel];
+  const attempts = [];
   for (const model of models) {
     if (onAttempt) onAttempt(model);
-    let response;
-    try {
-      response = await callModel(model, githubToken, imageDataUrl);
-    } catch {
-      continue; // tiempo agotado o error de red: probamos con el siguiente modelo
+    const result = await tryModel(model, githubToken, imageDataUrl);
+    if (result.ok) {
+      return { ok: true, data: result.data, modelUsed: model, attempts };
     }
-    if (!response.ok) continue;
-    const payload = await response.json();
-    const text = payload?.choices?.[0]?.message?.content;
-    const data = extractJson(text);
-    if (hasExpectedShape(data) && (data.confidence === null || data.confidence >= 0.3)) {
-      return { ok: true, data, modelUsed: model };
-    }
+    attempts.push({ model, detail: result.detail });
   }
   return {
     ok: false,
     reason: "No se pudo identificar el disco. Prueba con otra foto, con más luz, o escanea el código de barras.",
+    attempts,
   };
 }
 
@@ -124,7 +153,7 @@ export async function testGithubConnection(githubToken) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: CONFIG.AI_PROVIDER.fallbackModel,
+        model: CONFIG.AI_PROVIDER.pingModel,
         messages: [{ role: "user", content: "ping" }],
         max_tokens: 5,
       }),
