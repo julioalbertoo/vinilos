@@ -4,17 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>Vinilos</title>
-  <link rel="stylesheet" href="styles.css?v=0.4.3">
+  <link rel="stylesheet" href="styles.css?v=0.5.1">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=0.4.3",
-        "./tokens.js": "./tokens.js?v=0.4.3",
-        "./guide.js": "./guide.js?v=0.4.3",
-        "./ai.js": "./ai.js?v=0.4.3",
-        "./discogs.js": "./discogs.js?v=0.4.3",
-        "./imaging.js": "./imaging.js?v=0.4.3"
+        "./config.js": "./config.js?v=0.5.1",
+        "./tokens.js": "./tokens.js?v=0.5.1",
+        "./guide.js": "./guide.js?v=0.5.1",
+        "./ai.js": "./ai.js?v=0.5.1",
+        "./discogs.js": "./discogs.js?v=0.5.1",
+        "./imaging.js": "./imaging.js?v=0.5.1",
+        "./scoring.js": "./scoring.js?v=0.5.1"
       }
     }
   </script>
@@ -22,7 +23,7 @@
 <body>
   <header class="app-header">
     <h1>🎵 Vinilos</h1>
-    <p class="app-version">v0.4.3</p>
+    <p class="app-version">v0.5.1</p>
   </header>
 
   <main id="app">
@@ -98,7 +99,13 @@
 
     <section id="view-results" class="view">
       <h2>Candidatos</h2>
-      <p>Aquí aparecerán las tarjetas con los posibles discos.</p>
+      <p id="results-summary" class="results-summary"></p>
+      <div id="results-list"></div>
+      <details class="results-clues">
+        <summary>Ver lo que leyó la IA</summary>
+        <pre id="results-clues-json" class="raw-json"></pre>
+      </details>
+      <button type="button" id="results-back" class="secondary">← Probar con otra foto</button>
     </section>
 
     <section id="view-detail" class="view">
@@ -122,6 +129,6 @@
     <button type="button" data-view="history">Historial</button>
   </nav>
 
-  <script type="module" src="app.js?v=0.4.3"></script>
+  <script type="module" src="app.js?v=0.5.1"></script>
 </body>
 </html>

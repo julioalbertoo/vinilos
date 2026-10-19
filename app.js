@@ -12,8 +12,17 @@ import {
 } from "./tokens.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify } from "./ai.js";
-import { testDiscogsConnection } from "./discogs.js";
+import { testDiscogsConnection, findCandidates } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
+import { rankCandidates } from "./scoring.js";
+
+const SEARCH_STEP_LABELS = {
+  barcode: "por código de barras",
+  catno: "por número de catálogo",
+  "artist-title": "por artista y título",
+  text: "por texto libre",
+  master: "todas las ediciones del álbum",
+};
 
 const VIEWS = ["guide", "settings", "capture", "results", "detail", "history"];
 const GUIDE_SCREENS = ["intro", "ai", "discogs"];
@@ -145,6 +154,53 @@ function initSettings() {
   });
 }
 
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+
+function renderCard(candidate) {
+  const card = el("article", "card");
+
+  if (candidate.thumb) {
+    const img = el("img", "card-thumb");
+    img.src = candidate.thumb;
+    img.alt = "";
+    img.loading = "lazy";
+    card.append(img);
+  } else {
+    card.append(el("div", "card-thumb", "💿"));
+  }
+
+  const body = el("div", "card-body");
+  body.append(el("h3", null, candidate.title));
+  body.append(el("p", null, [candidate.year || "Año ?", candidate.country || "País ?"].join(" · ")));
+  body.append(el("p", null, [candidate.label || "Sello ?", candidate.catno || "Nº cat. ?"].join(" · ")));
+  body.append(el("p", null, candidate.formats.join(", ")));
+  if (candidate.matches.length) {
+    body.append(el("p", "card-matches", candidate.matches.map((m) => `✓ ${m}`).join("  ")));
+  }
+  const link = el("a", null, "Ver en Discogs ↗");
+  link.href = candidate.url;
+  link.target = "_blank";
+  link.rel = "noopener";
+  body.append(link);
+
+  card.append(body);
+  return card;
+}
+
+function renderResults(ranked, total, strategy, clues) {
+  const how = SEARCH_STEP_LABELS[strategy] || "";
+  document.getElementById("results-summary").textContent =
+    `${total} ediciones encontradas ${how}. Las ${ranked.length} que mejor encajan:`;
+  document.getElementById("results-list").replaceChildren(...ranked.map(renderCard));
+  document.getElementById("results-clues-json").textContent = JSON.stringify(clues, null, 2);
+  showView("results");
+}
+
 function initCapture() {
   const cameraInput = document.getElementById("capture-camera-input");
   const galleryInput = document.getElementById("capture-gallery-input");
@@ -196,19 +252,37 @@ function initCapture() {
     });
 
     clearInterval(ticker);
-    identifyButton.disabled = false;
 
-    const attemptLog = result.attempts.map((a) => `• ${a.model}: ${a.detail}`).join("\n");
-    if (result.ok) {
-      status.textContent = `Hecho (modelo: ${result.modelUsed}).`;
-      rawJson.textContent =
-        JSON.stringify(result.data, null, 2) + (attemptLog ? `\n\nIntentos fallidos antes:\n${attemptLog}` : "");
-    } else {
+    if (!result.ok) {
+      identifyButton.disabled = false;
       status.textContent = `❌ ${result.reason}`;
-      rawJson.textContent = `Diagnóstico:\n${attemptLog}`;
+      rawJson.textContent = `Diagnóstico:\n${result.attempts.map((a) => `• ${a.model}: ${a.detail}`).join("\n")}`;
+      rawJson.hidden = false;
+      return;
     }
-    rawJson.hidden = false;
+
+    const clues = result.data;
+    try {
+      const { candidates, strategy } = await findCandidates(clues, getDiscogsToken(), (step) => {
+        status.textContent = `Buscando en Discogs ${SEARCH_STEP_LABELS[step]}...`;
+      });
+      if (candidates.length === 0) {
+        status.textContent =
+          "❌ No encontré este disco en Discogs. Prueba a fotografiar el lomo o la galleta central, o escanea el código de barras.";
+        rawJson.textContent = `Lo que leyó la IA:\n${JSON.stringify(clues, null, 2)}`;
+        rawJson.hidden = false;
+      } else {
+        status.textContent = "";
+        renderResults(rankCandidates(candidates, clues), candidates.length, strategy, clues);
+      }
+    } catch (err) {
+      status.textContent = `❌ ${err.message}`;
+    } finally {
+      identifyButton.disabled = false;
+    }
   });
+
+  document.getElementById("results-back").addEventListener("click", () => showView("capture"));
 }
 
 initDebugNav();

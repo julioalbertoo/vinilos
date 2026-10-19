@@ -170,6 +170,64 @@ button.secondary {
   word-break: break-word;
 }
 
+.results-summary {
+  margin-top: 0;
+}
+
+.card {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--color-bg);
+  border: 1px solid #333;
+  border-radius: var(--radius);
+}
+
+.card-thumb {
+  flex: 0 0 88px;
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #2a2a2a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.card-body {
+  min-width: 0;
+}
+
+.card-body h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.view .card-body p {
+  margin: 2px 0;
+  font-size: 0.85rem;
+}
+
+.view .card-body .card-matches {
+  color: var(--color-accent);
+}
+
+.card-body a {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: var(--color-accent);
+}
+
+.results-clues {
+  margin-top: var(--gap);
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
 .link-like {
   text-align: center;
   color: var(--color-accent);

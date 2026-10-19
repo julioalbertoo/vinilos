@@ -1,5 +1,8 @@
 import { CONFIG } from "./config.js";
 
+const MIN_GAP_MS = 1100; // Discogs permite unas 60 peticiones por minuto con token
+let lastRequestAt = 0;
+
 function interpretStatus(status) {
   if (status === 401 || status === 403) {
     return "El token de Discogs no es válido. Revisa que lo copiaste bien.";
@@ -10,20 +13,127 @@ function interpretStatus(status) {
   return `Discogs respondió con un error inesperado (código ${status}).`;
 }
 
+async function discogsGet(path, params, discogsToken) {
+  const wait = lastRequestAt + MIN_GAP_MS - Date.now();
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  lastRequestAt = Date.now();
+
+  const query = params ? `?${new URLSearchParams(params)}` : "";
+  let response;
+  try {
+    response = await fetch(`${CONFIG.DISCOGS.baseUrl}${path}${query}`, {
+      headers: { Authorization: `Discogs token=${discogsToken}` },
+    });
+  } catch {
+    throw new Error("No se pudo contactar con Discogs. Comprueba tu conexión a internet.");
+  }
+  if (!response.ok) throw new Error(interpretStatus(response.status));
+  return response.json();
+}
+
 export async function testDiscogsConnection(discogsToken) {
   if (!discogsToken) {
     return { ok: false, reason: "Falta el token de Discogs." };
   }
   try {
-    const response = await fetch(`${CONFIG.DISCOGS.baseUrl}/oauth/identity`, {
-      headers: { Authorization: `Discogs token=${discogsToken}` },
-    });
-    if (response.ok) {
-      const data = await response.json();
-      return { ok: true, reason: `Conectado como ${data.username}.` };
-    }
-    return { ok: false, reason: interpretStatus(response.status) };
+    const data = await discogsGet("/oauth/identity", null, discogsToken);
+    return { ok: true, reason: `Conectado como ${data.username}.` };
   } catch (err) {
-    return { ok: false, reason: "No se pudo contactar con Discogs. Comprueba tu conexión a internet." };
+    return { ok: false, reason: err.message };
   }
+}
+
+function releaseUrl(id) {
+  return `https://www.discogs.com/release/${id}`;
+}
+
+function fromSearchResult(r) {
+  return {
+    id: r.id,
+    title: r.title,
+    year: r.year || "",
+    country: r.country || "",
+    label: (r.label || [])[0] || "",
+    catno: r.catno || "",
+    formats: r.format || [],
+    barcodes: r.barcode || [],
+    thumb: r.cover_image || r.thumb || "",
+    have: r.community?.have || 0,
+    url: releaseUrl(r.id),
+  };
+}
+
+function fromMasterVersion(v) {
+  return {
+    id: v.id,
+    title: v.title,
+    year: v.released || "",
+    country: v.country || "",
+    label: v.label || "",
+    catno: v.catno || "",
+    formats: [...(v.major_formats || []), ...(v.format || "").split(", ").filter(Boolean)],
+    barcodes: [],
+    thumb: v.thumb || "",
+    have: v.stats?.community?.in_collection || 0,
+    url: releaseUrl(v.id),
+  };
+}
+
+function mostCommonMasterId(results) {
+  const counts = new Map();
+  for (const r of results) {
+    if (r.master_id) counts.set(r.master_id, (counts.get(r.master_id) || 0) + 1);
+  }
+  let best = 0;
+  let bestCount = 0;
+  for (const [id, count] of counts) {
+    if (count > bestCount) [best, bestCount] = [id, count];
+  }
+  return best;
+}
+
+function buildSearchSteps(clues) {
+  const steps = [];
+  const barcode = (clues.barcode || "").replace(/\D/g, "");
+  if (barcode) {
+    steps.push({ by: "barcode", params: { barcode } });
+  }
+  if (clues.catalog_number) {
+    const params = { catno: clues.catalog_number };
+    if (clues.label) params.label = clues.label;
+    steps.push({ by: "catno", params });
+  }
+  if (clues.artist || clues.title) {
+    const params = {};
+    if (clues.artist) params.artist = clues.artist;
+    if (clues.title) params.release_title = clues.title;
+    steps.push({ by: "artist-title", params, expandMaster: true });
+    steps.push({ by: "text", params: { q: [clues.artist, clues.title].filter(Boolean).join(" ") }, expandMaster: true });
+  }
+  return steps;
+}
+
+// Orden de precisión: código de barras → nº de catálogo (+ sello) → artista + título → texto libre.
+export async function findCandidates(clues, discogsToken, onStep) {
+  for (const step of buildSearchSteps(clues)) {
+    if (onStep) onStep(step.by);
+    const data = await discogsGet(
+      "/database/search",
+      { ...step.params, type: "release", per_page: "50" },
+      discogsToken
+    );
+    const results = data.results || [];
+    if (results.length === 0) continue;
+
+    if (step.expandMaster) {
+      const masterId = mostCommonMasterId(results);
+      if (masterId) {
+        if (onStep) onStep("master");
+        const versions = await discogsGet(`/masters/${masterId}/versions`, { per_page: "100" }, discogsToken);
+        return { candidates: (versions.versions || []).map(fromMasterVersion), strategy: step.by, masterId };
+      }
+    }
+    return { candidates: results.map(fromSearchResult), strategy: step.by, masterId: null };
+  }
+  return { candidates: [], strategy: null, masterId: null };
 }
