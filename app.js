@@ -177,14 +177,21 @@ function initCapture() {
   let preparedImage = null;
 
   async function handleFile(file) {
-    if (!file) return;
+    if (!file) {
+      status.textContent = "No se ha recibido ninguna foto (¿se canceló la cámara?).";
+      return;
+    }
     status.textContent = "Preparando imagen...";
     rawJson.hidden = true;
-    preparedImage = await prepareImage(file);
-    preview.src = preparedImage;
-    preview.hidden = false;
-    identifyButton.hidden = false;
-    status.textContent = "";
+    try {
+      preparedImage = await prepareImage(file);
+      preview.src = preparedImage;
+      preview.hidden = false;
+      identifyButton.hidden = false;
+      status.textContent = "";
+    } catch (err) {
+      status.textContent = `❌ No se pudo preparar la imagen: ${err && err.message ? err.message : err}`;
+    }
   }
 
   cameraInput.addEventListener("change", (event) => handleFile(event.target.files[0]));
