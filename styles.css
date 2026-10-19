@@ -110,18 +110,25 @@ button:active {
 }
 
 .debug-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   background: var(--color-surface);
-  padding: var(--gap);
+  padding: 10px var(--gap);
   border-top: 1px solid #333;
 }
 
 .debug-nav-label {
+  width: 100%;
   color: var(--color-muted);
-  font-size: 0.8rem;
-  margin: 0 0 8px;
-  text-align: center;
+  font-size: 0.75rem;
+  margin: 0 0 4px;
 }
 
 .debug-nav button {
-  margin-top: 6px;
+  width: auto;
+  flex: 1 1 auto;
+  margin-top: 0;
+  padding: 8px 10px;
+  font-size: 0.85rem;
 }
