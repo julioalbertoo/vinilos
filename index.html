@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Vinilos</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>🎵 Vinilos</h1>
+  </header>
+
+  <main id="app">
+    <section id="view-guide" class="view">
+      <h2>Guía de bienvenida</h2>
+      <p>Aquí irá la guía para conseguir tus dos llaves (GitHub y Discogs).</p>
+    </section>
+
+    <section id="view-settings" class="view">
+      <h2>Ajustes</h2>
+      <p>Aquí irán los campos para pegar tus llaves.</p>
+    </section>
+
+    <section id="view-capture" class="view">
+      <h2>Identificar disco</h2>
+      <p>Aquí irán los botones de hacer foto / escanear código de barras.</p>
+    </section>
+
+    <section id="view-results" class="view">
+      <h2>Candidatos</h2>
+      <p>Aquí aparecerán las tarjetas con los posibles discos.</p>
+    </section>
+
+    <section id="view-detail" class="view">
+      <h2>Detalle</h2>
+      <p>Aquí aparecerá el disco confirmado, con enlace a Discogs.</p>
+    </section>
+
+    <section id="view-history" class="view">
+      <h2>Historial</h2>
+      <p>Aquí aparecerá la cuadrícula de discos identificados.</p>
+    </section>
+  </main>
+
+  <nav id="debug-nav" class="debug-nav">
+    <p class="debug-nav-label">Navegación temporal (solo para probar el Paso 1)</p>
+    <button type="button" data-view="guide">Guía</button>
+    <button type="button" data-view="settings">Ajustes</button>
+    <button type="button" data-view="capture">Captura</button>
+    <button type="button" data-view="results">Candidatos</button>
+    <button type="button" data-view="detail">Detalle</button>
+    <button type="button" data-view="history">Historial</button>
+  </nav>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

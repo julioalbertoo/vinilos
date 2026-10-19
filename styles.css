@@ -1,0 +1,95 @@
+:root {
+  --color-bg: #121212;
+  --color-surface: #1e1e1e;
+  --color-text: #f2f2f2;
+  --color-muted: #a0a0a0;
+  --color-accent: #e0a526;
+  --radius: 12px;
+  --gap: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.app-header {
+  padding: var(--gap);
+  text-align: center;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+#app {
+  padding: 0 var(--gap) var(--gap);
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.view {
+  display: none;
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: var(--gap);
+}
+
+.view.active {
+  display: block;
+}
+
+.view h2 {
+  margin-top: 0;
+}
+
+.view p {
+  color: var(--color-muted);
+}
+
+button {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  margin-top: 10px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+button:active {
+  opacity: 0.85;
+}
+
+.debug-nav {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-surface);
+  padding: var(--gap);
+  border-top: 1px solid #333;
+}
+
+.debug-nav-label {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+.debug-nav button {
+  margin-top: 6px;
+}
