@@ -450,6 +450,9 @@ function initCapture() {
       else {
         stopActiveScanner = stop;
         scannerStatus.textContent = "Apunta la cámara al código de barras de la contraportada.";
+        scanTipTimer = setTimeout(() => {
+          if (session === scanSession) scannerStatus.textContent = SCAN_TIP;
+        }, SCAN_TIP_DELAY_MS);
       }
     } catch (err) {
       if (session === scanSession) {
@@ -480,11 +483,18 @@ function barcodeClues(code) {
   };
 }
 
+const SCAN_TIP_DELAY_MS = 8000;
+const SCAN_TIP =
+  "¿No lo lee? Acércate hasta que el código ocupe casi todo el ancho del visor e inclina un poco el disco para quitar reflejos. " +
+  "También puedes usar «Hacer foto» con la contraportada: la IA lee el código.";
+
 let scanSession = 0;
 let stopActiveScanner = null;
+let scanTipTimer = null;
 
 function stopScanner() {
   scanSession++;
+  clearTimeout(scanTipTimer);
   if (stopActiveScanner) {
     stopActiveScanner();
     stopActiveScanner = null;

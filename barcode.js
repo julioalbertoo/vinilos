@@ -2,8 +2,15 @@
 const ZXING_URL = "https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/umd/zxing-browser.min.js";
 const ZXING_SRI = "sha384-HRtzk9lZgkbSgvUyQrnfC/GxiXZgwaNyD7hC9wcXlsBpDhkS80ISl73juef2FRuf";
 const NATIVE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e"];
-const CAMERA = { video: { facingMode: "environment" }, audio: false };
+// Sin pedir resolución, Safari abre la cámara a 640×480 y las barras quedan demasiado finas.
+const CAMERA = {
+  video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+  audio: false,
+};
 const NATIVE_SCAN_INTERVAL_MS = 200;
+// Valores de los enums DecodeHintType de @zxing/library, que el paquete del navegador no exporta.
+const HINT_POSSIBLE_FORMATS = 2;
+const HINT_TRY_HARDER = 3;
 
 let zxingLoading = null;
 
@@ -85,7 +92,12 @@ export async function startScanner(video, onCode) {
   }
 
   const ZXing = await loadZxing();
-  const reader = new ZXing.BrowserMultiFormatOneDReader();
+  const formats = ZXing.BarcodeFormat;
+  const hints = new Map([
+    [HINT_POSSIBLE_FORMATS, [formats.EAN_13, formats.EAN_8, formats.UPC_A, formats.UPC_E]],
+    [HINT_TRY_HARDER, true],
+  ]);
+  const reader = new ZXing.BrowserMultiFormatOneDReader(hints, { delayBetweenScanAttempts: 150 });
   let found = false;
   const controls = await reader.decodeFromConstraints(CAMERA, video, (result) => {
     if (result && !found) {
