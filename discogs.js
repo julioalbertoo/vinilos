@@ -186,7 +186,34 @@ export async function getRelease(id, discogsToken) {
     tracklist: (r.tracklist || [])
       .filter((t) => t.type_ === "track")
       .map((t) => ({ position: t.position, title: t.title })),
+    genres: r.genres || [],
+    styles: r.styles || [],
+    notes: cleanNotes(r.notes),
+    community: communityData(r.community),
     url: r.uri || releaseUrl(r.id),
+  };
+}
+
+// Las notas de Discogs traen marcas propias: [a=Artista], [l=Sello], [url=…]texto[/url], [b]…[/b].
+// Se dejan solo los textos.
+function cleanNotes(notes) {
+  return (notes || "")
+    .replace(/\[url=[^\]]*\]([\s\S]*?)\[\/url\]/gi, "$1")
+    .replace(/\[[almr]=([^\]]+)\]/gi, "$1")
+    .replace(/\[\/?(b|i|u)\]/gi, "")
+    .trim();
+}
+
+// Lo que dice la comunidad de Discogs sobre esta edición. null si no viene.
+function communityData(c) {
+  if (!c) return null;
+  return {
+    have: c.have || 0,
+    want: c.want || 0,
+    rating: c.rating && c.rating.count ? { average: c.rating.average, count: c.rating.count } : null,
+    contributors: (c.contributors || []).length,
+    dataQuality: c.data_quality || "",
+    status: c.status || "",
   };
 }
 

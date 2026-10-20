@@ -313,6 +313,13 @@ function renderDetail(release) {
     nodes.push(el("p", "detail-meta", formatLine(format)));
     if (format.text) nodes.push(el("p", "detail-meta detail-color", `Edición: ${format.text}`));
   }
+  const genres = [...(release.genres || []), ...(release.styles || [])];
+  if (genres.length) {
+    const chips = el("div", "detail-genres");
+    for (const name of release.genres || []) chips.append(el("span", "detail-genre", name));
+    for (const name of release.styles || []) chips.append(el("span", "detail-style", name));
+    nodes.push(chips);
+  }
   // La caja del precio solo se pone con la ficha completa (tiene id); se rellena al llegar los datos.
   if (release.id) {
     const price = el("div", "detail-price");
@@ -321,16 +328,57 @@ function renderDetail(release) {
     nodes.push(price);
   }
   if (release.tracklist.length) {
-    nodes.push(el("h3", null, "Canciones"));
     const list = el("ul", "detail-tracks");
     for (const track of release.tracklist) {
       const li = el("li");
       li.append(el("span", "pos", track.position), track.title);
       list.append(li);
     }
-    nodes.push(list);
+    nodes.push(foldable(`🎵 Canciones (${release.tracklist.length})`, list));
   }
+  if (release.notes) {
+    nodes.push(foldable("📝 Notas de la edición", el("p", "detail-notes", release.notes)));
+  }
+  if (release.community) nodes.push(foldable("👥 Comunidad de Discogs", communityList(release.community)));
   document.getElementById("detail-content").replaceChildren(...nodes);
+}
+
+// Apartado plegable de la ficha: empieza cerrado y se abre al tocar el título.
+function foldable(title, content) {
+  const box = el("details", "detail-fold");
+  box.append(el("summary", null, title), content);
+  return box;
+}
+
+// Calidad de los datos y estado de la ficha, tal como los da Discogs, en castellano.
+const DATA_QUALITY = {
+  "Complete and Correct": "Completa y correcta",
+  Correct: "Correcta",
+  "Needs Vote": "Pendiente de votos",
+  "Needs Minor Changes": "Necesita pequeños cambios",
+  "Needs Major Changes": "Necesita cambios importantes",
+  "Entirely Incorrect": "Incorrecta",
+};
+const RELEASE_STATUS = { Accepted: "Aceptada", Draft: "Borrador", Deleted: "Borrada", Rejected: "Rechazada" };
+
+function communityList(c) {
+  const number = (n) => new Intl.NumberFormat("es-ES").format(n);
+  const rows = [
+    ["Lo tienen", `${number(c.have)} personas`],
+    ["Lo quieren", `${number(c.want)} personas`],
+    [
+      "Nota media",
+      c.rating
+        ? `${c.rating.average.toLocaleString("es-ES", { maximumFractionDigits: 2 })} / 5 (${number(c.rating.count)} votos)`
+        : "Sin votos",
+    ],
+    ["Han editado la ficha", `${number(c.contributors)} personas`],
+  ];
+  if (c.dataQuality) rows.push(["Calidad de los datos", DATA_QUALITY[c.dataQuality] || c.dataQuality]);
+  if (c.status) rows.push(["Estado de la ficha", RELEASE_STATUS[c.status] || c.status]);
+  const list = el("dl", "detail-community");
+  for (const [term, value] of rows) list.append(el("dt", null, term), el("dd", null, value));
+  return list;
 }
 
 function formatMoney({ value, currency }) {

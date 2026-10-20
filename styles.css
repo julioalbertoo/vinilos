@@ -821,6 +821,70 @@ input[type="text"]:focus {
   font-size: 0.9rem;
 }
 
+.detail-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.detail-genre,
+.detail-style {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.detail-genre {
+  background: var(--primary);
+  color: #fff;
+}
+
+.detail-style {
+  background: var(--lilac);
+  color: var(--text);
+}
+
+.detail-fold {
+  margin-top: 16px;
+}
+
+.detail-fold > summary {
+  cursor: pointer;
+  padding: 8px 0;
+  font-weight: 800;
+}
+
+.view .detail-notes {
+  margin: 0;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  font-size: 0.92rem;
+  background: #faf8ff;
+  border-radius: var(--radius-sm);
+}
+
+.detail-community {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 0.92rem;
+  background: #faf8ff;
+  border-radius: var(--radius-sm);
+}
+
+.detail-community dt {
+  color: var(--muted);
+}
+
+.detail-community dd {
+  margin: 0;
+  font-weight: 700;
+}
+
 .detail-tracks {
   margin: 0;
   padding: 4px 12px;
@@ -1481,6 +1545,8 @@ body.typing .tabbar {
 :root[data-theme="dark"] .panel,
 :root[data-theme="dark"] .raw-json,
 :root[data-theme="dark"] .detail-tracks,
+:root[data-theme="dark"] .detail-notes,
+:root[data-theme="dark"] .detail-community,
 :root[data-theme="dark"] .card {
   background: #1b1826;
 }
