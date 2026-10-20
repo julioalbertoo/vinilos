@@ -74,6 +74,25 @@ function openGuide() {
   showGuideScreen("intro");
 }
 
+// En el iPhone, al abrir el teclado la barra de abajo se sube con él y tapa la caja en la que
+// escribes. Mientras hay una caja de texto activa, la barra se esconde.
+function isTextField(target) {
+  return target instanceof HTMLInputElement && !["button", "checkbox", "radio", "file"].includes(target.type);
+}
+
+function initTypingMode() {
+  document.addEventListener("focusin", (event) => {
+    if (isTextField(event.target)) document.body.classList.add("typing");
+  });
+  document.addEventListener("focusout", (event) => {
+    if (!isTextField(event.target)) return;
+    // Si el foco salta directamente a otra caja, la barra sigue escondida.
+    setTimeout(() => {
+      if (!isTextField(document.activeElement)) document.body.classList.remove("typing");
+    }, 0);
+  });
+}
+
 function initTabbar() {
   document.getElementById("tabbar").addEventListener("click", (event) => {
     const tab = event.target.closest("button");
@@ -939,6 +958,7 @@ function initCloudSettings() {
 }
 
 initTabbar();
+initTypingMode();
 populateGuideText();
 initGuideNavigation();
 initSettings();

@@ -1160,7 +1160,8 @@ body.no-tabbar {
   box-shadow: 0 -8px 24px -12px rgba(76, 60, 140, 0.3);
 }
 
-body.no-tabbar .tabbar {
+body.no-tabbar .tabbar,
+body.typing .tabbar {
   display: none;
 }
 
