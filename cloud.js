@@ -1,10 +1,12 @@
-// Copia en la nube de «Mis discos» (Supabase). Lo que se pinta en pantalla sigue saliendo del móvil
-// (history.js); esto solo sube los cambios y, al entrar o al abrir la app, mezcla lo de aquí con lo de allí.
+// Copia en la nube de «Mis discos» y de las llaves de Gemini y Discogs (Supabase). Lo que usa la app sigue
+// saliendo del móvil (history.js, tokens.js); esto sube los cambios y, al entrar o al abrir la app, mezcla
+// lo de aquí con lo de allí.
 // Si la librería no carga o no hay red, la app funciona igual que sin cuenta.
 import { CONFIG } from "./config.js";
 import { getHistory, onHistoryChange, replaceHistory } from "./history.js";
+import { getTokenState, onTokensChange, applyTokenState } from "./tokens.js";
 
-const { url, publishableKey, schema, table } = CONFIG.SUPABASE;
+const { url, publishableKey, schema, table, settingsTable } = CONFIG.SUPABASE;
 const SYNCED_KEY = CONFIG.STORAGE_KEYS.cloudSynced;
 const PENDING_KEY = CONFIG.STORAGE_KEYS.cloudPendingDeletes;
 
@@ -13,6 +15,7 @@ let user = null;
 let syncing = null;
 const statusListeners = [];
 const changeListeners = [];
+const tokenListeners = [];
 
 // ---------- Pequeñas listas guardadas en el móvil ----------
 
@@ -43,6 +46,11 @@ export function onCloudStatus(cb) {
 // cb() — cuando la sincronización cambia la lista de discos del móvil.
 export function onCloudHistoryChanged(cb) {
   changeListeners.push(cb);
+}
+
+// cb() — cuando la sincronización trae llaves de la nube a este móvil.
+export function onCloudTokensChanged(cb) {
+  tokenListeners.push(cb);
 }
 
 function setStatus(state, text) {
@@ -108,6 +116,7 @@ export async function initCloud() {
   }
 
   onHistoryChange(pushChange);
+  onTokensChange(pushTokens);
 
   client.auth.onAuthStateChange((event, session) => {
     const wasIn = Boolean(user);
@@ -207,6 +216,58 @@ async function pushChange(change) {
   }
 }
 
+// ---------- Llaves ----------
+
+function tokensRow(state) {
+  return {
+    user_id: user.id,
+    ai_key: state.aiKey,
+    discogs_token: state.discogsToken,
+    ai_verified: state.aiVerified,
+    discogs_verified: state.discogsVerified,
+  };
+}
+
+async function pushTokens(state) {
+  if (!client || !user) return;
+  const { error } = await client.from(settingsTable).upsert(tokensRow(state));
+  if (error) setStatus("error", "☁️ No se pudieron guardar las llaves en la nube; se reintentará al abrir la app.");
+}
+
+// Cada llave por separado: si el móvil tiene una, manda la del móvil; si no la tiene, se usa la de la nube.
+async function syncTokens() {
+  const { data, error } = await client.from(settingsTable).select("*").maybeSingle();
+  if (error) throw error;
+  const local = getTokenState();
+  const merged = { ...local };
+  if (data) {
+    if (!local.aiKey && data.ai_key) {
+      merged.aiKey = data.ai_key;
+      merged.aiVerified = data.ai_verified;
+    }
+    if (!local.discogsToken && data.discogs_token) {
+      merged.discogsToken = data.discogs_token;
+      merged.discogsVerified = data.discogs_verified;
+    }
+  }
+  const changedHere = JSON.stringify(merged) !== JSON.stringify(local);
+  if (changedHere) {
+    applyTokenState(merged);
+    for (const cb of tokenListeners) cb();
+  }
+  const row = tokensRow(merged);
+  const sameThere =
+    data &&
+    data.ai_key === row.ai_key &&
+    data.discogs_token === row.discogs_token &&
+    data.ai_verified === row.ai_verified &&
+    data.discogs_verified === row.discogs_verified;
+  if (!sameThere && (row.ai_key || row.discogs_token || data)) {
+    const { error: upsertError } = await client.from(settingsTable).upsert(row);
+    if (upsertError) throw upsertError;
+  }
+}
+
 // ---------- Sincronización completa ----------
 
 export function syncAll() {
@@ -218,6 +279,9 @@ export function syncAll() {
 async function runSync() {
   setStatus("busy", "☁️ Sincronizando…");
   try {
+    // 0. Llaves (lo primero: en un móvil nuevo es lo que permite empezar a usar la app).
+    await syncTokens();
+
     // 1. Borrados que no llegaron a la nube.
     const pending = readIds(PENDING_KEY);
     if (pending.size) {

@@ -3,7 +3,7 @@ export const GUIDE_TEXT = {
     title: "Bienvenido 👋",
     body:
       "Esta web identifica tus discos de vinilo a partir de una foto o un código de barras, y te dice la versión exacta en Discogs.\n\n" +
-      "Para eso hacen falta dos llaves, como el carné de socio de dos bibliotecas: una para la IA que \"lee\" la foto (Google Gemini) y otra para buscar el disco exacto (Discogs). Cada llave es tuya; la usamos en tu nombre y se queda guardada solo en este navegador.",
+      "Para eso hacen falta dos llaves, como el carné de socio de dos bibliotecas: una para la IA que \"lee\" la foto (Google Gemini) y otra para buscar el disco exacto (Discogs). Cada llave es tuya; la usamos en tu nombre y se queda guardada en este navegador (y en tu copia en la nube, si entras con tu email).",
     nextLabel: "Empezar →",
   },
   ai: {
@@ -35,7 +35,7 @@ export const GUIDE_TEXT = {
     saveLabel: "Guardar y terminar",
   },
   privacyNotice:
-    "🔒 Tus llaves se guardan solo en este navegador. No las compartas ni hagas capturas de esta pantalla.",
+    "🔒 Tus llaves se guardan en este navegador (y en tu copia en la nube, si entras con tu email). No las compartas ni hagas capturas de esta pantalla.",
   reopenLinkLabel: "¿Cómo consigo mis llaves?",
 };
 

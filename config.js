@@ -9,13 +9,14 @@ export const CONFIG = {
   DISCOGS: {
     baseUrl: "https://api.discogs.com",
   },
-  // Copia en la nube de «Mis discos» (proyecto Supabase compartido con otras apps; los discos van en el schema «vinilos»).
+  // Copia en la nube de «Mis discos» y de las llaves (proyecto Supabase compartido con otras apps; los discos van en el schema «vinilos»).
   // La clave publicable es pública por diseño: lo que protege los datos son las reglas RLS de la tabla.
   SUPABASE: {
     url: "https://lmfdpetsqmmymbuwbziw.supabase.co",
     publishableKey: "sb_publishable_EjbC1Y2umbq66ZS-ohAu8g_-BlYQHOd",
     schema: "vinilos",
     table: "records",
+    settingsTable: "settings",
   },
   STORAGE_KEYS: {
     aiKey: "vinilos_ai_key",

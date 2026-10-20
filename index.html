@@ -14,23 +14,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
-  <link rel="stylesheet" href="styles.css?v=1.8.0">
+  <link rel="stylesheet" href="styles.css?v=1.9.0">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=1.8.0",
-        "./tokens.js": "./tokens.js?v=1.8.0",
-        "./guide.js": "./guide.js?v=1.8.0",
-        "./ai.js": "./ai.js?v=1.8.0",
-        "./discogs.js": "./discogs.js?v=1.8.0",
-        "./imaging.js": "./imaging.js?v=1.8.0",
-        "./scoring.js": "./scoring.js?v=1.8.0",
-        "./barcode.js": "./barcode.js?v=1.8.0",
-        "./history.js": "./history.js?v=1.8.0",
-        "./gallery.js": "./gallery.js?v=1.8.0",
-        "./labels.js": "./labels.js?v=1.8.0",
-        "./cloud.js": "./cloud.js?v=1.8.0",
+        "./config.js": "./config.js?v=1.9.0",
+        "./tokens.js": "./tokens.js?v=1.9.0",
+        "./guide.js": "./guide.js?v=1.9.0",
+        "./ai.js": "./ai.js?v=1.9.0",
+        "./discogs.js": "./discogs.js?v=1.9.0",
+        "./imaging.js": "./imaging.js?v=1.9.0",
+        "./scoring.js": "./scoring.js?v=1.9.0",
+        "./barcode.js": "./barcode.js?v=1.9.0",
+        "./history.js": "./history.js?v=1.9.0",
+        "./gallery.js": "./gallery.js?v=1.9.0",
+        "./labels.js": "./labels.js?v=1.9.0",
+        "./cloud.js": "./cloud.js?v=1.9.0",
         "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm"
       }
     }
@@ -39,7 +39,7 @@
 <body>
   <header class="app-header">
     <h1><span class="logo-disc" aria-hidden="true"></span>Vinilos</h1>
-    <p class="app-version">v1.8.0</p>
+    <p class="app-version">v1.9.0</p>
   </header>
 
   <main id="app">
@@ -49,6 +49,7 @@
         <h2 id="guide-intro-title"></h2>
         <p id="guide-intro-body" class="guide-body"></p>
         <button type="button" id="guide-intro-next"></button>
+        <button type="button" id="guide-intro-cloud" class="ghost">☁️ Ya uso Vinilos en otro móvil: recuperar mis llaves</button>
       </div>
 
       <div id="guide-screen-ai" class="guide-screen" hidden>
@@ -79,7 +80,7 @@
 
     <section id="view-settings" class="view">
       <h2>Ajustes</h2>
-      <p class="notice">🔒 Tus llaves se guardan solo en este navegador. No las compartas ni hagas capturas de esta pantalla.</p>
+      <p class="notice">🔒 Tus llaves se guardan en este navegador y, si entras en la copia en la nube, también en tu cuenta. No las compartas ni hagas capturas de esta pantalla.</p>
 
       <label for="ai-key-input">Llave de Google Gemini</label>
       <input type="password" id="ai-key-input" placeholder="AIza...">
@@ -98,10 +99,10 @@
         <p id="settings-test-discogs-status" class="status"></p>
       </div>
 
-      <div id="cloud-panel" class="panel">
+      <div id="cloud-panel" class="panel" tabindex="-1">
         <p class="panel-title">☁️ Copia en la nube de tus discos</p>
         <div id="cloud-signed-out">
-          <p class="cloud-text">Entra con tu email y «Mis discos» se guardará también en la nube: si cambias de móvil o el navegador borra los datos, no los pierdes. Las llaves no se suben.</p>
+          <p class="cloud-text">Entra con tu email y tus discos y tus llaves se guardarán también en la nube: si cambias de móvil o el navegador borra los datos, no los pierdes. En un móvil nuevo, basta con entrar para recuperarlo todo.</p>
           <label for="cloud-email">Tu email</label>
           <input type="email" id="cloud-email" autocomplete="email" inputmode="email" placeholder="tu@email.com">
           <button type="button" id="cloud-send" class="secondary">Enviarme el enlace</button>
@@ -223,6 +224,6 @@
     <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=1.8.0"></script>
+  <script type="module" src="app.js?v=1.9.0"></script>
 </body>
 </html>

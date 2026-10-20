@@ -26,11 +26,11 @@ En **💿 Mis discos** tienes dos formas de verlos:
 
 ### ☁️ Copia en la nube (opcional)
 
-En **⚙️ Ajustes → Copia en la nube** escribe tu email y pulsa **Enviarme el enlace**. Al entrar, «Mis discos» se guarda también en la nube: si cambias de móvil o el navegador borra los datos, no los pierdes. Es como tener una fotocopia de tu lista en otro sitio.
+En **⚙️ Ajustes → Copia en la nube** escribe tu email y pulsa **Enviarme el enlace**. Al entrar, tus discos **y tus llaves** se guardan también en la nube: si cambias de móvil o el navegador borra los datos, no los pierdes. En un móvil nuevo, pulsa en la bienvenida **☁️ Ya uso Vinilos en otro móvil**, entra con tu email y lo recuperas todo sin volver a pegar las llaves. Es como tener una fotocopia de tu lista en otro sitio.
 
 - Si usas la app desde la **pantalla de inicio**, el enlace del correo se abre en Safari, no en la app. En ese caso escribe el **código** que trae el correo.
 - Sin cuenta, la app funciona igual que siempre.
-- Las llaves de Gemini y Discogs **no** se suben: siguen solo en tu móvil.
+- Si una llave ya está en el móvil, manda la del móvil; la de la nube solo se usa cuando aquí falta.
 
 **Truco para afinar la edición:** la portada suele ser igual en todas las ediciones. La contraportada y la galleta central traen el sello y el número de catálogo, que son los que distinguen una edición de otra.
 
@@ -38,7 +38,7 @@ En **⚙️ Ajustes → Copia en la nube** escribe tu email y pulsa **Enviarme e
 
 ## Antes de empezar: las dos llaves
 
-La web necesita dos llaves, como el carné de socio de dos bibliotecas: una para la IA que "lee" la foto (Google Gemini) y otra para buscar el disco (Discogs). Son tuyas, gratuitas, y **se guardan solo en tu navegador**: nunca se suben a este repositorio ni a ningún servidor (ni siquiera a la copia en la nube de tus discos).
+La web necesita dos llaves, como el carné de socio de dos bibliotecas: una para la IA que "lee" la foto (Google Gemini) y otra para buscar el disco (Discogs). Son tuyas, gratuitas, y **se guardan en tu navegador**: nunca se suben a este repositorio. Solo si entras en la copia en la nube se guardan también en tu cuenta de Supabase, donde únicamente tu cuenta puede leerlas.
 
 La primera vez que abres la web, una guía de bienvenida te lleva paso a paso. Aquí están los mismos pasos por si los quieres tener a mano.
 
@@ -68,7 +68,7 @@ Pega cada llave en la guía (o en **⚙️ Ajustes**) y pulsa **Probar conexión
 2. Recomendado: **añádela a la pantalla de inicio** para tenerla como una app.
    - iPhone: botón Compartir → **Añadir a pantalla de inicio**.
    - Android: menú ⋮ → **Añadir a pantalla de inicio** (o **Instalar app**).
-3. Ábrela desde el nuevo icono y **vuelve a pegar las dos llaves una vez**: la app de la pantalla de inicio guarda sus datos aparte de Safari.
+3. Ábrela desde el nuevo icono y **vuelve a pegar las dos llaves una vez** (o entra en la copia en la nube con el código del correo): la app de la pantalla de inicio guarda sus datos aparte de Safari.
 
 ¿Por qué merece la pena? Safari puede borrar los datos guardados de una web si pasas un tiempo sin abrirla (llaves e historial). Las apps de la pantalla de inicio no tienen ese límite.
 
@@ -117,9 +117,9 @@ Web estática (HTML + CSS + JavaScript sin frameworks) que habla directamente de
 | `scoring.js` | Puntúa cada edición según las pistas que coinciden. |
 | `barcode.js` | Escáner: lector del navegador si existe; si no, [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) 3.1.4 desde jsDelivr. |
 | `imaging.js` | Reduce la foto (lado largo ~1024 px) antes de enviarla a la IA. |
-| `tokens.js` | Guarda y comprueba las llaves (en el navegador). |
+| `tokens.js` | Guarda y comprueba las llaves (en el navegador). Avisa de cada cambio para que se suba a la nube. |
 | `history.js` | Historial de discos confirmados (en el navegador). Avisa de cada cambio para que se suba a la nube. |
-| `cloud.js` | Copia en la nube con Supabase: entrada por email, sube cada cambio y mezcla lo del móvil con lo de la nube. Los discos van en la tabla `vinilos.records`, y cada cuenta solo ve los suyos (reglas RLS). |
+| `cloud.js` | Copia en la nube con Supabase: entrada por email, sube cada cambio y mezcla lo del móvil con lo de la nube. Los discos van en la tabla `vinilos.records` y las llaves en `vinilos.settings`; cada cuenta solo ve lo suyo (reglas RLS). |
 | `gallery.js` | Galería horizontal: el disco del centro sale de la funda y gira. |
 | `labels.js` | Busca en segundo plano la foto de la galleta de cada disco guardado y la recorta. Como Discogs no deja que una web lea sus fotos, las descarga a través de [wsrv.nl](https://wsrv.nl), que solo recibe el enlace público de cada foto. |
 | `guide.js` | Textos de la guía de bienvenida: si cambian los menús de Google o Discogs, se edita solo aquí. |

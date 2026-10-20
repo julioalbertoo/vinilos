@@ -19,7 +19,7 @@ import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
 import { fillMissingLabels } from "./labels.js";
-import { initCloud, onCloudStatus, onCloudHistoryChanged, sendMagicLink, verifyCode, signOut, syncAll, isCloudReady } from "./cloud.js";
+import { initCloud, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, verifyCode, signOut, syncAll, isCloudReady } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -872,6 +872,23 @@ function initCloudSettings() {
     } finally {
       verifyButton.disabled = false;
     }
+  });
+
+  // Si la nube trae llaves (p. ej. en un móvil nuevo), se ponen en Ajustes y, si ya estaban
+  // comprobadas, se salta la guía de bienvenida.
+  onCloudTokensChanged(() => {
+    document.getElementById("ai-key-input").value = getAiKey();
+    document.getElementById("discogs-token-input").value = getDiscogsToken();
+    const onGuide = document.getElementById("view-guide").classList.contains("active");
+    const onSettings = document.getElementById("view-settings").classList.contains("active");
+    if (areTokensVerified() && (onGuide || onSettings)) showView("capture");
+    else if (hasTokens() && onGuide) showView("settings");
+  });
+
+  document.getElementById("guide-intro-cloud").addEventListener("click", () => {
+    showView("settings");
+    document.getElementById("cloud-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!signedOut.hidden) emailInput.focus();
   });
 
   document.getElementById("cloud-sync").addEventListener("click", () => syncAll());
