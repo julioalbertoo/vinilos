@@ -14,23 +14,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
-  <link rel="stylesheet" href="styles.css?v=1.13.1">
+  <link rel="stylesheet" href="styles.css?v=1.13.2">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=1.13.1",
-        "./tokens.js": "./tokens.js?v=1.13.1",
-        "./guide.js": "./guide.js?v=1.13.1",
-        "./ai.js": "./ai.js?v=1.13.1",
-        "./discogs.js": "./discogs.js?v=1.13.1",
-        "./imaging.js": "./imaging.js?v=1.13.1",
-        "./scoring.js": "./scoring.js?v=1.13.1",
-        "./barcode.js": "./barcode.js?v=1.13.1",
-        "./history.js": "./history.js?v=1.13.1",
-        "./gallery.js": "./gallery.js?v=1.13.1",
-        "./labels.js": "./labels.js?v=1.13.1",
-        "./cloud.js": "./cloud.js?v=1.13.1",
+        "./config.js": "./config.js?v=1.13.2",
+        "./tokens.js": "./tokens.js?v=1.13.2",
+        "./guide.js": "./guide.js?v=1.13.2",
+        "./ai.js": "./ai.js?v=1.13.2",
+        "./discogs.js": "./discogs.js?v=1.13.2",
+        "./imaging.js": "./imaging.js?v=1.13.2",
+        "./scoring.js": "./scoring.js?v=1.13.2",
+        "./barcode.js": "./barcode.js?v=1.13.2",
+        "./history.js": "./history.js?v=1.13.2",
+        "./gallery.js": "./gallery.js?v=1.13.2",
+        "./labels.js": "./labels.js?v=1.13.2",
+        "./cloud.js": "./cloud.js?v=1.13.2",
         "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm"
       }
     }
@@ -39,7 +39,7 @@
 <body>
   <header class="app-header">
     <h1><span class="logo-disc" aria-hidden="true"></span>Vinilos</h1>
-    <p class="app-version">v1.13.1</p>
+    <p class="app-version">v1.13.2</p>
   </header>
 
   <main id="app">
@@ -184,8 +184,6 @@
     <section id="view-detail" class="view">
       <div id="detail-content"></div>
       <p id="detail-saved" class="saved-pill"></p>
-      <button type="button" id="detail-new">📷 Identificar otro disco</button>
-      <a id="detail-open" class="btn btn-soft" target="_blank" rel="noopener">Abrir en Discogs ↗</a>
       <button type="button" id="detail-back" class="ghost">← Volver a los candidatos</button>
     </section>
 
@@ -231,6 +229,6 @@
     <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=1.13.1"></script>
+  <script type="module" src="app.js?v=1.13.2"></script>
 </body>
 </html>

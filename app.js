@@ -309,7 +309,6 @@ function renderDetail(release) {
     nodes.push(list);
   }
   document.getElementById("detail-content").replaceChildren(...nodes);
-  document.getElementById("detail-open").href = release.url;
 }
 
 function formatMoney({ value, currency }) {
@@ -635,12 +634,8 @@ function initResults(resetCapture) {
   });
 }
 
-function initDetail(resetCapture) {
+function initDetail() {
   document.getElementById("detail-back").addEventListener("click", () => showView(detailReturnView));
-  document.getElementById("detail-new").addEventListener("click", () => {
-    resetCapture();
-    showView("capture");
-  });
 }
 
 function initCapture() {
@@ -1024,7 +1019,7 @@ initGuideNavigation();
 initSettings();
 const resetCapture = initCapture();
 initResults(resetCapture);
-initDetail(resetCapture);
+initDetail();
 initHistory();
 initCloudSettings();
 if (cloudPinnedMessage) {
