@@ -350,9 +350,6 @@ function renderPrices(id, prices) {
       row.append(chip);
     }
     nodes.push(row);
-  } else {
-    nodes.push(el("p", "detail-price-hint",
-      "Para ver el precio sugerido por estado, rellena tus datos de vendedor en Discogs (Ajustes → Vendedor). No hace falta vender nada."));
   }
   nodes.push(spainLink(id));
   box.replaceChildren(...nodes);
