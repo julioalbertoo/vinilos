@@ -152,8 +152,8 @@ async function tryModel(model, aiKey, imageDataUrl) {
 const BUSY_RETRIES = 2;
 
 export async function identify(imageDataUrl, aiKey, onAttempt) {
-  const { primaryModel, fallbackModel, extraModels = [] } = CONFIG.AI_PROVIDER;
-  const models = [primaryModel, fallbackModel, ...extraModels];
+  const { primaryModel, fallbackModel } = CONFIG.AI_PROVIDER;
+  const models = [primaryModel, fallbackModel, ...(await backupModels(aiKey))];
   const attempts = [];
   for (const [index, model] of models.entries()) {
     if (onAttempt) onAttempt(model, attempts.at(-1)?.detail, 0);
@@ -249,6 +249,60 @@ const LABEL_PROMPT =
 // (file_data) además de fotos incrustadas (inline_data).
 const NATIVE_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
+// Google retira modelos cada pocos meses, así que los de respaldo se le preguntan a Google
+// (con la llave del usuario) en vez de fijarlos en el código. La lista se pide una vez por visita.
+const MAX_BACKUPS = 4;
+let modelNamesPromise = null;
+
+async function fetchModelNames(aiKey) {
+  const names = new Set();
+  let pageToken = "";
+  for (let page = 0; page < 5; page += 1) {
+    const query = new URLSearchParams({ pageSize: "1000" });
+    if (pageToken) query.set("pageToken", pageToken);
+    const response = await fetch(`${NATIVE_BASE}?${query}`, { headers: { "x-goog-api-key": aiKey } });
+    if (!response.ok) throw new Error(`código ${response.status}`);
+    const data = await response.json();
+    for (const m of data.models || []) {
+      if ((m.supportedGenerationMethods || []).includes("generateContent")) names.add(String(m.name).replace(/^models\//, ""));
+    }
+    pageToken = data.nextPageToken;
+    if (!pageToken) break;
+  }
+  return names;
+}
+
+// Versión de un modelo ("gemini-3.8-flash" → 3.8) para probar antes los más nuevos.
+const modelVersion = (name) => Number((/-(\d+(?:\.\d+)?)/.exec(name) || [])[1]) || 0;
+
+// Modelos que entienden fotos y devuelven texto: Gemini Flash (normal o Lite) y Gemma grandes.
+// Se dejan fuera las variantes de voz, imagen, vídeo, etc. y las versiones de prueba.
+function isUsefulModel(name) {
+  if (/^gemini-\d+(\.\d+)?-flash(-lite)?$/.test(name)) return true;
+  const gemma = /^gemma-\d+(?:\.\d+)?-(\d+)b-it$/.exec(name);
+  return Boolean(gemma) && Number(gemma[1]) >= 12;
+}
+
+async function backupModels(aiKey) {
+  const { primaryModel, fallbackModel, extraModels = [] } = CONFIG.AI_PROVIDER;
+  if (!modelNamesPromise) {
+    modelNamesPromise = fetchModelNames(aiKey).catch(() => {
+      modelNamesPromise = null;
+      return null;
+    });
+  }
+  const names = await modelNamesPromise;
+  // Si Google no da la lista, se usan los de la configuración tal cual.
+  if (!names) return extraModels;
+  const skip = new Set([primaryModel, fallbackModel]);
+  const configured = extraModels.filter((m) => names.has(m) && !skip.has(m));
+  const found = [...names]
+    .filter((m) => isUsefulModel(m) && !skip.has(m) && !configured.includes(m))
+    // Primero Gemini (del más nuevo al más viejo) y Gemma al final.
+    .sort((a, b) => Number(a.startsWith("gemma")) - Number(b.startsWith("gemma")) || modelVersion(b) - modelVersion(a));
+  return [...configured, ...found].slice(0, MAX_BACKUPS);
+}
+
 function imagePart(image) {
   const match = /^data:([^;]+);base64,(.*)$/.exec(image);
   if (match) return { inline_data: { mime_type: match[1], data: match[2] } };
@@ -283,6 +337,8 @@ async function callNative(model, parts, aiKey) {
   const detail = describeError(response.status, body);
   if (response.status >= 500) return { ok: false, detail, busy: true };
   if (response.status === 429) return { ok: false, detail, quota: true };
+  // 404: Google ha retirado ese modelo; se salta sin contar como fallo.
+  if (response.status === 404) return { ok: false, detail, notFound: true };
   // Sin llave válida no tiene sentido seguir con más discos.
   return { ok: false, detail, stop: detail === INVALID_KEY_MESSAGE };
 }
@@ -295,8 +351,7 @@ export async function locateLabel(images, aiKey) {
 
   // Se prueba primero el modelo ligero y, si falla, los de respaldo. El principal se reserva entero
   // para identificar discos, porque cada modelo tiene su propio cupo gratuito y no se comparte.
-  const { fallbackModel, extraModels = [] } = CONFIG.AI_PROVIDER;
-  const models = [fallbackModel, ...extraModels];
+  const models = [CONFIG.AI_PROVIDER.fallbackModel, ...(await backupModels(aiKey))];
   const failures = [];
   let allBusy = true;
   for (const model of models) {
@@ -304,7 +359,7 @@ export async function locateLabel(images, aiKey) {
     if (!result.ok) {
       // Sin llave válida no sirve probar otros modelos.
       if (result.stop) return result;
-      if (!result.busy && !result.quota) allBusy = false;
+      if (!result.busy && !result.quota && !result.notFound) allBusy = false;
       failures.push(`${model}: ${result.detail}`);
       continue;
     }
