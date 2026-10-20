@@ -69,27 +69,28 @@ body {
   align-items: center;
   justify-content: space-between;
   /* A todo el ancho para que Safari la tome como barra; el contenido sigue en 480 px como antes. */
-  padding: calc(2px + env(safe-area-inset-top)) max(20px, calc((100% - 440px) / 2)) 8px;
+  padding: calc(4px + env(safe-area-inset-top)) max(20px, calc((100% - 440px) / 2)) 4px;
   background: var(--bg);
 }
 
 .app-header h1 {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.1rem;
+  line-height: 1.2;
   font-weight: 800;
   letter-spacing: -0.01em;
 }
 
 .app-version {
   margin: 0;
-  padding: 3px 10px;
+  padding: 1px 8px;
   border-radius: 999px;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--muted);
 }
@@ -106,8 +107,8 @@ body {
 }
 
 .logo-disc {
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 22px;
 }
 
 .hero-disc {
