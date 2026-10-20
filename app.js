@@ -19,7 +19,7 @@ import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
 import { fillMissingLabels } from "./labels.js";
-import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, verifyCode, signOut, syncAll, isCloudReady } from "./cloud.js";
+import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -818,10 +818,10 @@ function initCloudSettings() {
   const signedOut = document.getElementById("cloud-signed-out");
   const signedIn = document.getElementById("cloud-signed-in");
   const emailInput = document.getElementById("cloud-email");
-  const codeInput = document.getElementById("cloud-code");
+  const passwordInput = document.getElementById("cloud-password");
   const status = document.getElementById("cloud-status");
   const sendButton = document.getElementById("cloud-send");
-  const verifyButton = document.getElementById("cloud-verify");
+  const loginButton = document.getElementById("cloud-login");
 
   onCloudStatus(({ user, state, text }) => {
     cloudSignedIn = Boolean(user);
@@ -849,7 +849,7 @@ function initCloudSettings() {
     status.textContent = "Enviando…";
     try {
       await sendMagicLink(email);
-      status.textContent = `✅ Correo enviado a ${email}.`;
+      status.textContent = `✅ Correo enviado a ${email}. Pulsa el enlace una sola vez (cada enlace sirve una vez).`;
     } catch (err) {
       status.textContent = `❌ ${err.message}`;
     } finally {
@@ -857,22 +857,48 @@ function initCloudSettings() {
     }
   });
 
-  verifyButton.addEventListener("click", async () => {
+  async function login() {
     const email = emailInput.value.trim();
-    const code = codeInput.value.replace(/\s/g, "");
-    if (!email || !code) {
-      status.textContent = "❌ Escribe tu email y el código del correo.";
+    const password = passwordInput.value;
+    if (!email || !password) {
+      status.textContent = "❌ Escribe tu email y tu contraseña.";
       return;
     }
-    verifyButton.disabled = true;
-    status.textContent = "Comprobando…";
+    loginButton.disabled = true;
+    cloudPinnedMessage = "";
+    status.textContent = "Entrando…";
     try {
-      await verifyCode(email, code);
-      codeInput.value = "";
+      await signInWithPassword(email, password);
+      passwordInput.value = "";
     } catch (err) {
       status.textContent = `❌ ${err.message}`;
     } finally {
-      verifyButton.disabled = false;
+      loginButton.disabled = false;
+    }
+  }
+  loginButton.addEventListener("click", login);
+  passwordInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") login();
+  });
+
+  const newPasswordInput = document.getElementById("cloud-new-password");
+  const setPasswordButton = document.getElementById("cloud-set-password");
+  setPasswordButton.addEventListener("click", async () => {
+    const password = newPasswordInput.value;
+    if (password.length < 8) {
+      status.textContent = "❌ Usa al menos 8 caracteres.";
+      return;
+    }
+    setPasswordButton.disabled = true;
+    status.textContent = "Guardando…";
+    try {
+      await setPassword(password);
+      newPasswordInput.value = "";
+      status.textContent = "✅ Contraseña guardada. Úsala con tu email para entrar en la app de la pantalla de inicio.";
+    } catch (err) {
+      status.textContent = `❌ ${err.message}`;
+    } finally {
+      setPasswordButton.disabled = false;
     }
   });
 
@@ -900,7 +926,7 @@ function initCloudSettings() {
     status.textContent = "Sesión cerrada. Tus discos siguen en este móvil.";
   });
 
-  // Vuelta de un enlace del correo que ya no vale: se explica en Ajustes, junto a la caja del código.
+  // Vuelta de un enlace del correo que ya no vale: se explica en Ajustes, junto al acceso con contraseña.
   const linkError = takeAuthError();
   if (linkError) {
     cloudPinnedMessage = `❌ ${linkError}`;

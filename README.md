@@ -26,9 +26,9 @@ En **💿 Mis discos** tienes dos formas de verlos:
 
 ### ☁️ Copia en la nube (opcional)
 
-En **⚙️ Ajustes → Copia en la nube** escribe tu email y pulsa **Enviarme el enlace**. Al entrar, tus discos **y tus llaves** se guardan también en la nube: si cambias de móvil o el navegador borra los datos, no los pierdes. En un móvil nuevo, pulsa en la bienvenida **☁️ Ya uso Vinilos en otro móvil**, entra con tu email y lo recuperas todo sin volver a pegar las llaves. Es como tener una fotocopia de tu lista en otro sitio.
+En **⚙️ Ajustes → Copia en la nube** entra con tu **email y contraseña**. Al entrar, tus discos **y tus llaves** se guardan también en la nube: si cambias de móvil o el navegador borra los datos, no los pierdes. En un móvil nuevo, pulsa en la bienvenida **☁️ Ya uso Vinilos en otro móvil**, entra y lo recuperas todo sin volver a pegar las llaves.
 
-- Si usas la app desde la **pantalla de inicio**, el enlace del correo se abre en Safari, no en la app. En ese caso escribe el **código** que trae el correo.
+- **¿Sin contraseña?** Abre la web en Safari, pulsa **✉️ Enviarme un enlace para entrar** y abre el enlace del correo (sirve una sola vez). Ya dentro, en el mismo panel, pon una contraseña. Luego úsala en la app de la pantalla de inicio: el enlace del correo siempre se abre en Safari, no en la app.
 - Sin cuenta, la app funciona igual que siempre.
 - Si una llave ya está en el móvil, manda la del móvil; la de la nube solo se usa cuando aquí falta.
 
@@ -68,7 +68,7 @@ Pega cada llave en la guía (o en **⚙️ Ajustes**) y pulsa **Probar conexión
 2. Recomendado: **añádela a la pantalla de inicio** para tenerla como una app.
    - iPhone: botón Compartir → **Añadir a pantalla de inicio**.
    - Android: menú ⋮ → **Añadir a pantalla de inicio** (o **Instalar app**).
-3. Ábrela desde el nuevo icono y **vuelve a pegar las dos llaves una vez** (o entra en la copia en la nube con el código del correo): la app de la pantalla de inicio guarda sus datos aparte de Safari.
+3. Ábrela desde el nuevo icono y **vuelve a pegar las dos llaves una vez** (o entra en la copia en la nube con tu email y contraseña): la app de la pantalla de inicio guarda sus datos aparte de Safari.
 
 ¿Por qué merece la pena? Safari puede borrar los datos guardados de una web si pasas un tiempo sin abrirla (llaves e historial). Las apps de la pantalla de inicio no tienen ese límite.
 
@@ -85,7 +85,7 @@ Debajo del título verás la versión (por ejemplo `v1.0.0`). Sirve para comprob
 | "No encontré este disco en Discogs" | Fotografía la contraportada o la galleta central, escanea el código, o usa **Ninguno es** para buscar escribiendo. |
 | El escáner no lee el código | Acerca el móvil hasta que el código ocupe casi todo el ancho del visor e inclina el disco para quitar reflejos. A los pocos segundos aparece **📷 Leer el número con una foto**. |
 | "No hay permiso para usar la cámara" | Activa la cámara para esta web en los ajustes del navegador. |
-| "Ese enlace ya se usó o caducó" | Cada enlace del correo sirve una sola vez: si lo abriste antes en otro navegador (Safari, Gmail…), allí ya estás dentro. Para entrar en la app, pide otro correo y escribe el código en **⚙️ Ajustes → Copia en la nube**. |
+| "Ese enlace ya se usó o caducó" | Cada enlace del correo sirve una sola vez: si lo abriste antes en otro navegador (Safari, Gmail…), allí ya estás dentro. Para entrar en la app, usa tu email y contraseña en **⚙️ Ajustes → Copia en la nube** (si no tienes, ponla desde Safari tras entrar con el enlace). |
 | No ves cambios recientes | Comprueba la versión bajo el título y recarga la página. |
 
 ---

@@ -116,7 +116,7 @@ function readAuthErrorFromUrl() {
   if (code === "otp_expired" || code === "access_denied") {
     return (
       "Ese enlace ya se usó o caducó: cada enlace sirve una sola vez. Si lo abriste antes en otro navegador " +
-      "(por ejemplo, Safari), allí ya estás dentro. Para entrar aquí, pide un correo nuevo y escribe el código."
+      "(por ejemplo, Safari), allí ya estás dentro. Para entrar aquí, usa tu email y contraseña, o pide un correo nuevo."
     );
   }
   return `No se pudo entrar con el enlace (${params.get("error_description") || code}). Pide un correo nuevo.`;
@@ -181,9 +181,18 @@ export async function sendMagicLink(email) {
   if (error) throw new Error(describeAuthError(error));
 }
 
-export async function verifyCode(email, code) {
+// Entrar con contraseña: es lo que funciona dentro de la app de la pantalla de inicio,
+// porque el enlace del correo siempre se abre en Safari.
+export async function signInWithPassword(email, password) {
   if (!client) throw new Error("La copia en la nube no está disponible ahora mismo.");
-  const { error } = await client.auth.verifyOtp({ email, token: code, type: "email" });
+  const { error } = await client.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(describeAuthError(error));
+}
+
+// Poner o cambiar la contraseña de la cuenta (hace falta haber entrado, p. ej. con el enlace).
+export async function setPassword(password) {
+  if (!client || !user) throw new Error("Primero entra en tu cuenta.");
+  const { error } = await client.auth.updateUser({ password });
   if (error) throw new Error(describeAuthError(error));
 }
 
@@ -200,8 +209,15 @@ function describeAuthError(error) {
   if (error.status === 429 || msg.includes("rate limit") || msg.includes("seconds")) {
     return "Has pedido varios correos seguidos. Espera un minuto y vuelve a probar.";
   }
+  if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
+    return "Email o contraseña incorrectos. Si no recuerdas la contraseña, entra con el enlace del correo desde Safari y pon una nueva aquí, en Ajustes.";
+  }
+  if (msg.includes("should be different")) return "Esa ya es tu contraseña actual.";
+  if (msg.includes("password") && (msg.includes("least") || msg.includes("short") || msg.includes("weak"))) {
+    return "La contraseña es demasiado corta o sencilla: usa al menos 8 caracteres.";
+  }
   if (msg.includes("expired") || msg.includes("invalid")) {
-    return "El código no es válido o ha caducado. Pide un correo nuevo.";
+    return "El enlace no es válido o ha caducado. Pide un correo nuevo.";
   }
   if (msg.includes("email")) return "Revisa el email: parece que no es válido.";
   return error.message || "No se pudo entrar.";
