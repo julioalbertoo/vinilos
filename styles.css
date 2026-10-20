@@ -521,6 +521,39 @@ input[type="text"]:focus {
   display: block;
 }
 
+.preview-wrap {
+  cursor: pointer;
+}
+
+.preview-wrap.busy {
+  cursor: default;
+}
+
+/* Aviso sobre la foto: tocarla la vuelve a buscar. Se oculta mientras se busca. */
+.preview-again {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(23, 20, 31, 0.72);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.preview-wrap.busy .preview-again {
+  display: none;
+}
+
+.preview-wrap:active:not(.busy) {
+  transform: scale(0.98);
+  transition: transform 0.12s ease;
+}
+
 .scanline {
   position: absolute;
   left: 0;

@@ -829,6 +829,17 @@ function initCapture() {
   }
 
   retryButton.addEventListener("click", () => runIdentify(++identifyRun));
+  // Al volver a esta pantalla, tocar la foto la busca de nuevo (salvo si ya se está buscando).
+  const searchAgain = () => {
+    if (!previewWrap.classList.contains("busy")) runIdentify(++identifyRun);
+  };
+  previewWrap.addEventListener("click", searchAgain);
+  previewWrap.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      searchAgain();
+    }
+  });
 
   async function searchAndShow(clues, source, run = identifyRun) {
     status.classList.add("loading");

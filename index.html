@@ -16,23 +16,23 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
   <!-- Pone el tema oscuro del modo explorador antes de pintar, para que no parpadee en claro. -->
   <script>try { if (localStorage.getItem("vinilos_explore_mode") === "1") document.documentElement.dataset.theme = "dark"; } catch {}</script>
-  <link rel="stylesheet" href="styles.css?v=1.22.0">
+  <link rel="stylesheet" href="styles.css?v=1.23.0">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=1.22.0",
-        "./tokens.js": "./tokens.js?v=1.22.0",
-        "./guide.js": "./guide.js?v=1.22.0",
-        "./ai.js": "./ai.js?v=1.22.0",
-        "./discogs.js": "./discogs.js?v=1.22.0",
-        "./imaging.js": "./imaging.js?v=1.22.0",
-        "./scoring.js": "./scoring.js?v=1.22.0",
-        "./barcode.js": "./barcode.js?v=1.22.0",
-        "./history.js": "./history.js?v=1.22.0",
-        "./gallery.js": "./gallery.js?v=1.22.0",
-        "./labels.js": "./labels.js?v=1.22.0",
-        "./cloud.js": "./cloud.js?v=1.22.0",
+        "./config.js": "./config.js?v=1.23.0",
+        "./tokens.js": "./tokens.js?v=1.23.0",
+        "./guide.js": "./guide.js?v=1.23.0",
+        "./ai.js": "./ai.js?v=1.23.0",
+        "./discogs.js": "./discogs.js?v=1.23.0",
+        "./imaging.js": "./imaging.js?v=1.23.0",
+        "./scoring.js": "./scoring.js?v=1.23.0",
+        "./barcode.js": "./barcode.js?v=1.23.0",
+        "./history.js": "./history.js?v=1.23.0",
+        "./gallery.js": "./gallery.js?v=1.23.0",
+        "./labels.js": "./labels.js?v=1.23.0",
+        "./cloud.js": "./cloud.js?v=1.23.0",
         "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm"
       }
     }
@@ -41,7 +41,7 @@
 <body>
   <header class="app-header">
     <h1><span class="logo-disc" aria-hidden="true"></span>Vinilos</h1>
-    <p class="app-version">v1.22.0</p>
+    <p class="app-version">v1.23.0</p>
   </header>
 
   <main id="app">
@@ -135,9 +135,10 @@
         <p>Haz una foto de la portada, el lomo o la galleta central. Lo identifico al momento.</p>
       </div>
 
-      <div id="capture-preview-wrap" class="preview-wrap" hidden>
+      <div id="capture-preview-wrap" class="preview-wrap" role="button" tabindex="0" aria-label="Buscar de nuevo esta foto" hidden>
         <img id="capture-preview" alt="Vista previa de la foto">
         <div class="preview-busy" aria-hidden="true"><span class="scanline"></span></div>
+        <span class="preview-again" aria-hidden="true">↻ Toca para buscar de nuevo</span>
       </div>
       <p id="capture-status" class="status status-card" role="status" aria-live="polite"></p>
       <button type="button" id="capture-identify" hidden>↻ Reintentar con esta foto</button>
@@ -242,6 +243,6 @@
     <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=1.22.0"></script>
+  <script type="module" src="app.js?v=1.23.0"></script>
 </body>
 </html>
