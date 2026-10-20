@@ -65,7 +65,7 @@ body {
   justify-content: space-between;
   max-width: 480px;
   margin: 0 auto;
-  padding: calc(12px + env(safe-area-inset-top)) 20px 12px;
+  padding: calc(2px + env(safe-area-inset-top)) 20px 8px;
 }
 
 .app-header h1 {
