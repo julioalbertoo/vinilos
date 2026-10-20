@@ -245,7 +245,8 @@ export async function locateLabel(images, aiKey) {
       signal: controller.signal,
     });
   } catch (err) {
-    const detail = err && err.name === "AbortError" ? "tiempo agotado" : "error de red";
+    const detail =
+      err && err.name === "AbortError" ? "tiempo agotado" : `error de red (${err && err.message ? err.message : err})`;
     return { ok: false, detail, transient: true };
   } finally {
     clearTimeout(timer);

@@ -112,7 +112,7 @@ Web estática (HTML + CSS + JavaScript sin frameworks) que habla directamente de
 | `tokens.js` | Guarda y comprueba las llaves (en el navegador). |
 | `history.js` | Historial de discos confirmados (en el navegador). |
 | `gallery.js` | Galería horizontal: el disco del centro sale de la funda y gira. |
-| `labels.js` | Busca en segundo plano la foto de la galleta de cada disco guardado y la recorta. |
+| `labels.js` | Busca en segundo plano la foto de la galleta de cada disco guardado y la recorta. Como Discogs no deja que una web lea sus fotos, las descarga a través de [wsrv.nl](https://wsrv.nl), que solo recibe el enlace público de cada foto. |
 | `guide.js` | Textos de la guía de bienvenida: si cambian los menús de Google o Discogs, se edita solo aquí. |
 
 **Versiones:** cada publicación sube el número de versión en `index.html`, que también se añade a las direcciones de los archivos (`app.js?v=1.0.0`). Así el móvil descarga siempre la versión nueva en vez de una copia antigua guardada.
