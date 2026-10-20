@@ -13,7 +13,7 @@ import {
 import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify } from "./ai.js";
-import { testDiscogsConnection, findCandidates, searchByText, getRelease, getMasterYear, bothYears, getPrices, vinylColor, releaseWeight } from "./discogs.js";
+import { testDiscogsConnection, findCandidates, searchByText, getRelease, getMasterYear, bothYears, getPrices, countryWithFlag, vinylColor, releaseWeight } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -226,7 +226,7 @@ function renderCard(candidate, index) {
 
   const body = el("div", "card-body");
   body.append(el("h3", null, candidate.title));
-  body.append(el("p", null, [candidate.year || "Año ?", candidate.country || "País ?"].join(" · ")));
+  body.append(el("p", null, [candidate.year || "Año ?", countryWithFlag(candidate.country) || "País ?"].join(" · ")));
   body.append(el("p", null, [candidate.label || "Sello ?", candidate.catno || "Nº cat. ?"].join(" · ")));
   body.append(el("p", null, candidate.formats.join(", ")));
   if (candidate.color) body.append(el("p", "card-color", `🎨 ${candidate.color}`));
@@ -314,7 +314,7 @@ function detailYears(release) {
 
 // "1985 (ed. julio de 2009) · UK"; el año original aparece cuando llega del master.
 function detailYearLine(release) {
-  return [detailYears(release) || "Año ?", release.country || "País ?"].join(" · ");
+  return [detailYears(release) || "Año ?", countryWithFlag(release.country) || "País ?"].join(" · ");
 }
 
 // "3:32" o "1:02:10" → segundos. null si no se entiende.

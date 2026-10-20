@@ -314,3 +314,35 @@ async function runSearchSteps(steps, discogsToken, onStep) {
   }
   return { candidates: [], strategy: null, masterId: null };
 }
+
+// Países tal como los escribe Discogs → código ISO de dos letras, para la bandera.
+const COUNTRY_CODES = {
+  Spain: "ES", UK: "GB", US: "US", USA: "US", Europe: "EU", "European Union": "EU", Germany: "DE",
+  France: "FR", Italy: "IT", Portugal: "PT", Netherlands: "NL", Belgium: "BE", Benelux: "BE",
+  Switzerland: "CH", Austria: "AT", Sweden: "SE", Norway: "NO", Denmark: "DK", Finland: "FI",
+  Iceland: "IS", Ireland: "IE", Greece: "GR", Poland: "PL", Czechia: "CZ", "Czech Republic": "CZ",
+  Czechoslovakia: "CZ", Slovakia: "SK", Hungary: "HU", Romania: "RO", Bulgaria: "BG",
+  Yugoslavia: "RS", Serbia: "RS", Croatia: "HR", Slovenia: "SI", Russia: "RU", USSR: "RU",
+  Ukraine: "UA", "German Democratic Republic (GDR)": "DE", "West Germany": "DE", Turkey: "TR",
+  Israel: "IL", Canada: "CA", Mexico: "MX", Brazil: "BR", Argentina: "AR", Chile: "CL",
+  Colombia: "CO", Peru: "PE", Venezuela: "VE", Uruguay: "UY", Cuba: "CU", Jamaica: "JM",
+  "Puerto Rico": "PR", Japan: "JP", "South Korea": "KR", Korea: "KR", China: "CN", Taiwan: "TW",
+  "Hong Kong": "HK", India: "IN", Indonesia: "ID", Malaysia: "MY", Philippines: "PH",
+  Singapore: "SG", Thailand: "TH", Australia: "AU", "New Zealand": "NZ", "South Africa": "ZA",
+  Nigeria: "NG", Egypt: "EG", Lebanon: "LB", Iran: "IR", Luxembourg: "LU", Scandinavia: "",
+};
+
+// Bandera del país de Discogs: "Spain" → 🇪🇸; "UK & Europe" → 🇬🇧🇪🇺. "" si no se conoce.
+export function countryFlag(country) {
+  return (country || "")
+    .split(/\s*&\s*/)
+    .map((name) => COUNTRY_CODES[name] || "")
+    .map((code) => code.replace(/./g, (c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65)))
+    .join("");
+}
+
+// "Spain 🇪🇸", o solo el país si no hay bandera.
+export function countryWithFlag(country) {
+  const flag = countryFlag(country);
+  return flag ? `${country} ${flag}` : country;
+}
