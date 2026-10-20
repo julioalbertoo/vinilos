@@ -205,6 +205,7 @@ function renderCard(candidate, index) {
   body.append(el("p", null, [candidate.label || "Sello ?", candidate.catno || "Nº cat. ?"].join(" · ")));
   body.append(el("p", null, candidate.formats.join(", ")));
   if (candidate.color) body.append(el("p", "card-color", `🎨 ${candidate.color}`));
+  if (candidate.weight) body.append(el("p", "card-weight", `⚖️ ${candidate.weight}`));
   if (candidate.matches.length) {
     body.append(el("p", "card-matches", candidate.matches.map((m) => `✓ ${m}`).join("  ")));
   }
@@ -605,6 +606,9 @@ function initCapture() {
     resetCapture();
     const session = ++scanSession;
     document.getElementById("scanner").hidden = false;
+    // Mientras se escanea, la cámara ocupa la pantalla: se ocultan el disco decorativo y los botones.
+    view.classList.add("scanning");
+    window.scrollTo(0, 0);
     const scannerPhoto = document.getElementById("scanner-photo");
     scannerPhoto.hidden = true;
     const scannerStatus = document.getElementById("scanner-status");
@@ -680,6 +684,7 @@ let scanTipTimer = null;
 
 function stopScanner() {
   scanSession++;
+  document.getElementById("view-capture").classList.remove("scanning");
   clearTimeout(scanTipTimer);
   if (stopActiveScanner) {
     stopActiveScanner();

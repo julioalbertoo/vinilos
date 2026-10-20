@@ -61,6 +61,15 @@ export function vinylColor(texts) {
   return hit ? hit.trim() : "";
 }
 
+// Devuelve el gramaje (p. ej. "180 g") si Discogs lo indica: "180 Gram", "180g", "200 gr".
+export function vinylWeight(texts) {
+  for (const t of texts) {
+    const m = (t || "").match(/\b(\d{2,3})\s*-?\s*(?:grams?|gr|g)\b/i);
+    if (m) return `${m[1]} g`;
+  }
+  return "";
+}
+
 function fromSearchResult(r) {
   return {
     id: r.id,
@@ -71,6 +80,7 @@ function fromSearchResult(r) {
     catno: r.catno || "",
     formats: r.format || [],
     color: vinylColor([...(r.formats || []).map((f) => f.text), ...(r.format || [])]),
+    weight: vinylWeight([...(r.formats || []).flatMap((f) => [f.text, ...(f.descriptions || [])]), ...(r.format || [])]),
     barcodes: r.barcode || [],
     thumb: r.cover_image || r.thumb || "",
     have: r.community?.have || 0,
@@ -88,6 +98,7 @@ function fromMasterVersion(v) {
     catno: v.catno || "",
     formats: [...(v.major_formats || []), ...(v.format || "").split(", ").filter(Boolean)],
     color: vinylColor((v.format || "").split(", ")),
+    weight: vinylWeight((v.format || "").split(", ")),
     barcodes: [],
     thumb: v.thumb || "",
     have: v.stats?.community?.in_collection || 0,

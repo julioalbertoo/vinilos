@@ -515,7 +515,15 @@ input[type="text"]:focus {
 }
 
 .scanner {
-  margin-top: var(--gap);
+  margin-top: 0;
+}
+
+#view-capture.scanning .hero,
+#view-capture.scanning #capture-camera-label,
+#view-capture.scanning .btn-row,
+#view-capture.scanning .preview-wrap,
+#view-capture.scanning .raw-json {
+  display: none !important;
 }
 
 .scanner-frame {
@@ -528,7 +536,7 @@ input[type="text"]:focus {
 .scanner video {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
 }
 
@@ -862,6 +870,17 @@ body.no-tabbar .tabbar {
 .tabbar button.active {
   background: var(--primary-soft);
   color: var(--primary-press);
+}
+
+.view .card-body .card-weight {
+  display: inline-block;
+  margin: 6px 6px 0 0;
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: #e3efff;
+  color: #2f5c96;
+  font-weight: 700;
+  font-size: 0.8rem;
 }
 
 .view .card-body .card-color {
