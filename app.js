@@ -235,7 +235,7 @@ function renderCard(candidate, index) {
     body.append(el("p", "card-matches", candidate.matches.map((m) => `✓ ${m}`).join("  ")));
   }
   // Solo el mejor candidato lleva el botón lila: es la acción más probable.
-  const select = el("button", best ? "card-select" : "card-select secondary", "✓ Es este");
+  const select = el("button", best ? "card-select" : "card-select secondary", exploreMode ? "🧭 Explorar este" : "✓ Es este");
   select.type = "button";
   select.addEventListener("click", () => openDetail(candidate));
   body.append(select);
