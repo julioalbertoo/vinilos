@@ -449,7 +449,9 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
     }
   }
 
-  if (!fromHistory) {
+  if (!fromHistory && exploreMode) {
+    savedNote.textContent = "🧭 Modo explorador: no se ha guardado en tu colección";
+  } else if (!fromHistory) {
     // Si la ficha no llegó, se guarda con los datos del candidato para no perder la confirmación.
     try {
       addToHistory({
@@ -687,6 +689,35 @@ function initResults(resetCapture) {
 
 function initDetail() {
   document.getElementById("detail-back").addEventListener("click", () => showView(detailReturnView));
+}
+
+// Modo explorador: tema oscuro y lo que se identifica no se guarda en «Mis discos».
+// El tema ya lo pone un script en index.html antes de pintar; aquí se sincroniza el interruptor.
+const EXPLORE_KEY = CONFIG.STORAGE_KEYS.exploreMode;
+let exploreMode = false;
+
+function setExploreMode(on) {
+  exploreMode = on;
+  if (on) document.documentElement.dataset.theme = "dark";
+  else delete document.documentElement.dataset.theme;
+  // Color de la franja de la hora en Safari: el mismo que el fondo de la cabecera.
+  document.querySelector('meta[name="theme-color"]').content = on ? "#17141f" : "#fbf6f1";
+  document.getElementById("explore-toggle").checked = on;
+  try {
+    if (on) localStorage.setItem(EXPLORE_KEY, "1");
+    else localStorage.removeItem(EXPLORE_KEY);
+  } catch {
+    // Sin memoria del navegador el modo dura hasta cerrar la app.
+  }
+}
+
+function initExploreMode() {
+  let saved = false;
+  try {
+    saved = localStorage.getItem(EXPLORE_KEY) === "1";
+  } catch {}
+  setExploreMode(saved);
+  document.getElementById("explore-toggle").addEventListener("change", (event) => setExploreMode(event.target.checked));
 }
 
 function initCapture() {
@@ -1073,6 +1104,7 @@ initTypingMode();
 populateGuideText();
 initGuideNavigation();
 initSettings();
+initExploreMode();
 const resetCapture = initCapture();
 initResults(resetCapture);
 initDetail();

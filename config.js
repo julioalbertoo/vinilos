@@ -29,6 +29,8 @@ export const CONFIG = {
     discogsVerified: "vinilos_discogs_verified",
     history: "vinilos_history",
     collectionSort: "vinilos_collection_sort",
+    // "1" = modo explorador (tema oscuro; lo que se identifica no se guarda en «Mis discos»).
+    exploreMode: "vinilos_explore_mode",
     cloudSynced: "vinilos_cloud_synced",
     cloudPendingDeletes: "vinilos_cloud_pending_deletes",
   },
