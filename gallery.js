@@ -181,6 +181,16 @@ function renderSlide(item) {
   return slide;
 }
 
+// Formas de salir el disco de la funda (ver styles.css). Nunca la misma dos veces seguidas.
+const DISC_ANIMS = ["rebote", "giro", "salto", "asoma", "elastico", "lento"];
+let lastDiscAnim = "";
+
+function randomDiscAnim() {
+  const options = DISC_ANIMS.filter((name) => name !== lastDiscAnim);
+  lastDiscAnim = options[Math.floor(Math.random() * options.length)];
+  return lastDiscAnim;
+}
+
 // items: entradas del historial. onOpen(item): se llama al pulsar el disco que ya está en el centro.
 export function renderGallery(items, onOpen) {
   const track = document.getElementById("gallery-track");
@@ -196,8 +206,13 @@ export function renderGallery(items, onOpen) {
     if (index === current) return;
     current = index;
     slides.forEach((slide, i) => {
-      slide.classList.toggle("is-selected", i === index);
-      slide.setAttribute("aria-current", i === index ? "true" : "false");
+      const selected = i === index;
+      // Se pone la animación antes de seleccionar, para que arranque con la de este disco.
+      const wrap = slide.querySelector(".gallery-disc-wrap");
+      if (selected) wrap.dataset.anim = randomDiscAnim();
+      else delete wrap.dataset.anim;
+      slide.classList.toggle("is-selected", selected);
+      slide.setAttribute("aria-current", selected ? "true" : "false");
     });
     const item = items[index];
     selectedId = item.release_id;

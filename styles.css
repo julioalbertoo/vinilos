@@ -1007,6 +1007,65 @@ input[type="text"]:focus {
   transform: translateY(-62%);
 }
 
+/* Cada vez que se centra un disco sale de la funda con una animación al azar (data-anim, en
+   gallery.js). Todas acaban en el mismo sitio (-62%) para que el disco quede siempre igual. */
+.gallery-slide.is-selected .gallery-disc-wrap[data-anim] {
+  animation-duration: 0.8s;
+  animation-fill-mode: both;
+  animation-timing-function: ease-out;
+}
+.gallery-slide.is-selected .gallery-disc-wrap[data-anim="rebote"] { animation-name: disc-rebote; }
+.gallery-slide.is-selected .gallery-disc-wrap[data-anim="giro"] { animation-name: disc-giro; }
+.gallery-slide.is-selected .gallery-disc-wrap[data-anim="salto"] { animation-name: disc-salto; animation-duration: 0.9s; }
+.gallery-slide.is-selected .gallery-disc-wrap[data-anim="asoma"] { animation-name: disc-asoma; animation-duration: 1.1s; }
+.gallery-slide.is-selected .gallery-disc-wrap[data-anim="elastico"] { animation-name: disc-elastico; }
+.gallery-slide.is-selected .gallery-disc-wrap[data-anim="lento"] {
+  animation-name: disc-lento;
+  animation-duration: 1.3s;
+  animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+@keyframes disc-rebote {
+  0% { transform: translateY(-14%); }
+  55% { transform: translateY(-74%); }
+  78% { transform: translateY(-58%); }
+  100% { transform: translateY(-62%); }
+}
+
+@keyframes disc-giro {
+  0% { transform: translateY(-14%) rotate(-360deg); }
+  100% { transform: translateY(-62%) rotate(0deg); }
+}
+
+@keyframes disc-salto {
+  0% { transform: translateY(-14%); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  45% { transform: translateY(-95%); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  80% { transform: translateY(-60%); animation-timing-function: ease-out; }
+  90% { transform: translateY(-66%); animation-timing-function: ease-in; }
+  100% { transform: translateY(-62%); }
+}
+
+@keyframes disc-asoma {
+  0% { transform: translateY(-14%); }
+  30% { transform: translateY(-30%); }
+  35% { transform: translateY(-28%); }
+  60% { transform: translateY(-30%); animation-timing-function: cubic-bezier(0.3, 1.6, 0.5, 1); }
+  100% { transform: translateY(-62%); }
+}
+
+@keyframes disc-elastico {
+  0% { transform: translateY(-14%) scale(1, 1); }
+  50% { transform: translateY(-58%) scale(0.92, 1.1); }
+  72% { transform: translateY(-64%) scale(1.06, 0.94); }
+  88% { transform: translateY(-61%) scale(0.98, 1.02); }
+  100% { transform: translateY(-62%) scale(1, 1); }
+}
+
+@keyframes disc-lento {
+  0% { transform: translateY(-14%); }
+  100% { transform: translateY(-62%); }
+}
+
 /* Surcos con un leve brillo; la galleta central lleva la portada. */
 .gallery-disc {
   position: absolute;
@@ -1175,6 +1234,7 @@ input[type="text"]:focus {
 @media (prefers-reduced-motion: reduce) {
   .gallery-disc { animation: none; }
   .gallery-slide, .gallery-disc-wrap { transition: none; }
+  .gallery-slide.is-selected .gallery-disc-wrap[data-anim] { animation: none; }
 }
 
 /* ---------- Barra inferior ---------- */
