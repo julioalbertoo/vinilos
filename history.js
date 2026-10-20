@@ -3,9 +3,10 @@ import { CONFIG } from "./config.js";
 const KEY = CONFIG.STORAGE_KEYS.history;
 const MAX_ITEMS = 500;
 
-// Cada entrada: { release_id, artist, title, year, thumb, cover, label, color, weight, date }. color: texto del
+// Cada entrada: { release_id, artist, title, year, originalYear, thumb, cover, label, color, weight, date }. color: texto del
 // color del vinilo según Discogs ("" = negro; sin el campo = aún no se sabe). weight: gramaje ("180 g";
-// "" = Discogs no lo dice; sin el campo = aún no se sabe). No va a la nube: cada móvil lo rellena solo. release_id es la clave
+// "" = Discogs no lo dice; sin el campo = aún no se sabe). originalYear: año del álbum original (el del master;
+// "" = no se sabe; sin el campo = aún no se ha mirado). No va a la nube: cada móvil lo rellena solo. release_id es la clave
 // para la copia en la nube y para sincronizar con la colección de Discogs en la v2.
 export function getHistory() {
   try {

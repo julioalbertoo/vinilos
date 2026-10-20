@@ -1,4 +1,4 @@
-import { getRelease, mainVinylRelease, vinylColor, releaseWeight } from "./discogs.js";
+import { getRelease, getMasterYear, mainVinylRelease, vinylColor, releaseWeight } from "./discogs.js";
 import { locateLabel } from "./ai.js";
 import { getHistory, updateHistoryItem } from "./history.js";
 
@@ -106,6 +106,8 @@ const needsCover = (item) => !item.cover && !failedThisVisit.has(item.release_id
 const needsColor = (item) => item.color === undefined && !failedThisVisit.has(item.release_id);
 // Los discos guardados antes de la v1.12.0 no saben su gramaje.
 const needsWeight = (item) => item.weight === undefined && !failedThisVisit.has(item.release_id);
+// Los discos guardados antes de la v1.19.0 no saben el año del álbum original.
+const needsOriginalYear = (item) => item.originalYear === undefined && !failedThisVisit.has(item.release_id);
 
 // Al abrir la ficha de un disco sin galleta, se vuelve a buscar aunque antes no se encontrara
 // (Discogs puede tener fotos nuevas). release: la ficha ya descargada.
@@ -132,11 +134,11 @@ export async function retryLabel(item, release, aiKey, discogsToken) {
   }
 }
 
-// Recorre, de uno en uno, los discos sin galleta, sin portada grande, sin color o sin gramaje.
+// Recorre, de uno en uno, los discos sin galleta, sin portada grande, sin color, sin gramaje o sin año original.
 // onUpdate(item): se ha guardado algo nuevo del disco. onStatus(texto): resumen para la pantalla.
 export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus) {
   if (running || !aiKey || !discogsToken) return;
-  const pending = getHistory().filter((item) => needsLabel(item) || needsCover(item) || needsColor(item) || needsWeight(item));
+  const pending = getHistory().filter((item) => needsLabel(item) || needsCover(item) || needsColor(item) || needsWeight(item) || needsOriginalYear(item));
   if (!pending.length) return;
   const labelTotal = pending.filter(needsLabel).length;
   let labelIndex = 0;
@@ -158,6 +160,7 @@ export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus)
         if (!item.cover && release.image) patch.cover = release.image;
         if (item.color === undefined) patch.color = vinylColor(release.formats.map((f) => f.text));
         if (item.weight === undefined) patch.weight = releaseWeight(release);
+        if (item.originalYear === undefined) patch.originalYear = await getMasterYear(release.masterId, discogsToken);
         if (Object.keys(patch).length) {
           Object.assign(item, patch);
           updateHistoryItem(item.release_id, patch);

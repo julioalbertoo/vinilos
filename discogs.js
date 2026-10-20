@@ -190,6 +190,21 @@ export async function getRelease(id, discogsToken) {
   };
 }
 
+// Año en que salió el álbum por primera vez (el del master, común a todas sus ediciones). "" si no se sabe.
+export async function getMasterYear(masterId, discogsToken) {
+  if (!masterId) return "";
+  const master = await discogsGet(`/masters/${masterId}`, null, discogsToken);
+  return master.year ? String(master.year) : "";
+}
+
+// Año para enseñar: "1978 · ed. 2020" si la edición es posterior al original; si no, solo un año.
+export function yearText(item) {
+  const year = String(item.year || "");
+  const original = String(item.originalYear || "");
+  if (original && year && original !== year) return `${original} · ed. ${year}`;
+  return original || year;
+}
+
 // Edición de referencia en vinilo de un álbum: la principal del master si es de vinilo; si no,
 // la edición en vinilo más antigua. Devuelve su id, o null si no hay (o es la misma que exceptId).
 export async function mainVinylRelease(masterId, discogsToken, exceptId) {
