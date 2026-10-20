@@ -735,7 +735,7 @@ input[type="text"]:focus {
 .detail-cover {
   display: block;
   width: 100%;
-  border-radius: var(--radius);
+  border-radius: 3px; /* como la funda de la galería */
   background: var(--lilac);
   box-shadow: var(--shadow);
 }
