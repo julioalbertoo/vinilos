@@ -74,7 +74,7 @@ export async function fillMissingLabels(aiKey, discogsToken, onFound, onStatus) 
   let found = 0;
   let without = 0;
   const errors = [];
-  let busy = false;
+  let busy = "";
   try {
     for (const [i, item] of pending.entries()) {
       onStatus(`Buscando galletas en Discogs: ${i + 1} de ${pending.length}…`);
@@ -87,7 +87,7 @@ export async function fillMissingLabels(aiKey, discogsToken, onFound, onStatus) 
       if (outcome.error) {
         // Si Gemini está saturado se para todo y se reintenta la próxima vez que se abra «Mis discos».
         if (outcome.busy) {
-          busy = true;
+          busy = outcome.error;
           break;
         }
         failedThisVisit.add(item.release_id);
@@ -110,6 +110,9 @@ export async function fillMissingLabels(aiKey, discogsToken, onFound, onStatus) 
   if (found) parts.push(`${found} encontrada${found > 1 ? "s" : ""}`);
   if (without) parts.push(`${without} sin foto de la galleta en Discogs`);
   if (errors.length) parts.push(`${errors.length} con error (${errors[0]})`);
-  if (busy) parts.push("Gemini está saturado ahora mismo: lo reintento la próxima vez que abras «Mis discos»");
+  if (busy) {
+    const why = /cupo/.test(busy) ? "se ha agotado el cupo gratuito de Gemini" : "Gemini está saturado";
+    parts.push(`${why} por ahora: lo reintento la próxima vez que abras «Mis discos»`);
+  }
   onStatus(`Galletas: ${parts.join(" · ")}.`);
 }

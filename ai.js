@@ -251,8 +251,9 @@ async function callNative(model, parts, aiKey) {
   if (response.ok) return { ok: true, body };
   const detail = describeError(response.status, body);
   if (response.status >= 500) return { ok: false, detail, busy: true };
-  // Sin llave válida o sin cupo no tiene sentido seguir con más discos.
-  return { ok: false, detail, stop: detail === INVALID_KEY_MESSAGE || response.status === 429 };
+  if (response.status === 429) return { ok: false, detail, quota: true };
+  // Sin llave válida no tiene sentido seguir con más discos.
+  return { ok: false, detail, stop: detail === INVALID_KEY_MESSAGE };
 }
 
 // images: lista de data URL o de enlaces. Devuelve { ok: true, index, box } (index null = no hay
@@ -261,19 +262,27 @@ export async function locateLabel(images, aiKey) {
   const parts = [{ text: LABEL_PROMPT }];
   images.forEach((image, i) => parts.push({ text: `Foto ${i}:` }, imagePart(image)));
 
-  // Si un modelo está saturado (503) o falla en el servidor, se reintenta y luego se prueba el ligero.
+  // Primero el modelo ligero: basta para encontrar una galleta y así no se gasta el cupo del
+  // principal, que es el que identifica los discos. Cada modelo tiene su propio cupo gratuito.
+  // Si uno está saturado (5xx) se reintenta una vez; si está sin cupo (429), se pasa al otro.
   let body = null;
-  let last = null;
-  for (const model of [CONFIG.AI_PROVIDER.primaryModel, CONFIG.AI_PROVIDER.fallbackModel]) {
+  let quota = false;
+  for (const model of [CONFIG.AI_PROVIDER.fallbackModel, CONFIG.AI_PROVIDER.primaryModel]) {
     for (let attempt = 0; attempt < 2 && body === null; attempt += 1) {
       if (attempt) await new Promise((resolve) => setTimeout(resolve, 3000));
-      last = await callNative(model, parts, aiKey);
-      if (last.ok) body = last.body;
-      else if (!last.busy) return last;
+      const result = await callNative(model, parts, aiKey);
+      if (result.ok) body = result.body;
+      else if (result.quota) {
+        quota = true;
+        break;
+      } else if (!result.busy) return result;
     }
     if (body !== null) break;
   }
-  if (body === null) return { ok: false, detail: "Gemini está saturado ahora mismo", busy: true, stop: true };
+  if (body === null) {
+    const detail = quota ? "se ha agotado el cupo gratuito de Gemini por ahora" : "Gemini está saturado ahora mismo";
+    return { ok: false, detail, busy: true, stop: true };
+  }
 
   let data = null;
   try {
