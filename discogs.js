@@ -197,10 +197,11 @@ export async function getMasterYear(masterId, discogsToken) {
   return master.year ? String(master.year) : "";
 }
 
-// Los dos años, siempre que se sepan: "Orig. 1978 · Ed. 2020". "" si no se sabe ninguno.
+// Los dos años, si se saben: "Orig. 1978 · Ed. 2020". Si son el mismo, solo "1985". "" si no se sabe ninguno.
 export function bothYears(item) {
   const year = String(item.year || "");
   const original = String(item.originalYear || "");
+  if (original && original === year) return year;
   return [original && `Orig. ${original}`, year && `Ed. ${year}`].filter(Boolean).join(" · ");
 }
 
