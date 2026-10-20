@@ -341,7 +341,7 @@ function renderDetail(release) {
   }
   if (release.community) {
     const rating = release.community.rating;
-    const title = rating ? `👥 Comunidad de Discogs (${ratingNumber(rating.average)}${ratingStars(rating.average)})` : "👥 Comunidad de Discogs";
+    const title = rating ? `👥 Comunidad (${ratingNumber(rating.average)}${ratingStars(rating.average)})` : "👥 Comunidad";
     nodes.push(foldable(title, communityList(release.community)));
   }
   document.getElementById("detail-content").replaceChildren(...nodes);
@@ -367,12 +367,12 @@ const RELEASE_STATUS = { Accepted: "Aceptada", Draft: "Borrador", Deleted: "Borr
 
 const ratingNumber = (n) => n.toLocaleString("es-ES", { maximumFractionDigits: 2 });
 
-// Una ⭐️ por punto entero; lo que sobra: 0,75 o más cuenta como otra ⭐️, desde 0,25 es ⚡️.
+// Una ⭐️ por punto entero; lo que sobra: 0,75 o más cuenta como otra ⭐️, desde 0,25 es 🌓.
 function ratingStars(average) {
   let full = Math.floor(average);
   const rest = average - full;
   if (rest >= 0.75) full += 1;
-  return "⭐️".repeat(full) + (rest >= 0.25 && rest < 0.75 ? "⚡️" : "");
+  return "⭐️".repeat(full) + (rest >= 0.25 && rest < 0.75 ? "🌓" : "");
 }
 
 function communityList(c) {
