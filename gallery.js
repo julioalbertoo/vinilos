@@ -1,5 +1,7 @@
 // Galería horizontal: cada disco asoma de su funda y el que queda en el centro sale y gira.
 
+import { isHeavy } from "./discogs.js";
+
 let selectedId = null; // Se recuerda para volver al mismo disco después de abrir su ficha.
 
 function el(tag, className, text) {
@@ -130,6 +132,16 @@ function fillDisc(disc, item) {
   const background = vinylBackground(item.color || "");
   disc.style.background = background;
   disc.classList.toggle("is-colored", Boolean(background));
+  // Vinilo pesado (180 g o más): canto más grueso y una etiqueta con el gramaje.
+  const wrap = disc.parentElement;
+  const heavy = isHeavy(item.weight || "");
+  wrap.classList.toggle("is-heavy", heavy);
+  let badge = wrap.querySelector(".gallery-weight");
+  if (heavy && !badge) {
+    badge = el("span", "gallery-weight");
+    wrap.append(badge);
+  }
+  if (badge) badge.textContent = heavy ? item.weight : "";
 }
 
 function fillSleeve(sleeve, item) {
@@ -156,11 +168,11 @@ function renderSlide(item) {
   // Dos capas: la de fuera desliza el disco fuera de la funda y la de dentro gira.
   const discWrap = el("span", "gallery-disc-wrap");
   const disc = el("span", "gallery-disc");
-  fillDisc(disc, item);
   const label = el("span", "gallery-label");
   fillLabel(label, item);
   disc.append(label);
   discWrap.append(disc, el("span", "gallery-shine"));
+  fillDisc(disc, item);
 
   const sleeve = el("span", "gallery-sleeve");
   fillSleeve(sleeve, item);
@@ -190,7 +202,7 @@ export function renderGallery(items, onOpen) {
     const item = items[index];
     selectedId = item.release_id;
     title.textContent = item.title;
-    meta.textContent = [item.artist, item.year].filter(Boolean).join(" · ");
+    meta.textContent = [item.artist, item.year, isHeavy(item.weight || "") && item.weight].filter(Boolean).join(" · ");
     count.textContent = `${index + 1} de ${items.length}`;
   }
 

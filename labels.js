@@ -1,4 +1,4 @@
-import { getRelease, vinylColor } from "./discogs.js";
+import { getRelease, vinylColor, releaseWeight } from "./discogs.js";
 import { locateLabel } from "./ai.js";
 import { getHistory, updateHistoryItem } from "./history.js";
 
@@ -68,12 +68,14 @@ const needsLabel = (item) => !isResolved(item) && !failedThisVisit.has(item.rele
 const needsCover = (item) => !item.cover && !failedThisVisit.has(item.release_id);
 // Los discos guardados antes de la v1.11.0 no saben de qué color es el vinilo.
 const needsColor = (item) => item.color === undefined && !failedThisVisit.has(item.release_id);
+// Los discos guardados antes de la v1.12.0 no saben su gramaje.
+const needsWeight = (item) => item.weight === undefined && !failedThisVisit.has(item.release_id);
 
-// Recorre, de uno en uno, los discos sin galleta, sin portada grande o sin color.
+// Recorre, de uno en uno, los discos sin galleta, sin portada grande, sin color o sin gramaje.
 // onUpdate(item): se ha guardado algo nuevo del disco. onStatus(texto): resumen para la pantalla.
 export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus) {
   if (running || !aiKey || !discogsToken) return;
-  const pending = getHistory().filter((item) => needsLabel(item) || needsCover(item) || needsColor(item));
+  const pending = getHistory().filter((item) => needsLabel(item) || needsCover(item) || needsColor(item) || needsWeight(item));
   if (!pending.length) return;
   const labelTotal = pending.filter(needsLabel).length;
   let labelIndex = 0;
@@ -92,6 +94,7 @@ export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus)
         const patch = {};
         if (!item.cover && release.image) patch.cover = release.image;
         if (item.color === undefined) patch.color = vinylColor(release.formats.map((f) => f.text));
+        if (item.weight === undefined) patch.weight = releaseWeight(release);
         if (Object.keys(patch).length) {
           Object.assign(item, patch);
           updateHistoryItem(item.release_id, patch);

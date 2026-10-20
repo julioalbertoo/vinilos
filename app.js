@@ -12,7 +12,7 @@ import {
 } from "./tokens.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify } from "./ai.js";
-import { testDiscogsConnection, findCandidates, searchByText, getRelease, getPrices, vinylColor } from "./discogs.js";
+import { testDiscogsConnection, findCandidates, searchByText, getRelease, getPrices, vinylColor, releaseWeight } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -431,6 +431,8 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
         cover: (release && release.image) || "",
         // Color del vinilo ("" si es negro); sin ficha se usa el del candidato si lo traía.
         color: release ? vinylColor(release.formats.map((f) => f.text)) : candidate.color || undefined,
+        // Gramaje ("180 g"; "" si Discogs no lo dice).
+        weight: release ? releaseWeight(release) : candidate.weight || undefined,
       });
       if (request === detailRequest) savedNote.textContent = "✓ Guardado en tu historial";
     } catch {

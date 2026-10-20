@@ -1019,6 +1019,36 @@ input[type="text"]:focus {
   animation-play-state: running;
 }
 
+/* Vinilo pesado (180 g o más): un canto grueso debajo, como si se viera de lado, y más sombra. */
+.gallery-disc-wrap.is-heavy .gallery-disc {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.14),
+    0 3px 0 #2a2a30,
+    0 6px 0 #0b0b0e,
+    0 7px 0 rgba(255, 255, 255, 0.12),
+    0 16px 30px -8px rgba(0, 0, 0, 0.8);
+}
+
+.gallery-weight {
+  position: absolute;
+  top: 2%;
+  right: 2%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #1b1b1f;
+  color: #f2c530;
+  border: 1.5px solid #f2c530;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.gallery-weight:empty {
+  display: none;
+}
+
 .gallery-label {
   position: absolute;
   inset: 32%;

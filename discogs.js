@@ -70,6 +70,16 @@ export function vinylWeight(texts) {
   return "";
 }
 
+// Gramaje de una ficha completa: Discogs lo pone en las descripciones ("180 Gram") o en el texto libre.
+export function releaseWeight(release) {
+  return vinylWeight(release.formats.flatMap((f) => [f.text, ...f.descriptions]));
+}
+
+// Vinilo pesado: 180 g o más.
+export function isHeavy(weight) {
+  return parseInt(weight, 10) >= 180;
+}
+
 function fromSearchResult(r) {
   return {
     id: r.id,
