@@ -469,7 +469,7 @@ function formatMoney({ value, currency }) {
 
 // Abre en Discogs las copias de esta edición a la venta que se envían desde España.
 function spainLink(id) {
-  const link = el("a", "detail-price-spain", "🇪🇸 Ver las que se venden desde España ↗");
+  const link = el("a", "detail-price-spain", "🇪🇸 En venta desde España ↗");
   link.href = `https://www.discogs.com/sell/release/${id}?ships_from=Spain`;
   link.target = "_blank";
   link.rel = "noopener";
