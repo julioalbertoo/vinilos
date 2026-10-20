@@ -291,9 +291,68 @@ function formatLine(format) {
   return qty + [format.name, ...format.descriptions].filter(Boolean).join(", ");
 }
 
-// "Orig. 1978 · Ed. 2020 · UK"; el original aparece cuando llega del master.
+const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+// Fecha de salida de Discogs ("1987-07-00") en castellano: "julio de 1987" o "30 de julio de 1987".
+// "" si solo se sabe el año.
+function releaseDate(released) {
+  const [, year, month, day] = /^(\d{4})-(\d{2})-(\d{2})/.exec(released || "") || [];
+  const name = MONTHS[Number(month) - 1];
+  if (!name) return "";
+  return Number(day) ? `${Number(day)} de ${name} de ${year}` : `${name} de ${year}`;
+}
+
+// Como bothYears, pero con la fecha exacta de esta edición si se sabe:
+// "1985 (ed. julio de 2009)", o solo "julio de 1987" si es la original.
+function detailYears(release) {
+  const date = releaseDate(release.released);
+  if (!date) return bothYears(release);
+  const original = String(release.originalYear || "");
+  if (!original) return `Ed. ${date}`;
+  return original === String(release.year || "") ? date : `${original} (ed. ${date})`;
+}
+
+// "1985 (ed. julio de 2009) · UK"; el año original aparece cuando llega del master.
 function detailYearLine(release) {
-  return [bothYears(release) || "Año ?", release.country || "País ?"].join(" · ");
+  return [detailYears(release) || "Año ?", release.country || "País ?"].join(" · ");
+}
+
+// "3:32" o "1:02:10" → segundos. null si no se entiende.
+function seconds(duration) {
+  if (!/^\d+(:\d{1,2}){1,2}$/.test(duration || "")) return null;
+  return duration.split(":").reduce((total, part) => total * 60 + Number(part), 0);
+}
+
+// Duración total del disco: "42 min". "" si a alguna canción le falta la duración.
+function totalDuration(tracks) {
+  const all = tracks.map((t) => seconds(t.duration));
+  if (!all.length || all.includes(null)) return "";
+  return `${Math.round(all.reduce((a, b) => a + b, 0) / 60)} min`;
+}
+
+// Nombres en castellano de los códigos de Discogs; los que no están se dejan tal cual.
+const IDENTIFIER_TYPES = {
+  Barcode: "Código de barras",
+  "Matrix / Runout": "Matriz",
+  "Label Code": "Código del sello",
+  "Price Code": "Código de precio",
+  "Rights Society": "Sociedad de derechos",
+  "Mastering SID Code": "Código SID de masterizado",
+  "Mould SID Code": "Código SID del molde",
+  "Pressing Plant ID": "Código de la fábrica",
+  "Depósito Legal": "Depósito legal",
+  Other: "Otro",
+};
+
+function identifierList(identifiers) {
+  const list = el("ul", "detail-codes");
+  for (const id of identifiers) {
+    const li = el("li");
+    const type = IDENTIFIER_TYPES[id.type] || id.type;
+    li.append(el("span", "detail-code-type", id.description ? `${type} · ${id.description}` : type), el("span", "detail-code-value", id.value));
+    list.append(li);
+  }
+  return list;
 }
 
 function renderDetail(release) {
@@ -331,13 +390,18 @@ function renderDetail(release) {
     const list = el("ul", "detail-tracks");
     for (const track of release.tracklist) {
       const li = el("li");
-      li.append(el("span", "pos", track.position), track.title);
+      li.append(el("span", "pos", track.position), el("span", "detail-track-title", track.title));
+      if (track.duration) li.append(el("span", "detail-track-time", track.duration));
       list.append(li);
     }
-    nodes.push(foldable(`🎵 Canciones (${release.tracklist.length})`, list));
+    const total = totalDuration(release.tracklist);
+    nodes.push(foldable(`🎵 Canciones (${[release.tracklist.length, total].filter(Boolean).join(" · ")})`, list));
   }
   if (release.notes) {
     nodes.push(foldable("📝 Notas de la edición", el("p", "detail-notes", release.notes)));
+  }
+  if (release.identifiers && release.identifiers.length) {
+    nodes.push(foldable("🔢 Matriz y códigos", identifierList(release.identifiers)));
   }
   if (release.community) {
     const rating = release.community.rating;

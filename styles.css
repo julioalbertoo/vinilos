@@ -895,12 +895,53 @@ input[type="text"]:focus {
 }
 
 .detail-tracks li {
+  display: flex;
+  gap: 8px;
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
 }
 
 .detail-tracks li:last-child {
   border-bottom: none;
+}
+
+.detail-track-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-track-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-codes {
+  margin: 0;
+  padding: 4px 12px;
+  list-style: none;
+  font-size: 0.92rem;
+  background: #faf8ff;
+  border-radius: var(--radius-sm);
+}
+
+.detail-codes li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-codes li:last-child {
+  border-bottom: none;
+}
+
+.detail-code-type {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.detail-code-value {
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .detail-tracks .pos {
@@ -1546,6 +1587,7 @@ body.typing .tabbar {
 :root[data-theme="dark"] .raw-json,
 :root[data-theme="dark"] .detail-tracks,
 :root[data-theme="dark"] .detail-notes,
+:root[data-theme="dark"] .detail-codes,
 :root[data-theme="dark"] .detail-community,
 :root[data-theme="dark"] .card {
   background: #1b1826;

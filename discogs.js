@@ -185,7 +185,13 @@ export async function getRelease(id, discogsToken) {
       .map((i) => ({ uri: i.uri, uri150: i.uri150 || i.uri })),
     tracklist: (r.tracklist || [])
       .filter((t) => t.type_ === "track")
-      .map((t) => ({ position: t.position, title: t.title })),
+      .map((t) => ({ position: t.position, title: t.title, duration: t.duration || "" })),
+    released: r.released || "",
+    identifiers: (r.identifiers || []).map((i) => ({
+      type: i.type || "",
+      value: i.value || "",
+      description: i.description || "",
+    })),
     genres: r.genres || [],
     styles: r.styles || [],
     notes: cleanNotes(r.notes),
