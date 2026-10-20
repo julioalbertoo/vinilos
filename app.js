@@ -12,7 +12,7 @@ import {
 } from "./tokens.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify } from "./ai.js";
-import { testDiscogsConnection, findCandidates, searchByText, getRelease } from "./discogs.js";
+import { testDiscogsConnection, findCandidates, searchByText, getRelease, getPrices } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -270,6 +270,13 @@ function renderDetail(release) {
     nodes.push(el("p", "detail-meta", formatLine(format)));
     if (format.text) nodes.push(el("p", "detail-meta detail-color", `Edición: ${format.text}`));
   }
+  // La caja del precio solo se pone con la ficha completa (tiene id); se rellena al llegar los datos.
+  if (release.id) {
+    const price = el("div", "detail-price");
+    price.id = "detail-price";
+    price.append(el("p", "detail-price-title", "💶 Precio de esta edición"), el("p", "detail-price-note", "Buscando precio en Discogs…"));
+    nodes.push(price);
+  }
   if (release.tracklist.length) {
     nodes.push(el("h3", null, "Canciones"));
     const list = el("ul", "detail-tracks");
@@ -282,6 +289,56 @@ function renderDetail(release) {
   }
   document.getElementById("detail-content").replaceChildren(...nodes);
   document.getElementById("detail-open").href = release.url;
+}
+
+function formatMoney({ value, currency }) {
+  try {
+    return new Intl.NumberFormat("es-ES", { style: "currency", currency: currency || "EUR" }).format(value);
+  } catch {
+    return `${Number(value).toFixed(2)} ${currency || ""}`.trim();
+  }
+}
+
+function renderPrices(prices) {
+  const box = document.getElementById("detail-price");
+  if (!box) return;
+  const nodes = [el("p", "detail-price-title", "💶 Precio de esta edición")];
+  if (prices.blocked) {
+    nodes.push(el("p", "detail-price-note", "Discogs no permite vender esta edición."));
+  } else if (prices.lowest) {
+    const copies = prices.forSale === 1 ? "1 copia" : `${prices.forSale} copias`;
+    nodes.push(el("p", "detail-price-main", `En venta desde ${formatMoney(prices.lowest)}`));
+    nodes.push(el("p", "detail-price-note", `${copies} a la venta ahora`));
+  } else {
+    nodes.push(el("p", "detail-price-note", "Ahora mismo nadie la vende en Discogs."));
+  }
+  if (prices.suggested.length) {
+    nodes.push(el("p", "detail-price-sub", "Precio sugerido según el estado:"));
+    const row = el("div", "detail-price-grades");
+    for (const s of prices.suggested) {
+      const chip = el("span", "detail-price-chip");
+      chip.append(el("b", null, s.grade), ` ${formatMoney(s)}`);
+      row.append(chip);
+    }
+    nodes.push(row);
+  } else {
+    nodes.push(el("p", "detail-price-hint",
+      "Para ver el precio sugerido por estado, rellena tus datos de vendedor en Discogs (Ajustes → Vendedor). No hace falta vender nada."));
+  }
+  box.replaceChildren(...nodes);
+}
+
+async function loadPrices(id, request) {
+  try {
+    const prices = await getPrices(id, getDiscogsToken());
+    if (request === detailRequest) renderPrices(prices);
+  } catch (err) {
+    const box = document.getElementById("detail-price");
+    if (request === detailRequest && box) {
+      box.replaceChildren(el("p", "detail-price-title", "💶 Precio de esta edición"),
+        el("p", "detail-price-note", `No se pudo consultar el precio: ${err.message}`));
+    }
+  }
 }
 
 let detailRequest = 0;
@@ -320,7 +377,10 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
   let release = null;
   try {
     release = await getRelease(candidate.id, getDiscogsToken());
-    if (request === detailRequest) renderDetail(release);
+    if (request === detailRequest) {
+      renderDetail(release);
+      loadPrices(release.id, request);
+    }
   } catch (err) {
     if (request === detailRequest) {
       const note = el("p", "status");

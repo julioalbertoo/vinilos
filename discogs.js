@@ -179,6 +179,34 @@ export async function getRelease(id, discogsToken) {
   };
 }
 
+// Estados que se enseñan del precio sugerido, de mejor a peor (claves tal como las da Discogs).
+const SUGGESTED_GRADES = [
+  ["Near Mint (NM or M-)", "NM"],
+  ["Very Good Plus (VG+)", "VG+"],
+  ["Very Good (VG)", "VG"],
+];
+
+// Precio de esta edición: lo que hay en venta ahora y el precio sugerido por estado.
+// El sugerido solo llega si la cuenta tiene rellenados los datos de vendedor; si no, queda vacío.
+export async function getPrices(id, discogsToken) {
+  const stats = await discogsGet(`/marketplace/stats/${id}`, { curr_abbr: "EUR" }, discogsToken);
+  let suggested = [];
+  try {
+    const data = await discogsGet(`/marketplace/price_suggestions/${id}`, null, discogsToken);
+    suggested = SUGGESTED_GRADES
+      .filter(([key]) => data[key] && data[key].value)
+      .map(([key, grade]) => ({ grade, value: data[key].value, currency: data[key].currency }));
+  } catch {
+    // Sin datos de vendedor Discogs no da sugerencias: se enseña solo lo que hay en venta.
+  }
+  return {
+    lowest: stats.lowest_price && stats.lowest_price.value ? stats.lowest_price : null,
+    forSale: stats.num_for_sale || 0,
+    blocked: Boolean(stats.blocked_from_sale),
+    suggested,
+  };
+}
+
 async function runSearchSteps(steps, discogsToken, onStep) {
   for (const step of steps) {
     if (onStep) onStep(step.by);
