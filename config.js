@@ -4,6 +4,9 @@ export const CONFIG = {
     endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     primaryModel: "gemini-flash-latest",
     fallbackModel: "gemini-flash-lite-latest",
+    // Más respaldos si los dos de arriba fallan. Cada modelo tiene su propio cupo gratuito.
+    // Gemma va al final: está en otras máquinas de Google, así que suele responder aunque Gemini esté saturado.
+    extraModels: ["gemini-2.5-flash", "gemini-2.0-flash", "gemma-3-27b-it"],
     pingModel: "gemini-flash-lite-latest",
   },
   DISCOGS: {

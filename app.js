@@ -738,7 +738,7 @@ function initCapture() {
       fallbackNote = retry
         ? `Gemini está saturado. Reintento ${retry} de 2. `
         : previousFailure
-          ? `El modelo principal no respondió (${previousFailure}). Reintento con el de respaldo. `
+          ? `El modelo anterior no respondió (${previousFailure}). Pruebo con otro de respaldo. `
           : "";
       startedAt = Date.now();
       renderProgress();

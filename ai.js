@@ -23,16 +23,15 @@ const SYSTEM_PROMPT =
 
 const MODEL_TIMEOUT_MS = 45000;
 
-function buildMessages(imageDataUrl) {
+// Gemma no admite instrucciones de sistema: a ese modelo se le dan dentro del mensaje.
+function buildMessages(model, imageDataUrl) {
+  const image = { type: "image_url", image_url: { url: imageDataUrl } };
+  if (model.startsWith("gemma")) {
+    return [{ role: "user", content: [{ type: "text", text: `${SYSTEM_PROMPT}\n\nIdentifica este disco de vinilo.` }, image] }];
+  }
   return [
     { role: "system", content: SYSTEM_PROMPT },
-    {
-      role: "user",
-      content: [
-        { type: "text", text: "Identifica este disco de vinilo." },
-        { type: "image_url", image_url: { url: imageDataUrl } },
-      ],
-    },
+    { role: "user", content: [{ type: "text", text: "Identifica este disco de vinilo." }, image] },
   ];
 }
 
@@ -105,7 +104,7 @@ async function tryModel(model, aiKey, imageDataUrl) {
       aiKey,
       {
         model,
-        messages: buildMessages(imageDataUrl),
+        messages: buildMessages(model, imageDataUrl),
         temperature: 0.1,
         // Margen amplio: los modelos Flash "piensan" antes de responder y eso también consume tokens.
         max_tokens: 4096,
@@ -127,6 +126,8 @@ async function tryModel(model, aiKey, imageDataUrl) {
       detail,
       authError: detail === INVALID_KEY_MESSAGE,
       quotaError: response.status === 429,
+      // 404: Google ha retirado ese modelo; se salta sin contar como fallo.
+      notFound: response.status === 404,
       // 5xx: saturado o caído un momento; merece la pena reintentar.
       busy: response.status >= 500,
     };
@@ -151,13 +152,20 @@ async function tryModel(model, aiKey, imageDataUrl) {
 const BUSY_RETRIES = 2;
 
 export async function identify(imageDataUrl, aiKey, onAttempt) {
-  const models = [CONFIG.AI_PROVIDER.primaryModel, CONFIG.AI_PROVIDER.fallbackModel];
+  const { primaryModel, fallbackModel, extraModels = [] } = CONFIG.AI_PROVIDER;
+  const models = [primaryModel, fallbackModel, ...extraModels];
   const attempts = [];
-  for (const model of models) {
+  for (const [index, model] of models.entries()) {
     if (onAttempt) onAttempt(model, attempts.at(-1)?.detail, 0);
     let result = await tryModel(model, aiKey, imageDataUrl);
+    if (result.authError) {
+      // Con la llave mal, ningún modelo va a funcionar: no se gasta tiempo en el resto.
+      return { ok: false, reason: INVALID_KEY_MESSAGE, authError: true, attempts: [...attempts, { model, detail: result.detail }] };
+    }
     // Si Gemini está saturado (suele durar segundos), se espera un poco y se reintenta hasta 2 veces.
-    for (let retry = 1; retry <= BUSY_RETRIES && result.busy; retry += 1) {
+    // Solo con el modelo principal: con los de respaldo es más rápido pasar al siguiente.
+    const retries = index === 0 ? BUSY_RETRIES : 0;
+    for (let retry = 1; retry <= retries && result.busy; retry += 1) {
       if (onAttempt) onAttempt(model, attempts.at(-1)?.detail, retry);
       await new Promise((resolve) => setTimeout(resolve, retry * 4000));
       result = await tryModel(model, aiKey, imageDataUrl);
@@ -170,12 +178,11 @@ export async function identify(imageDataUrl, aiKey, onAttempt) {
       detail: result.detail,
       authError: Boolean(result.authError),
       quotaError: Boolean(result.quotaError),
+      notFound: Boolean(result.notFound),
     });
   }
-  if (attempts.every((a) => a.authError)) {
-    return { ok: false, reason: INVALID_KEY_MESSAGE, authError: true, attempts };
-  }
-  if (attempts.every((a) => a.quotaError)) {
+  const counted = attempts.filter((a) => !a.notFound);
+  if (counted.length && counted.every((a) => a.quotaError)) {
     return {
       ok: false,
       reason:
