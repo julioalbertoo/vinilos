@@ -19,7 +19,7 @@ import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
-import { fillMissingLabels, stopLabelSearch } from "./labels.js";
+import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
@@ -424,6 +424,7 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
     if (request === detailRequest) {
       renderDetail(release);
       loadPrices(release.id, request);
+      if (fromHistory) searchLabelAgain(release, request);
     }
   } catch (err) {
     if (request === detailRequest) {
@@ -453,6 +454,20 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
       if (request === detailRequest) savedNote.textContent = "❌ No se pudo guardar en el historial (¿memoria del navegador llena?).";
     }
   }
+}
+
+// Si el disco guardado aún no tiene galleta, se vuelve a buscar al abrir su ficha.
+async function searchLabelAgain(release, request) {
+  const item = getHistory().find((i) => i.release_id === release.id);
+  if (!item || (item.label && item.label.src)) return;
+  const note = el("p", "detail-meta detail-label-note", "🔍 Buscando la galleta en las fotos de Discogs…");
+  const content = document.getElementById("detail-content");
+  content.insertBefore(note, document.getElementById("detail-price"));
+  const text = await retryLabel(item, release, getAiKey());
+  if (item.label && item.label.src) updateSlide(item);
+  if (request !== detailRequest) return;
+  if (text) note.textContent = text;
+  else note.remove();
 }
 
 function historyItemToCandidate(item) {

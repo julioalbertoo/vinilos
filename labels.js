@@ -70,13 +70,37 @@ async function findLabel(release, aiKey) {
   return { label: { src: photos[found.index].uri, box: found.box } };
 }
 
-const needsLabel = (item) => !isResolved(item) && !failedThisVisit.has(item.release_id);
+// Discos cuya galleta se está buscando ahora desde su ficha: la búsqueda de fondo se los salta.
+const searchingNow = new Set();
+
+const needsLabel = (item) => !isResolved(item) && !failedThisVisit.has(item.release_id) && !searchingNow.has(item.release_id);
 // Los discos guardados antes de la v1.6.6 solo tienen la miniatura (150 px), que se ve pixelada.
 const needsCover = (item) => !item.cover && !failedThisVisit.has(item.release_id);
 // Los discos guardados antes de la v1.11.0 no saben de qué color es el vinilo.
 const needsColor = (item) => item.color === undefined && !failedThisVisit.has(item.release_id);
 // Los discos guardados antes de la v1.12.0 no saben su gramaje.
 const needsWeight = (item) => item.weight === undefined && !failedThisVisit.has(item.release_id);
+
+// Al abrir la ficha de un disco sin galleta, se vuelve a buscar aunque antes no se encontrara
+// (Discogs puede tener fotos nuevas). release: la ficha ya descargada.
+// Devuelve un texto para enseñar en la ficha, o "" si no hay nada que decir.
+export async function retryLabel(item, release, aiKey) {
+  if (!item || (item.label && item.label.src) || !aiKey || searchingNow.has(item.release_id)) return "";
+  searchingNow.add(item.release_id);
+  try {
+    const outcome = await findLabel(release, aiKey);
+    if (outcome.error) {
+      if (outcome.busy) return "No pude buscar la galleta: Gemini está saturado o sin cupo. Lo reintento más tarde.";
+      return `No pude buscar la galleta (${outcome.error}).`;
+    }
+    item.label = outcome.label;
+    failedThisVisit.delete(item.release_id);
+    updateHistoryItem(item.release_id, { label: outcome.label });
+    return outcome.label.src ? "✓ Galleta encontrada: ya la verás en el disco." : `Sin galleta: ${outcome.label.reason}.`;
+  } finally {
+    searchingNow.delete(item.release_id);
+  }
+}
 
 // Recorre, de uno en uno, los discos sin galleta, sin portada grande, sin color o sin gramaje.
 // onUpdate(item): se ha guardado algo nuevo del disco. onStatus(texto): resumen para la pantalla.
