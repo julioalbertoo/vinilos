@@ -207,7 +207,7 @@ export async function signOut() {
 function describeAuthError(error) {
   const msg = (error.message || "").toLowerCase();
   if (error.status === 429 || msg.includes("rate limit") || msg.includes("seconds")) {
-    return "Has pedido varios correos seguidos. Espera un minuto y vuelve a probar.";
+    return "Supabase solo deja enviar 2 correos por hora y ya se han enviado. Espera hasta una hora, o entra con tu contraseña.";
   }
   if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
     return "Email o contraseña incorrectos. Si no recuerdas la contraseña, entra con el enlace del correo desde Safari y pon una nueva aquí, en Ajustes.";
