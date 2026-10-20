@@ -968,7 +968,7 @@ input[type="text"]:focus {
   z-index: 1;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 3px; /* casi recta, como una funda de cartón */
   background: var(--lilac);
   box-shadow: 0 16px 30px -14px rgba(46, 42, 64, 0.55);
 }
