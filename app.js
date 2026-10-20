@@ -252,12 +252,29 @@ function renderCard(candidate, index) {
 
 let lastClues = {};
 
+const RESULTS_STEP = 5;
+
+// ranked: todas las ediciones ordenadas de mejor a peor. Se enseñan de 5 en 5 con «Ver 5 más».
 function renderResults(ranked, total, strategy, clues) {
   lastClues = clues;
   const how = SEARCH_STEP_LABELS[strategy] || "";
-  document.getElementById("results-summary").textContent =
-    `${total} ediciones encontradas ${how}. Las ${ranked.length} que mejor encajan:`;
-  document.getElementById("results-list").replaceChildren(...ranked.map(renderCard));
+  const summary = document.getElementById("results-summary");
+  const list = document.getElementById("results-list");
+  const more = document.getElementById("results-more");
+  let shown = 0;
+  function showMore() {
+    const next = ranked.slice(shown, shown + RESULTS_STEP);
+    list.append(...next.map((candidate, i) => renderCard(candidate, shown + i)));
+    shown += next.length;
+    summary.textContent = `${total} ediciones encontradas ${how}. Las ${shown} que mejor encajan:`;
+    const left = ranked.length - shown;
+    more.hidden = left <= 0;
+    more.textContent =
+      left > RESULTS_STEP ? `Ver ${RESULTS_STEP} más (quedan ${left})` : left === 1 ? "Ver la que queda" : `Ver las ${left} que quedan`;
+  }
+  list.replaceChildren();
+  more.onclick = showMore;
+  showMore();
   document.getElementById("results-clues-json").textContent = JSON.stringify(clues, null, 2);
   showView("results");
   window.scrollTo(0, 0);
@@ -616,7 +633,7 @@ function initResults(resetCapture) {
         status.textContent = `❌ No hay resultados para "${text}". Prueba con menos palabras o con el número de catálogo.`;
       } else {
         status.textContent = "";
-        renderResults(rankCandidates(candidates, lastClues), candidates.length, strategy, lastClues);
+        renderResults(rankCandidates(candidates, lastClues, Infinity), candidates.length, strategy, lastClues);
       }
     } catch (err) {
       showError(status, err.message, err.authError);
@@ -759,7 +776,7 @@ function initCapture() {
       } else {
         status.textContent = "";
         resetManualSearch(clues);
-        renderResults(rankCandidates(candidates, clues), candidates.length, strategy, clues);
+        renderResults(rankCandidates(candidates, clues, Infinity), candidates.length, strategy, clues);
       }
     } catch (err) {
       if (run !== identifyRun) return;
