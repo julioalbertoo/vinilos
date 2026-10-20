@@ -1188,23 +1188,10 @@ body.no-tabbar {
   margin: 0 auto;
   padding: 4px 12px calc(4px + env(safe-area-inset-bottom));
   border-radius: 20px 20px 0 0;
-  background: rgba(255, 255, 255, 0.9);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  /* Blanco opaco: Safari en iOS 26 tiñe la franja de su barra de la URL con el color de la barra
+     fija de abajo, pero solo si es opaco; con transparencia deja el beis del fondo. */
+  background: #fff;
   box-shadow: 0 -8px 24px -12px rgba(76, 60, 140, 0.3);
-}
-
-/* En Safari del iPhone queda una franja entre la barra y la de la URL: se rellena del mismo blanco
-   para que la barra llegue hasta abajo. */
-.tabbar::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: 80px;
-  background: rgba(255, 255, 255, 0.9);
-  pointer-events: none;
 }
 
 body.no-tabbar .tabbar,
