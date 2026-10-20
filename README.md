@@ -85,6 +85,7 @@ Debajo del título verás la versión (por ejemplo `v1.0.0`). Sirve para comprob
 | "No encontré este disco en Discogs" | Fotografía la contraportada o la galleta central, escanea el código, o usa **Ninguno es** para buscar escribiendo. |
 | El escáner no lee el código | Acerca el móvil hasta que el código ocupe casi todo el ancho del visor e inclina el disco para quitar reflejos. A los pocos segundos aparece **📷 Leer el número con una foto**. |
 | "No hay permiso para usar la cámara" | Activa la cámara para esta web en los ajustes del navegador. |
+| "Ese enlace ya se usó o caducó" | Cada enlace del correo sirve una sola vez: si lo abriste antes en otro navegador (Safari, Gmail…), allí ya estás dentro. Para entrar en la app, pide otro correo y escribe el código en **⚙️ Ajustes → Copia en la nube**. |
 | No ves cambios recientes | Comprueba la versión bajo el título y recarga la página. |
 
 ---

@@ -14,23 +14,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
-  <link rel="stylesheet" href="styles.css?v=1.9.0">
+  <link rel="stylesheet" href="styles.css?v=1.9.1">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=1.9.0",
-        "./tokens.js": "./tokens.js?v=1.9.0",
-        "./guide.js": "./guide.js?v=1.9.0",
-        "./ai.js": "./ai.js?v=1.9.0",
-        "./discogs.js": "./discogs.js?v=1.9.0",
-        "./imaging.js": "./imaging.js?v=1.9.0",
-        "./scoring.js": "./scoring.js?v=1.9.0",
-        "./barcode.js": "./barcode.js?v=1.9.0",
-        "./history.js": "./history.js?v=1.9.0",
-        "./gallery.js": "./gallery.js?v=1.9.0",
-        "./labels.js": "./labels.js?v=1.9.0",
-        "./cloud.js": "./cloud.js?v=1.9.0",
+        "./config.js": "./config.js?v=1.9.1",
+        "./tokens.js": "./tokens.js?v=1.9.1",
+        "./guide.js": "./guide.js?v=1.9.1",
+        "./ai.js": "./ai.js?v=1.9.1",
+        "./discogs.js": "./discogs.js?v=1.9.1",
+        "./imaging.js": "./imaging.js?v=1.9.1",
+        "./scoring.js": "./scoring.js?v=1.9.1",
+        "./barcode.js": "./barcode.js?v=1.9.1",
+        "./history.js": "./history.js?v=1.9.1",
+        "./gallery.js": "./gallery.js?v=1.9.1",
+        "./labels.js": "./labels.js?v=1.9.1",
+        "./cloud.js": "./cloud.js?v=1.9.1",
         "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm"
       }
     }
@@ -39,7 +39,7 @@
 <body>
   <header class="app-header">
     <h1><span class="logo-disc" aria-hidden="true"></span>Vinilos</h1>
-    <p class="app-version">v1.9.0</p>
+    <p class="app-version">v1.9.1</p>
   </header>
 
   <main id="app">
@@ -106,8 +106,8 @@
           <label for="cloud-email">Tu email</label>
           <input type="email" id="cloud-email" autocomplete="email" inputmode="email" placeholder="tu@email.com">
           <button type="button" id="cloud-send" class="secondary">Enviarme el enlace</button>
-          <div id="cloud-code-box" hidden>
-            <p class="cloud-text">📬 Abre el correo y pulsa el enlace. Si usas la app desde la pantalla de inicio, el enlace se abre en Safari: escribe aquí el código del correo para entrar en esta app.</p>
+          <div id="cloud-code-box">
+            <p class="cloud-text">📬 ¿Tienes el código del correo? Escríbelo aquí. Es la forma segura de entrar si usas la app desde la pantalla de inicio: el enlace siempre se abre en Safari, no en esta app. Cada enlace y cada código sirven una sola vez.</p>
             <label for="cloud-code">Código del correo</label>
             <input type="text" id="cloud-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
             <button type="button" id="cloud-verify" class="secondary">Entrar con el código</button>
@@ -224,6 +224,6 @@
     <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=1.9.0"></script>
+  <script type="module" src="app.js?v=1.9.1"></script>
 </body>
 </html>

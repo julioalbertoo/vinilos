@@ -19,7 +19,7 @@ import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
 import { fillMissingLabels } from "./labels.js";
-import { initCloud, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, verifyCode, signOut, syncAll, isCloudReady } from "./cloud.js";
+import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, verifyCode, signOut, syncAll, isCloudReady } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -811,6 +811,8 @@ function stopScanner() {
 // ---------- Copia en la nube ----------
 
 let cloudSignedIn = false;
+// Aviso que no se borra con los cambios de estado de la nube (p. ej. un enlace del correo caducado).
+let cloudPinnedMessage = "";
 
 function initCloudSettings() {
   const signedOut = document.getElementById("cloud-signed-out");
@@ -826,7 +828,8 @@ function initCloudSettings() {
     signedOut.hidden = cloudSignedIn;
     signedIn.hidden = !cloudSignedIn;
     if (user) document.getElementById("cloud-user-email").textContent = user.email || "";
-    status.textContent = state === "off" ? "" : text;
+    if (cloudSignedIn) cloudPinnedMessage = "";
+    status.textContent = state === "off" ? cloudPinnedMessage : text;
     document.getElementById("collection-cloud-status").textContent = cloudSignedIn || state === "error" ? text : "";
   });
 
@@ -842,11 +845,11 @@ function initCloudSettings() {
       return;
     }
     sendButton.disabled = true;
+    cloudPinnedMessage = "";
     status.textContent = "Enviando…";
     try {
       await sendMagicLink(email);
       status.textContent = `✅ Correo enviado a ${email}.`;
-      document.getElementById("cloud-code-box").hidden = false;
     } catch (err) {
       status.textContent = `❌ ${err.message}`;
     } finally {
@@ -866,7 +869,6 @@ function initCloudSettings() {
     try {
       await verifyCode(email, code);
       codeInput.value = "";
-      document.getElementById("cloud-code-box").hidden = true;
     } catch (err) {
       status.textContent = `❌ ${err.message}`;
     } finally {
@@ -898,6 +900,13 @@ function initCloudSettings() {
     status.textContent = "Sesión cerrada. Tus discos siguen en este móvil.";
   });
 
+  // Vuelta de un enlace del correo que ya no vale: se explica en Ajustes, junto a la caja del código.
+  const linkError = takeAuthError();
+  if (linkError) {
+    cloudPinnedMessage = `❌ ${linkError}`;
+    status.textContent = cloudPinnedMessage;
+  }
+
   initCloud().then(() => {
     if (!isCloudReady()) sendButton.disabled = true;
   });
@@ -912,6 +921,9 @@ initResults(resetCapture);
 initDetail(resetCapture);
 initHistory();
 initCloudSettings();
-if (areTokensVerified()) showView("capture");
+if (cloudPinnedMessage) {
+  showView("settings");
+  setTimeout(() => document.getElementById("cloud-status").scrollIntoView({ block: "center" }), 0);
+} else if (areTokensVerified()) showView("capture");
 else if (hasTokens()) showView("settings");
 else openGuide();

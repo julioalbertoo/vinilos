@@ -103,6 +103,32 @@ function mergeItem(local, remote) {
 
 // ---------- Arranque y sesión ----------
 
+// Si se vuelve de un enlace del correo que ya no vale, Supabase deja el error en la URL
+// (#error=access_denied&error_code=otp_expired…). Se lee al cargar, se limpia la URL y se guarda
+// un mensaje claro para mostrarlo en Ajustes.
+let authError = readAuthErrorFromUrl();
+
+function readAuthErrorFromUrl() {
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const code = params.get("error_code") || params.get("error");
+  if (!code) return "";
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  if (code === "otp_expired" || code === "access_denied") {
+    return (
+      "Ese enlace ya se usó o caducó: cada enlace sirve una sola vez. Si lo abriste antes en otro navegador " +
+      "(por ejemplo, Safari), allí ya estás dentro. Para entrar aquí, pide un correo nuevo y escribe el código."
+    );
+  }
+  return `No se pudo entrar con el enlace (${params.get("error_description") || code}). Pide un correo nuevo.`;
+}
+
+// Devuelve el error del enlace (una sola vez) para que la pantalla lo enseñe.
+export function takeAuthError() {
+  const message = authError;
+  authError = "";
+  return message;
+}
+
 export async function initCloud() {
   try {
     const { createClient } = await import("@supabase/supabase-js");
