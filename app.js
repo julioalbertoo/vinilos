@@ -339,7 +339,11 @@ function renderDetail(release) {
   if (release.notes) {
     nodes.push(foldable("📝 Notas de la edición", el("p", "detail-notes", release.notes)));
   }
-  if (release.community) nodes.push(foldable("👥 Comunidad de Discogs", communityList(release.community)));
+  if (release.community) {
+    const rating = release.community.rating;
+    const title = rating ? `👥 Comunidad de Discogs (${ratingNumber(rating.average)}${ratingStars(rating.average)})` : "👥 Comunidad de Discogs";
+    nodes.push(foldable(title, communityList(release.community)));
+  }
   document.getElementById("detail-content").replaceChildren(...nodes);
 }
 
@@ -361,6 +365,16 @@ const DATA_QUALITY = {
 };
 const RELEASE_STATUS = { Accepted: "Aceptada", Draft: "Borrador", Deleted: "Borrada", Rejected: "Rechazada" };
 
+const ratingNumber = (n) => n.toLocaleString("es-ES", { maximumFractionDigits: 2 });
+
+// Una ⭐️ por punto entero; lo que sobra: 0,75 o más cuenta como otra ⭐️, desde 0,25 es ⚡️.
+function ratingStars(average) {
+  let full = Math.floor(average);
+  const rest = average - full;
+  if (rest >= 0.75) full += 1;
+  return "⭐️".repeat(full) + (rest >= 0.25 && rest < 0.75 ? "⚡️" : "");
+}
+
 function communityList(c) {
   const number = (n) => new Intl.NumberFormat("es-ES").format(n);
   const rows = [
@@ -369,7 +383,7 @@ function communityList(c) {
     [
       "Nota media",
       c.rating
-        ? `${c.rating.average.toLocaleString("es-ES", { maximumFractionDigits: 2 })} / 5 (${number(c.rating.count)} votos)`
+        ? `${ratingNumber(c.rating.average)} / 5 (${number(c.rating.count)} votos)`
         : "Sin votos",
     ],
     ["Han editado la ficha", `${number(c.contributors)} personas`],
