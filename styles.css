@@ -60,12 +60,17 @@ body {
 /* ---------- Cabecera ---------- */
 
 .app-header {
+  /* Fija arriba y opaca, del mismo color que la franja de la hora: Safari en iOS 26 tiñe esa franja
+     con el color de lo que hay fijo arriba, y así no se ve un corte con raya entre las dos. */
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 480px;
-  margin: 0 auto;
-  padding: calc(2px + env(safe-area-inset-top)) 20px 8px;
+  /* A todo el ancho para que Safari la tome como barra; el contenido sigue en 480 px como antes. */
+  padding: calc(2px + env(safe-area-inset-top)) max(20px, calc((100% - 440px) / 2)) 8px;
+  background: var(--bg);
 }
 
 .app-header h1 {
