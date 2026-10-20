@@ -831,11 +831,7 @@ input[type="text"]:focus {
   font-weight: 800;
 }
 
-/* Fila de «Ordenar»: más pegada al selector de arriba y con letra algo menor. */
-.segmented--small {
-  margin-top: -6px;
-}
-
+/* Fila de «Ordenar»: letra algo menor que la del selector Galería / Cuadrícula. */
 .segmented--small button {
   padding: 6px 0;
   font-size: 0.8rem;
