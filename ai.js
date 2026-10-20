@@ -225,17 +225,13 @@ function imagePart(image) {
   return { file_data: { mime_type: "image/jpeg", file_uri: image } };
 }
 
-// images: lista de data URL o de enlaces. Devuelve { ok: true, index, box } (index null = no hay
-// galleta) o { ok: false, detail, stop }.
-export async function locateLabel(images, aiKey) {
-  const parts = [{ text: LABEL_PROMPT }];
-  images.forEach((image, i) => parts.push({ text: `Foto ${i}:` }, imagePart(image)));
-
+// Una petición al modelo. busy: saturado o caído un momento (merece reintentar).
+async function callNative(model, parts, aiKey) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
   let response;
   try {
-    response = await fetch(`${NATIVE_BASE}/${CONFIG.AI_PROVIDER.primaryModel}:generateContent`, {
+    response = await fetch(`${NATIVE_BASE}/${model}:generateContent`, {
       method: "POST",
       headers: { "x-goog-api-key": aiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -247,16 +243,38 @@ export async function locateLabel(images, aiKey) {
   } catch (err) {
     const detail =
       err && err.name === "AbortError" ? "tiempo agotado" : `error de red (${err && err.message ? err.message : err})`;
-    return { ok: false, detail, transient: true };
+    return { ok: false, detail, busy: true };
   } finally {
     clearTimeout(timer);
   }
   const body = await response.text();
-  if (!response.ok) {
-    const detail = describeError(response.status, body);
-    // Sin llave válida o sin cupo no tiene sentido seguir con más discos.
-    return { ok: false, detail, stop: detail === INVALID_KEY_MESSAGE || response.status === 429 };
+  if (response.ok) return { ok: true, body };
+  const detail = describeError(response.status, body);
+  if (response.status >= 500) return { ok: false, detail, busy: true };
+  // Sin llave válida o sin cupo no tiene sentido seguir con más discos.
+  return { ok: false, detail, stop: detail === INVALID_KEY_MESSAGE || response.status === 429 };
+}
+
+// images: lista de data URL o de enlaces. Devuelve { ok: true, index, box } (index null = no hay
+// galleta) o { ok: false, detail, stop }.
+export async function locateLabel(images, aiKey) {
+  const parts = [{ text: LABEL_PROMPT }];
+  images.forEach((image, i) => parts.push({ text: `Foto ${i}:` }, imagePart(image)));
+
+  // Si un modelo está saturado (503) o falla en el servidor, se reintenta y luego se prueba el ligero.
+  let body = null;
+  let last = null;
+  for (const model of [CONFIG.AI_PROVIDER.primaryModel, CONFIG.AI_PROVIDER.fallbackModel]) {
+    for (let attempt = 0; attempt < 2 && body === null; attempt += 1) {
+      if (attempt) await new Promise((resolve) => setTimeout(resolve, 3000));
+      last = await callNative(model, parts, aiKey);
+      if (last.ok) body = last.body;
+      else if (!last.busy) return last;
+    }
+    if (body !== null) break;
   }
+  if (body === null) return { ok: false, detail: "Gemini está saturado ahora mismo", busy: true, stop: true };
+
   let data = null;
   try {
     const text = (JSON.parse(body)?.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
