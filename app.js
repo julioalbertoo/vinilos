@@ -13,7 +13,7 @@ import {
 import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify } from "./ai.js";
-import { testDiscogsConnection, findCandidates, searchByText, getRelease, getMasterYear, yearText, getPrices, vinylColor, releaseWeight } from "./discogs.js";
+import { testDiscogsConnection, findCandidates, searchByText, getRelease, getMasterYear, bothYears, getPrices, vinylColor, releaseWeight } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -291,12 +291,9 @@ function formatLine(format) {
   return qty + [format.name, ...format.descriptions].filter(Boolean).join(", ");
 }
 
-// "Original 1978 · ed. 2020 · UK"; sin año original, solo el de la edición.
+// "Orig. 1978 · Ed. 2020 · UK"; el original aparece cuando llega del master.
 function detailYearLine(release) {
-  const year = release.year ? String(release.year) : "";
-  const original = release.originalYear || "";
-  const years = original && original !== year ? `Original ${original} · ed. ${year || "?"}` : year || original || "Año ?";
-  return [years, release.country || "País ?"].join(" · ");
+  return [bothYears(release) || "Año ?", release.country || "País ?"].join(" · ");
 }
 
 function renderDetail(release) {
@@ -519,7 +516,9 @@ function renderHistoryItem(item) {
     open.append(el("span", "history-cover", "💿"));
   }
   open.append(el("span", "history-title", item.title));
-  open.append(el("span", "history-meta", [yearText(item), item.artist].filter(Boolean).join(" · ")));
+  if (item.artist) open.append(el("span", "history-meta", item.artist));
+  const years = bothYears(item);
+  if (years) open.append(el("span", "history-meta", years));
   open.addEventListener("click", () => openDetail(historyItemToCandidate(item), { returnView: "collection" }));
 
   const remove = el("button", "history-remove", "✕");
@@ -562,9 +561,13 @@ function sortItems(items) {
     if (!x !== !y) return x ? -1 : 1; // los vacíos al final
     return collator.compare(x, y);
   };
-  if (collectionSort === "year") {
-    // Del más antiguo al más nuevo (por el año del álbum original); los que no tienen año, al final. A igual año, por artista.
-    const year = (item) => Number.parseInt(item.originalYear || item.year, 10) || Infinity;
+  if (collectionSort === "year" || collectionSort === "edition") {
+    // Del más antiguo al más nuevo: por el año del álbum original o por el de tu edición.
+    // Los que no tienen año, al final. A igual año, por artista.
+    const year =
+      collectionSort === "year"
+        ? (item) => Number.parseInt(item.originalYear || item.year, 10) || Infinity
+        : (item) => Number.parseInt(item.year, 10) || Infinity;
     list.sort((a, b) => year(a) - year(b) || byText("artist")(a, b));
   } else if (collectionSort === "artist") {
     // A igual artista, sus discos por año.

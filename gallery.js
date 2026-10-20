@@ -1,6 +1,6 @@
 // Galería horizontal: cada disco asoma de su funda y el que queda en el centro sale y gira.
 
-import { isHeavy, yearText } from "./discogs.js";
+import { isHeavy, bothYears } from "./discogs.js";
 
 let selectedId = null; // Se recuerda para volver al mismo disco después de abrir su ficha.
 
@@ -202,7 +202,7 @@ export function renderGallery(items, onOpen) {
     const item = items[index];
     selectedId = item.release_id;
     title.textContent = item.title;
-    meta.textContent = [item.artist, yearText(item), isHeavy(item.weight || "") && item.weight].filter(Boolean).join(" · ");
+    meta.textContent = [item.artist, bothYears(item), isHeavy(item.weight || "") && item.weight].filter(Boolean).join(" · ");
     count.textContent = `${index + 1} de ${items.length}`;
   }
 

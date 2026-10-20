@@ -197,12 +197,11 @@ export async function getMasterYear(masterId, discogsToken) {
   return master.year ? String(master.year) : "";
 }
 
-// Año para enseñar: "1978 · ed. 2020" si la edición es posterior al original; si no, solo un año.
-export function yearText(item) {
+// Los dos años, siempre que se sepan: "Orig. 1978 · Ed. 2020". "" si no se sabe ninguno.
+export function bothYears(item) {
   const year = String(item.year || "");
   const original = String(item.originalYear || "");
-  if (original && year && original !== year) return `${original} · ed. ${year}`;
-  return original || year;
+  return [original && `Orig. ${original}`, year && `Ed. ${year}`].filter(Boolean).join(" · ");
 }
 
 // Edición de referencia en vinilo de un álbum: la principal del master si es de vinilo; si no,
