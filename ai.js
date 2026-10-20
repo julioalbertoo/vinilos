@@ -266,7 +266,8 @@ async function callNative(model, parts, aiKey) {
       headers: { "x-goog-api-key": aiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts }],
-        generationConfig: { temperature: 0, responseMimeType: "application/json" },
+        // Gemma no admite el modo JSON: a ese se le pide el JSON solo en el texto.
+        generationConfig: model.startsWith("gemma") ? { temperature: 0 } : { temperature: 0, responseMimeType: "application/json" },
       }),
       signal: controller.signal,
     });
@@ -292,34 +293,41 @@ export async function locateLabel(images, aiKey) {
   const parts = [{ text: LABEL_PROMPT }];
   images.forEach((image, i) => parts.push({ text: `Foto ${i}:` }, imagePart(image)));
 
-  // Solo el modelo ligero: basta para encontrar una galleta. El principal se reserva entero para
-  // identificar discos, porque cada modelo tiene su propio cupo gratuito y no se comparte.
-  // Si está saturado (5xx) se reintenta una vez; si está sin cupo (429), se deja para otro día.
-  let body = null;
-  let quota = false;
-  for (let attempt = 0; attempt < 2 && body === null; attempt += 1) {
-    if (attempt) await new Promise((resolve) => setTimeout(resolve, 3000));
-    const result = await callNative(CONFIG.AI_PROVIDER.fallbackModel, parts, aiKey);
-    if (result.ok) body = result.body;
-    else if (result.quota) {
-      quota = true;
-      break;
-    } else if (!result.busy) return result;
+  // Se prueba primero el modelo ligero y, si falla, los de respaldo. El principal se reserva entero
+  // para identificar discos, porque cada modelo tiene su propio cupo gratuito y no se comparte.
+  const { fallbackModel, extraModels = [] } = CONFIG.AI_PROVIDER;
+  const models = [fallbackModel, ...extraModels];
+  const failures = [];
+  let allBusy = true;
+  for (const model of models) {
+    const result = await callNative(model, parts, aiKey);
+    if (!result.ok) {
+      // Sin llave válida no sirve probar otros modelos.
+      if (result.stop) return result;
+      if (!result.busy && !result.quota) allBusy = false;
+      failures.push(`${model}: ${result.detail}`);
+      continue;
+    }
+    const parsed = parseLabelAnswer(result.body, images.length);
+    if (parsed) return parsed;
+    allBusy = false;
+    failures.push(`${model}: la IA no devolvió el JSON pedido`);
   }
-  if (body === null) {
-    const detail = quota ? "se ha agotado el cupo gratuito de Gemini por ahora" : "Gemini está saturado ahora mismo";
-    return { ok: false, detail, busy: true, stop: true };
-  }
+  // busy: todos saturados o sin cupo, así que se reintenta otro rato.
+  return { ok: false, detail: failures.join(" · "), busy: allBusy, stop: allBusy };
+}
 
+// Lee la respuesta de la IA. Devuelve null si no trae el JSON pedido.
+function parseLabelAnswer(body, count) {
   let data = null;
   try {
     const text = (JSON.parse(body)?.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
     data = extractJson(text);
   } catch {
-    // cae al error de abajo
+    // cae al null de abajo
   }
-  if (!data || !("index" in data)) return { ok: false, detail: "la IA no devolvió el JSON pedido" };
-  const index = Number.isInteger(data.index) && data.index >= 0 && data.index < images.length ? data.index : null;
+  if (!data || !("index" in data)) return null;
+  const index = Number.isInteger(data.index) && data.index >= 0 && data.index < count ? data.index : null;
   const box = Array.isArray(data.box_2d) && data.box_2d.length === 4 ? data.box_2d.map(Number) : null;
   if (index === null || !box || box.some((n) => !Number.isFinite(n))) return { ok: true, index: null };
   const [ymin, xmin, ymax, xmax] = box;

@@ -90,7 +90,7 @@ export async function retryLabel(item, release, aiKey) {
   try {
     const outcome = await findLabel(release, aiKey);
     if (outcome.error) {
-      if (outcome.busy) return "No pude buscar la galleta: Gemini está saturado o sin cupo. Lo reintento más tarde.";
+      if (outcome.busy) return "No pude buscar la galleta: probé todos los modelos de respaldo y están saturados o sin cupo. Lo reintento más tarde.";
       return `No pude buscar la galleta (${outcome.error}).`;
     }
     item.label = outcome.label;
