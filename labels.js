@@ -1,4 +1,4 @@
-import { getRelease } from "./discogs.js";
+import { getRelease, vinylColor } from "./discogs.js";
 import { locateLabel } from "./ai.js";
 import { getHistory, updateHistoryItem } from "./history.js";
 
@@ -66,12 +66,14 @@ async function findLabel(release, aiKey) {
 const needsLabel = (item) => !isResolved(item) && !failedThisVisit.has(item.release_id);
 // Los discos guardados antes de la v1.6.6 solo tienen la miniatura (150 px), que se ve pixelada.
 const needsCover = (item) => !item.cover && !failedThisVisit.has(item.release_id);
+// Los discos guardados antes de la v1.11.0 no saben de qué color es el vinilo.
+const needsColor = (item) => item.color === undefined && !failedThisVisit.has(item.release_id);
 
-// Recorre, de uno en uno, los discos sin galleta o sin portada grande.
+// Recorre, de uno en uno, los discos sin galleta, sin portada grande o sin color.
 // onUpdate(item): se ha guardado algo nuevo del disco. onStatus(texto): resumen para la pantalla.
 export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus) {
   if (running || !aiKey || !discogsToken) return;
-  const pending = getHistory().filter((item) => needsLabel(item) || needsCover(item));
+  const pending = getHistory().filter((item) => needsLabel(item) || needsCover(item) || needsColor(item));
   if (!pending.length) return;
   const labelTotal = pending.filter(needsLabel).length;
   let labelIndex = 0;
@@ -87,9 +89,12 @@ export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus)
       let outcome;
       try {
         const release = await getRelease(item.release_id, discogsToken);
-        if (!item.cover && release.image) {
-          item.cover = release.image;
-          updateHistoryItem(item.release_id, { cover: item.cover });
+        const patch = {};
+        if (!item.cover && release.image) patch.cover = release.image;
+        if (item.color === undefined) patch.color = vinylColor(release.formats.map((f) => f.text));
+        if (Object.keys(patch).length) {
+          Object.assign(item, patch);
+          updateHistoryItem(item.release_id, patch);
           onUpdate(item);
         }
         if (!wantsLabel) continue;

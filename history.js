@@ -3,7 +3,8 @@ import { CONFIG } from "./config.js";
 const KEY = CONFIG.STORAGE_KEYS.history;
 const MAX_ITEMS = 500;
 
-// Cada entrada: { release_id, artist, title, year, thumb, cover, label, date }. release_id es la clave
+// Cada entrada: { release_id, artist, title, year, thumb, cover, label, color, date }. color: texto del
+// color del vinilo según Discogs ("" = negro; sin el campo = aún no se sabe). release_id es la clave
 // para la copia en la nube y para sincronizar con la colección de Discogs en la v2.
 export function getHistory() {
   try {

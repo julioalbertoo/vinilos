@@ -21,7 +21,7 @@ En cada candidato verás qué pistas coinciden (✓ sello, ✓ año, ✓ código
 
 En **💿 Mis discos** tienes dos formas de verlos:
 
-- **Galería** (la de inicio): deslizas en horizontal y el disco del centro sale de su funda y gira. Púlsalo otra vez para abrir su ficha. La galleta del centro es la de verdad: la IA busca su foto entre las de la edición en Discogs (una consulta por disco, solo la primera vez). Si Discogs no tiene foto de la galleta, sale una genérica con el título y el artista.
+- **Galería** (la de inicio): deslizas en horizontal y el disco del centro sale de su funda y gira. Púlsalo otra vez para abrir su ficha. La galleta del centro es la de verdad: la IA busca su foto entre las de la edición en Discogs (una consulta por disco, solo la primera vez). Si Discogs no tiene foto de la galleta, sale una genérica con el título y el artista. Si la edición es de vinilo de color (según Discogs), el disco gira de ese color: translúcido, jaspeado o con salpicaduras incluidos.
 - **Cuadrícula**: todas las portadas de un vistazo; aquí puedes borrar discos (✕).
 
 ### ☁️ Copia en la nube (opcional)

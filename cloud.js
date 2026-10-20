@@ -73,6 +73,7 @@ function toRow(item) {
     thumb: item.thumb || "",
     cover: item.cover || "",
     label: item.label || null,
+    color: item.color === undefined ? null : item.color,
     saved_at: item.date || new Date().toISOString(),
   };
 }
@@ -88,6 +89,7 @@ function fromRow(row) {
     date: row.saved_at,
   };
   if (row.label) item.label = row.label;
+  if (row.color !== null && row.color !== undefined) item.color = row.color;
   return item;
 }
 
@@ -98,6 +100,7 @@ function mergeItem(local, remote) {
   for (const field of ["artist", "title", "year", "thumb", "cover", "label"]) {
     if (!local[field] && remote[field]) merged[field] = remote[field];
   }
+  if (local.color === undefined && remote.color !== undefined) merged.color = remote.color;
   return merged;
 }
 
