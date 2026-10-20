@@ -17,7 +17,7 @@ import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
-import { renderGallery, updateSlideLabel } from "./gallery.js";
+import { renderGallery, updateSlide } from "./gallery.js";
 import { fillMissingLabels } from "./labels.js";
 
 const SEARCH_STEP_LABELS = {
@@ -338,6 +338,7 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
         title: release ? release.title : candidate.title,
         year: String((release ? release.year : candidate.year) || ""),
         thumb: (release && release.thumb) || candidate.thumb || "",
+        cover: (release && release.image) || "",
       });
       if (request === detailRequest) savedNote.textContent = "✓ Guardado en tu historial";
     } catch {
@@ -366,9 +367,9 @@ function renderHistoryItem(item) {
 
   const open = el("button", "history-open");
   open.type = "button";
-  if (item.thumb) {
+  if (item.cover || item.thumb) {
     const img = el("img", "history-cover");
-    img.src = item.thumb;
+    img.src = item.cover || item.thumb;
     img.alt = "";
     img.loading = "lazy";
     open.append(img);
@@ -410,7 +411,7 @@ function renderCollection() {
   }
   if (empty) return;
   // Busca en segundo plano la galleta real de los discos que aún no la tienen.
-  fillMissingLabels(getAiKey(), getDiscogsToken(), updateSlideLabel, (text) => {
+  fillMissingLabels(getAiKey(), getDiscogsToken(), updateSlide, (text) => {
     document.getElementById("gallery-label-status").textContent = text;
   });
   if (grid) {

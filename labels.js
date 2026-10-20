@@ -33,8 +33,7 @@ function isResolved(item) {
 }
 
 // Devuelve { label } para guardar, o { error, stop } si hay que reintentar otro día.
-async function findLabel(item, aiKey, discogsToken) {
-  const release = await getRelease(item.release_id, discogsToken);
+async function findLabel(release, aiKey) {
   const photos = release.extraImages.slice(0, MAX_PHOTOS);
   if (!photos.length) return { label: { none: true, reason: "Discogs solo tiene la portada" } };
 
@@ -64,23 +63,37 @@ async function findLabel(item, aiKey, discogsToken) {
   return { label: { src: photos[found.index].uri, box: found.box } };
 }
 
-// Recorre los discos sin galleta, de uno en uno.
-// onFound(item): se ha guardado su galleta. onStatus(texto): resumen para enseñar en pantalla.
-export async function fillMissingLabels(aiKey, discogsToken, onFound, onStatus) {
+const needsLabel = (item) => !isResolved(item) && !failedThisVisit.has(item.release_id);
+// Los discos guardados antes de la v1.6.6 solo tienen la miniatura (150 px), que se ve pixelada.
+const needsCover = (item) => !item.cover && !failedThisVisit.has(item.release_id);
+
+// Recorre, de uno en uno, los discos sin galleta o sin portada grande.
+// onUpdate(item): se ha guardado algo nuevo del disco. onStatus(texto): resumen para la pantalla.
+export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus) {
   if (running || !aiKey || !discogsToken) return;
-  const pending = getHistory().filter((item) => !isResolved(item) && !failedThisVisit.has(item.release_id));
+  const pending = getHistory().filter((item) => needsLabel(item) || needsCover(item));
   if (!pending.length) return;
+  const labelTotal = pending.filter(needsLabel).length;
+  let labelIndex = 0;
   running = true;
   let found = 0;
   let without = 0;
   const errors = [];
   let busy = "";
   try {
-    for (const [i, item] of pending.entries()) {
-      onStatus(`Buscando galletas en Discogs: ${i + 1} de ${pending.length}…`);
+    for (const item of pending) {
+      const wantsLabel = needsLabel(item);
+      if (wantsLabel) onStatus(`Buscando galletas en Discogs: ${++labelIndex} de ${labelTotal}…`);
       let outcome;
       try {
-        outcome = await findLabel(item, aiKey, discogsToken);
+        const release = await getRelease(item.release_id, discogsToken);
+        if (!item.cover && release.image) {
+          item.cover = release.image;
+          updateHistoryItem(item.release_id, { cover: item.cover });
+          onUpdate(item);
+        }
+        if (!wantsLabel) continue;
+        outcome = await findLabel(release, aiKey);
       } catch (err) {
         outcome = { error: `Discogs: ${err && err.message ? err.message : err}`, stop: err && err.authError };
       }
@@ -95,10 +108,11 @@ export async function fillMissingLabels(aiKey, discogsToken, onFound, onStatus) 
         if (outcome.stop) break;
         continue;
       }
+      item.label = outcome.label;
       updateHistoryItem(item.release_id, { label: outcome.label });
       if (outcome.label.src) {
         found += 1;
-        onFound({ ...item, label: outcome.label });
+        onUpdate(item);
       } else {
         without += 1;
       }
@@ -106,6 +120,7 @@ export async function fillMissingLabels(aiKey, discogsToken, onFound, onStatus) 
   } finally {
     running = false;
   }
+  if (!labelTotal) return;
   const parts = [];
   if (found) parts.push(`${found} encontrada${found > 1 ? "s" : ""}`);
   if (without) parts.push(`${without} sin foto de la galleta en Discogs`);

@@ -44,10 +44,18 @@ function fillLabel(label, item) {
   label.append(el("span", "gallery-label-title", item.title || ""), el("span", "gallery-label-artist", item.artist || ""));
 }
 
-// Cambia la galleta de un disco ya pintado (cuando se encuentra la real en segundo plano).
-export function updateSlideLabel(item) {
-  const label = document.querySelector(`.gallery-slide[data-id="${item.release_id}"] .gallery-label`);
-  if (label) fillLabel(label, item);
+function fillSleeve(sleeve, item) {
+  // Portada grande si se tiene; la miniatura de 150 px se ve pixelada a este tamaño.
+  const src = item.cover || item.thumb;
+  sleeve.replaceChildren(src ? coverImg(src, "") : el("span", "gallery-sleeve-empty", "💿"));
+}
+
+// Repinta la galleta y la funda de un disco ya pintado (cuando llegan en segundo plano).
+export function updateSlide(item) {
+  const slide = document.querySelector(`.gallery-slide[data-id="${item.release_id}"]`);
+  if (!slide) return;
+  fillLabel(slide.querySelector(".gallery-label"), item);
+  fillSleeve(slide.querySelector(".gallery-sleeve"), item);
 }
 
 function renderSlide(item) {
@@ -65,7 +73,7 @@ function renderSlide(item) {
   discWrap.append(disc, el("span", "gallery-shine"));
 
   const sleeve = el("span", "gallery-sleeve");
-  sleeve.append(item.thumb ? coverImg(item.thumb, "") : el("span", "gallery-sleeve-empty", "💿"));
+  fillSleeve(sleeve, item);
 
   slide.append(discWrap, sleeve);
   return slide;
