@@ -384,6 +384,7 @@ function renderHistoryItem(item) {
   remove.type = "button";
   remove.setAttribute("aria-label", `Borrar ${item.title} del historial`);
   remove.addEventListener("click", () => {
+    if (!window.confirm(`¿Borrar «${item.title}» de tus discos? No se puede deshacer.`)) return;
     removeFromHistory(item.release_id);
     renderCollection();
   });
@@ -409,7 +410,11 @@ function renderCollection() {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   }
-  if (empty) return;
+  if (empty) {
+    document.getElementById("history-grid").replaceChildren();
+    document.getElementById("gallery-track").replaceChildren();
+    return;
+  }
   // Busca en segundo plano la galleta real de los discos que aún no la tienen.
   fillMissingLabels(getAiKey(), getDiscogsToken(), updateSlide, (text) => {
     document.getElementById("gallery-label-status").textContent = text;
