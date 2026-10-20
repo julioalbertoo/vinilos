@@ -1019,14 +1019,24 @@ input[type="text"]:focus {
   animation-play-state: running;
 }
 
-/* Vinilo pesado (180 g o más): un canto grueso debajo, como si se viera de lado, y más sombra. */
-.gallery-disc-wrap.is-heavy .gallery-disc {
+/* Vinilo pesado (180 g o más): un canto grueso debajo, como si se viera de lado. Va en una capa
+   que no gira (detrás del disco); si fuera sombra del propio disco, giraría y parecería descentrado. */
+.gallery-disc-wrap.is-heavy::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 50%;
+  background: #0b0b0e;
   box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.14),
     0 3px 0 #2a2a30,
     0 6px 0 #0b0b0e,
     0 7px 0 rgba(255, 255, 255, 0.12),
     0 16px 30px -8px rgba(0, 0, 0, 0.8);
+}
+
+.gallery-disc-wrap.is-heavy .gallery-disc {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
 }
 
 .gallery-weight {
