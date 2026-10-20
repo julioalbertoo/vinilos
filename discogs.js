@@ -165,6 +165,7 @@ export async function getRelease(id, discogsToken) {
   const cover = images.find((i) => i.type === "primary") || images[0];
   return {
     id: r.id,
+    masterId: r.master_id || null,
     artist: r.artists_sort || "",
     title: r.title || "",
     year: r.year || "",
@@ -187,6 +188,20 @@ export async function getRelease(id, discogsToken) {
       .map((t) => ({ position: t.position, title: t.title })),
     url: r.uri || releaseUrl(r.id),
   };
+}
+
+// Edición de referencia en vinilo de un álbum: la principal del master si es de vinilo; si no,
+// la edición en vinilo más antigua. Devuelve su id, o null si no hay (o es la misma que exceptId).
+export async function mainVinylRelease(masterId, discogsToken, exceptId) {
+  const master = await discogsGet(`/masters/${masterId}`, null, discogsToken);
+  const versions = await discogsGet(
+    `/masters/${masterId}/versions`,
+    { format: "Vinyl", sort: "released", sort_order: "asc", per_page: "100" },
+    discogsToken
+  );
+  const vinyls = (versions.versions || []).map((v) => v.id);
+  const id = vinyls.includes(master.main_release) ? master.main_release : vinyls[0];
+  return id && id !== exceptId ? id : null;
 }
 
 // Estados que se enseñan del precio sugerido, de mejor a peor (claves tal como las da Discogs).

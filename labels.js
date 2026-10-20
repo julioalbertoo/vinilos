@@ -1,4 +1,4 @@
-import { getRelease, vinylColor, releaseWeight } from "./discogs.js";
+import { getRelease, mainVinylRelease, vinylColor, releaseWeight } from "./discogs.js";
 import { locateLabel } from "./ai.js";
 import { getHistory, updateHistoryItem } from "./history.js";
 
@@ -34,15 +34,17 @@ async function toDataUrl(url) {
 }
 
 // Galleta ya resuelta: encontrada, o confirmado que no hay foto. Las marcas "none" sin motivo
-// vienen de la v1.6.0, que fallaba sin decir por qué: se vuelven a buscar.
+// vienen de la v1.6.0, que fallaba sin decir por qué, y las que no llevan checkedMain, de antes de
+// la v1.18.0, que no miraba la edición principal: se vuelven a buscar.
 function isResolved(item) {
-  return Boolean(item.label && (item.label.src || item.label.reason));
+  return Boolean(item.label && (item.label.src || (item.label.reason && item.label.checkedMain)));
 }
 
-// Devuelve { label } para guardar, o { error, stop } si hay que reintentar otro día.
-async function findLabel(release, aiKey) {
+// Busca la galleta entre las fotos de una edición.
+// Devuelve { label } si la encuentra, { none: motivo } si no, o { error, stop, busy }.
+async function findInPhotos(release, aiKey) {
   const photos = release.extraImages.slice(0, MAX_PHOTOS);
-  if (!photos.length) return { label: { none: true, reason: "Discogs solo tiene la portada" } };
+  if (!photos.length) return { none: "Discogs solo tiene la portada" };
 
   // Las fotos van dentro del mensaje: directas de Discogs, o a través de wsrv.nl.
   // Si ninguna vía funciona, se le pasan a Gemini los enlaces.
@@ -65,9 +67,33 @@ async function findLabel(release, aiKey) {
     const tried = notes.length ? `; descargas fallidas → ${notes.join(", ")}` : "";
     return { error: `Gemini (${how}): ${found.detail}${tried}`, stop: found.stop, busy: found.busy };
   }
-  if (found.index === null) return { label: { none: true, reason: "ninguna foto de Discogs muestra la galleta" } };
+  if (found.index === null) return { none: "ninguna foto de Discogs muestra la galleta" };
   // Para enseñarla se usa la foto grande; la caja va en proporciones, así que vale igual.
   return { label: { src: photos[found.index].uri, box: found.box } };
+}
+
+// Devuelve { label } para guardar, o { error, stop } si hay que reintentar otro día.
+// Si esta edición no tiene foto de la galleta, se busca en la edición principal en vinilo del álbum.
+async function findLabel(release, aiKey, discogsToken) {
+  const own = await findInPhotos(release, aiKey);
+  if (!own.none) return own;
+  let mainId = null;
+  try {
+    if (release.masterId) mainId = await mainVinylRelease(release.masterId, discogsToken, release.id);
+  } catch (err) {
+    return { error: `Discogs (edición principal): ${err && err.message ? err.message : err}`, stop: err && err.authError };
+  }
+  if (!mainId) return { label: { none: true, reason: own.none, checkedMain: true } };
+  let main;
+  try {
+    main = await getRelease(mainId, discogsToken);
+  } catch (err) {
+    return { error: `Discogs (edición principal): ${err && err.message ? err.message : err}`, stop: err && err.authError };
+  }
+  const other = await findInPhotos(main, aiKey);
+  if (other.label) return { label: { ...other.label, fromRelease: mainId } };
+  if (other.error) return other;
+  return { label: { none: true, reason: "ni esta edición ni la principal en vinilo tienen foto de la galleta", checkedMain: true } };
 }
 
 // Discos cuya galleta se está buscando ahora desde su ficha: la búsqueda de fondo se los salta.
@@ -84,11 +110,11 @@ const needsWeight = (item) => item.weight === undefined && !failedThisVisit.has(
 // Al abrir la ficha de un disco sin galleta, se vuelve a buscar aunque antes no se encontrara
 // (Discogs puede tener fotos nuevas). release: la ficha ya descargada.
 // Devuelve un texto para enseñar en la ficha, o "" si no hay nada que decir.
-export async function retryLabel(item, release, aiKey) {
-  if (!item || (item.label && item.label.src) || !aiKey || searchingNow.has(item.release_id)) return "";
+export async function retryLabel(item, release, aiKey, discogsToken) {
+  if (!item || (item.label && item.label.src) || !aiKey || !discogsToken || searchingNow.has(item.release_id)) return "";
   searchingNow.add(item.release_id);
   try {
-    const outcome = await findLabel(release, aiKey);
+    const outcome = await findLabel(release, aiKey, discogsToken);
     if (outcome.error) {
       if (outcome.busy) return "No pude buscar la galleta: probé todos los modelos de respaldo y están saturados o sin cupo. Lo reintento más tarde.";
       return `No pude buscar la galleta (${outcome.error}).`;
@@ -96,7 +122,11 @@ export async function retryLabel(item, release, aiKey) {
     item.label = outcome.label;
     failedThisVisit.delete(item.release_id);
     updateHistoryItem(item.release_id, { label: outcome.label });
-    return outcome.label.src ? "✓ Galleta encontrada: ya la verás en el disco." : `Sin galleta: ${outcome.label.reason}.`;
+    return outcome.label.src
+      ? outcome.label.fromRelease
+        ? "✓ Galleta encontrada en la edición principal en vinilo: ya la verás en el disco."
+        : "✓ Galleta encontrada: ya la verás en el disco."
+      : `Sin galleta: ${outcome.label.reason}.`;
   } finally {
     searchingNow.delete(item.release_id);
   }
@@ -134,7 +164,7 @@ export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus)
           onUpdate(item);
         }
         if (!wantsLabel) continue;
-        outcome = await findLabel(release, aiKey);
+        outcome = await findLabel(release, aiKey, discogsToken);
       } catch (err) {
         outcome = { error: `Discogs: ${err && err.message ? err.message : err}`, stop: err && err.authError };
       }

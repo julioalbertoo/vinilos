@@ -463,7 +463,7 @@ async function searchLabelAgain(release, request) {
   const note = el("p", "detail-meta detail-label-note", "🔍 Buscando la galleta en las fotos de Discogs…");
   const content = document.getElementById("detail-content");
   content.insertBefore(note, document.getElementById("detail-price"));
-  const text = await retryLabel(item, release, getAiKey());
+  const text = await retryLabel(item, release, getAiKey(), getDiscogsToken());
   if (item.label && item.label.src) updateSlide(item);
   if (request !== detailRequest) return;
   if (text) note.textContent = text;
