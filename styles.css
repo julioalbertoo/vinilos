@@ -1054,10 +1054,17 @@ input[type="text"]:focus {
 }
 
 .view .gallery-label-status {
-  margin: 4px 0 0;
-  font-size: 0.75rem;
-  text-align: center;
+  margin: 8px 0 0;
   overflow-wrap: anywhere;
+  font-size: 0.78rem;
+}
+
+.view .gallery-label-status:not(:empty) {
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--butter);
+  color: var(--butter-text);
+  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {
