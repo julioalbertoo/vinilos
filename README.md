@@ -13,8 +13,8 @@ En la pestaña **📷 Identificar** tienes tres caminos, de más a menos preciso
 
 | Camino | Cuándo usarlo |
 |---|---|
-| **▦ Escanear código de barras** | Si la contraportada tiene código. Es el más rápido y exacto: va directo a la edición. |
-| **📷 Hacer foto** / **🖼️ Elegir de galería** | Portada, contraportada, lomo o galleta central. La IA lee artista, título, sello, número de catálogo y también los números del código de barras. |
+| **▦ Código de barras** | Si la contraportada tiene código. Es el más rápido y exacto: va directo a la edición. |
+| **📷 Hacer foto** / **🖼️ Galería** | Portada, contraportada, lomo o galleta central. Se identifica sola nada más subir la foto, sin pulsar nada más. La IA lee artista, título, sello, número de catálogo y también los números del código de barras. |
 | **Ninguno es** (en los resultados) | Si ningún candidato es el tuyo: escribe artista y título, o el número de catálogo. |
 
 En cada candidato verás qué pistas coinciden (✓ sello, ✓ año, ✓ código de barras…). Pulsa **✓ Es este** en el tuyo: se abre su ficha (canciones, sello, color del vinilo si Discogs lo tiene) y se guarda en **🗂️ Historial**.

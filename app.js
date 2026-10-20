@@ -184,8 +184,10 @@ function el(tag, className, text) {
   return node;
 }
 
-function renderCard(candidate) {
-  const card = el("article", "card");
+function renderCard(candidate, index) {
+  const best = index === 0;
+  const card = el("article", best ? "card card--best" : "card");
+  if (best) card.append(el("span", "card-badge", "★ Mejor coincidencia"));
 
   if (candidate.thumb) {
     const img = el("img", "card-thumb");
@@ -205,7 +207,8 @@ function renderCard(candidate) {
   if (candidate.matches.length) {
     body.append(el("p", "card-matches", candidate.matches.map((m) => `✓ ${m}`).join("  ")));
   }
-  const select = el("button", "card-select", "✓ Es este");
+  // Solo el mejor candidato lleva el botón lila: es la acción más probable.
+  const select = el("button", best ? "card-select" : "card-select secondary", "✓ Es este");
   select.type = "button";
   select.addEventListener("click", () => openDetail(candidate));
   body.append(select);
@@ -385,6 +388,7 @@ function renderHistory() {
 }
 
 function initHistory() {
+  document.getElementById("history-start").addEventListener("click", () => showView("capture"));
   document.getElementById("history-clear").addEventListener("click", () => {
     if (window.confirm("¿Borrar todos los discos del historial? No se puede deshacer.")) {
       clearHistory();
@@ -393,13 +397,16 @@ function initHistory() {
   });
 }
 
-function initResults() {
+function initResults(resetCapture) {
   const manual = document.getElementById("results-manual");
   const input = document.getElementById("results-manual-input");
   const status = document.getElementById("results-manual-status");
   const searchButton = document.getElementById("results-manual-search");
 
-  document.getElementById("results-back").addEventListener("click", () => showView("capture"));
+  document.getElementById("results-back").addEventListener("click", () => {
+    resetCapture();
+    showView("capture");
+  });
 
   document.getElementById("results-none").addEventListener("click", () => {
     manual.hidden = false;
@@ -441,59 +448,82 @@ function initDetail(resetCapture) {
 }
 
 function initCapture() {
+  const view = document.getElementById("view-capture");
   const cameraInput = document.getElementById("capture-camera-input");
   const galleryInput = document.getElementById("capture-gallery-input");
+  const previewWrap = document.getElementById("capture-preview-wrap");
   const preview = document.getElementById("capture-preview");
-  const identifyButton = document.getElementById("capture-identify");
+  const retryButton = document.getElementById("capture-identify");
+  const cameraLabel = document.getElementById("capture-camera-label");
   const status = document.getElementById("capture-status");
   const rawJson = document.getElementById("capture-raw-json");
 
   let preparedImage = null;
-  // Si la foto viene del botón del escáner, se identifica sin esperar a que pulses «Identificar».
-  let autoIdentify = false;
+  // Cada foto nueva invalida lo que estuviera en marcha con la anterior.
+  let identifyRun = 0;
+
+  function setBusy(busy) {
+    previewWrap.classList.toggle("busy", busy);
+    status.classList.toggle("loading", busy);
+  }
 
   async function handleFile(file) {
     if (!file) {
-      autoIdentify = false;
       status.textContent = "No se ha recibido ninguna foto (¿se canceló la cámara?).";
       return;
     }
-    status.textContent = "Preparando imagen...";
+    const run = ++identifyRun;
+    stopScanner();
+    retryButton.hidden = true;
     rawJson.hidden = true;
+    setBusy(true);
+    status.textContent = "Preparando la foto...";
     try {
-      preparedImage = await prepareImage(file);
-      preview.src = preparedImage;
-      preview.hidden = false;
-      identifyButton.hidden = false;
-      status.textContent = "";
-      if (autoIdentify) {
-        autoIdentify = false;
-        identifyButton.click();
-      }
+      const image = await prepareImage(file);
+      if (run !== identifyRun) return;
+      preparedImage = image;
+      preview.src = image;
+      previewWrap.hidden = false;
+      view.classList.add("has-photo");
+      cameraLabel.textContent = "📷 Hacer otra foto";
+      window.scrollTo(0, 0);
     } catch (err) {
-      autoIdentify = false;
+      if (run !== identifyRun) return;
+      setBusy(false);
       status.textContent = `❌ No se pudo preparar la imagen: ${err && err.message ? err.message : err}`;
+      return;
     }
+    // Se identifica nada más subir la foto: el usuario no tiene que pulsar nada más.
+    await runIdentify(run);
   }
 
-  cameraInput.addEventListener("change", (event) => handleFile(event.target.files[0]));
-  galleryInput.addEventListener("change", (event) => handleFile(event.target.files[0]));
+  cameraInput.addEventListener("change", (event) => {
+    handleFile(event.target.files[0]);
+    event.target.value = "";
+  });
+  galleryInput.addEventListener("change", (event) => {
+    handleFile(event.target.files[0]);
+    event.target.value = "";
+  });
 
-  identifyButton.addEventListener("click", async () => {
+  async function runIdentify(run) {
     if (!preparedImage) return;
     if (!hasTokens()) {
+      setBusy(false);
       openGuide();
       return;
     }
     rawJson.hidden = true;
-    identifyButton.disabled = true;
+    retryButton.hidden = true;
+    setBusy(true);
 
     let currentModel = "";
     let fallbackNote = "";
     let startedAt = Date.now();
     const renderProgress = () => {
+      if (run !== identifyRun) return;
       const seconds = Math.round((Date.now() - startedAt) / 1000);
-      status.textContent = `${fallbackNote}Probando con ${currentModel}... ${seconds} s`;
+      status.textContent = `${fallbackNote}Leyendo la foto${currentModel ? ` con ${currentModel}` : ""}... ${seconds} s`;
     };
     const ticker = setInterval(renderProgress, 1000);
 
@@ -505,24 +535,31 @@ function initCapture() {
     });
 
     clearInterval(ticker);
+    if (run !== identifyRun) return;
 
     if (!result.ok) {
-      identifyButton.disabled = false;
+      setBusy(false);
+      retryButton.hidden = false;
       showError(status, result.reason, result.authError);
       rawJson.textContent = `Diagnóstico:\n${result.attempts.map((a) => `• ${a.model}: ${a.detail}`).join("\n")}`;
       rawJson.hidden = false;
       return;
     }
 
-    await searchAndShow(result.data, "foto");
-    identifyButton.disabled = false;
-  });
+    await searchAndShow(result.data, "foto", run);
+    if (run === identifyRun) setBusy(false);
+  }
 
-  async function searchAndShow(clues, source) {
+  retryButton.addEventListener("click", () => runIdentify(++identifyRun));
+
+  async function searchAndShow(clues, source, run = identifyRun) {
+    status.classList.add("loading");
     try {
       const { candidates, strategy } = await findCandidates(clues, getDiscogsToken(), (step) => {
-        status.textContent = `Buscando en Discogs ${SEARCH_STEP_LABELS[step]}...`;
+        if (run === identifyRun) status.textContent = `Buscando en Discogs ${SEARCH_STEP_LABELS[step]}...`;
       });
+      if (run !== identifyRun) return;
+      status.classList.remove("loading");
       if (candidates.length === 0) {
         status.textContent =
           source === "barcode"
@@ -536,18 +573,24 @@ function initCapture() {
         renderResults(rankCandidates(candidates, clues), candidates.length, strategy, clues);
       }
     } catch (err) {
+      if (run !== identifyRun) return;
+      status.classList.remove("loading");
       showError(status, err.message, err.authError);
     }
   }
 
   function resetCapture() {
     stopScanner();
+    identifyRun++;
     preparedImage = null;
     cameraInput.value = "";
     galleryInput.value = "";
-    preview.hidden = true;
+    setBusy(false);
+    previewWrap.hidden = true;
     preview.removeAttribute("src");
-    identifyButton.hidden = true;
+    view.classList.remove("has-photo");
+    cameraLabel.textContent = "📷 Hacer foto";
+    retryButton.hidden = true;
     status.textContent = "";
     rawJson.hidden = true;
   }
@@ -604,7 +647,6 @@ function initCapture() {
   document.getElementById("scanner-cancel").addEventListener("click", stopScanner);
   document.getElementById("scanner-photo").addEventListener("click", () => {
     stopScanner();
-    autoIdentify = true;
     cameraInput.click();
   });
 
@@ -650,7 +692,7 @@ populateGuideText();
 initGuideNavigation();
 initSettings();
 const resetCapture = initCapture();
-initResults();
+initResults(resetCapture);
 initDetail(resetCapture);
 initHistory();
 if (areTokensVerified()) showView("capture");

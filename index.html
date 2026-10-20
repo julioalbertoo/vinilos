@@ -4,66 +4,72 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>Vinilos</title>
-  <meta name="theme-color" content="#121212">
+  <meta name="theme-color" content="#fbf6f1">
   <meta name="apple-mobile-web-app-title" content="Vinilos">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="stylesheet" href="styles.css?v=1.0.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
+  <link rel="stylesheet" href="styles.css?v=1.1.0">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=1.0.0",
-        "./tokens.js": "./tokens.js?v=1.0.0",
-        "./guide.js": "./guide.js?v=1.0.0",
-        "./ai.js": "./ai.js?v=1.0.0",
-        "./discogs.js": "./discogs.js?v=1.0.0",
-        "./imaging.js": "./imaging.js?v=1.0.0",
-        "./scoring.js": "./scoring.js?v=1.0.0",
-        "./barcode.js": "./barcode.js?v=1.0.0",
-        "./history.js": "./history.js?v=1.0.0"
+        "./config.js": "./config.js?v=1.1.0",
+        "./tokens.js": "./tokens.js?v=1.1.0",
+        "./guide.js": "./guide.js?v=1.1.0",
+        "./ai.js": "./ai.js?v=1.1.0",
+        "./discogs.js": "./discogs.js?v=1.1.0",
+        "./imaging.js": "./imaging.js?v=1.1.0",
+        "./scoring.js": "./scoring.js?v=1.1.0",
+        "./barcode.js": "./barcode.js?v=1.1.0",
+        "./history.js": "./history.js?v=1.1.0"
       }
     }
   </script>
 </head>
 <body>
   <header class="app-header">
-    <h1>🎵 Vinilos</h1>
-    <p class="app-version">v1.0.0</p>
+    <h1><span class="logo-disc" aria-hidden="true"></span>Vinilos</h1>
+    <p class="app-version">v1.1.0</p>
   </header>
 
   <main id="app">
     <section id="view-guide" class="view">
       <div id="guide-screen-intro" class="guide-screen">
+        <div class="hero-disc hero-disc--small" aria-hidden="true"></div>
         <h2 id="guide-intro-title"></h2>
         <p id="guide-intro-body" class="guide-body"></p>
         <button type="button" id="guide-intro-next"></button>
       </div>
 
       <div id="guide-screen-ai" class="guide-screen" hidden>
+        <p class="step-pill">Paso 1 de 2</p>
         <h2 id="guide-ai-title"></h2>
-        <ol id="guide-ai-steps"></ol>
-        <a id="guide-ai-link" class="guide-link" target="_blank" rel="noopener"></a>
+        <ol id="guide-ai-steps" class="steps"></ol>
+        <a id="guide-ai-link" class="btn btn-soft" target="_blank" rel="noopener"></a>
         <p id="guide-ai-notice" class="notice"></p>
         <label id="guide-ai-paste-label" for="guide-ai-input"></label>
         <input type="password" id="guide-ai-input">
         <p id="guide-ai-hint" class="hint"></p>
         <button type="button" id="guide-ai-save"></button>
-        <button type="button" id="guide-ai-back" class="secondary">← Atrás</button>
+        <button type="button" id="guide-ai-back" class="ghost">← Atrás</button>
       </div>
 
       <div id="guide-screen-discogs" class="guide-screen" hidden>
+        <p class="step-pill">Paso 2 de 2</p>
         <h2 id="guide-discogs-title"></h2>
-        <ol id="guide-discogs-steps"></ol>
-        <a id="guide-discogs-link" class="guide-link" target="_blank" rel="noopener"></a>
+        <ol id="guide-discogs-steps" class="steps"></ol>
+        <a id="guide-discogs-link" class="btn btn-soft" target="_blank" rel="noopener"></a>
         <p id="guide-discogs-notice" class="notice"></p>
         <label id="guide-discogs-paste-label" for="guide-discogs-input"></label>
         <input type="password" id="guide-discogs-input">
         <button type="button" id="guide-discogs-save"></button>
-        <button type="button" id="guide-discogs-back" class="secondary">← Atrás</button>
+        <button type="button" id="guide-discogs-back" class="ghost">← Atrás</button>
       </div>
     </section>
 
@@ -78,49 +84,62 @@
       <input type="password" id="discogs-token-input" placeholder="Tu token personal de Discogs">
 
       <button type="button" id="settings-save">Guardar</button>
-      <button type="button" id="settings-clear">Borrar llaves</button>
       <p id="settings-status" class="status"></p>
 
-      <button type="button" id="settings-test-ai">Probar conexión Gemini</button>
-      <p id="settings-test-ai-status" class="status"></p>
-
-      <button type="button" id="settings-test-discogs">Probar conexión Discogs</button>
-      <p id="settings-test-discogs-status" class="status"></p>
+      <div class="panel">
+        <p class="panel-title">Comprobar que funcionan</p>
+        <button type="button" id="settings-test-ai" class="secondary">Probar conexión Gemini</button>
+        <p id="settings-test-ai-status" class="status"></p>
+        <button type="button" id="settings-test-discogs" class="secondary">Probar conexión Discogs</button>
+        <p id="settings-test-discogs-status" class="status"></p>
+      </div>
 
       <p id="settings-open-guide" class="link-like"></p>
+      <button type="button" id="settings-clear" class="ghost danger">Borrar llaves</button>
     </section>
 
     <section id="view-capture" class="view">
-      <h2>Identificar disco</h2>
-
-      <label class="guide-link" for="capture-camera-input">📷 Hacer foto</label>
-      <input type="file" accept="image/*" capture="environment" id="capture-camera-input" class="visually-hidden">
-
-      <label class="guide-link" for="capture-gallery-input">🖼️ Elegir de galería</label>
-      <input type="file" accept="image/*" id="capture-gallery-input" class="visually-hidden">
-
-      <button type="button" id="capture-scan">▦ Escanear código de barras</button>
-      <div id="scanner" class="scanner" hidden>
-        <video id="scanner-video" playsinline muted autoplay></video>
-        <p id="scanner-status" class="status">Apunta la cámara al código de barras de la contraportada.</p>
-        <button type="button" id="scanner-photo" hidden>📷 Leer el número con una foto</button>
-        <button type="button" id="scanner-cancel" class="secondary">Cancelar</button>
+      <div class="hero">
+        <div class="hero-disc" aria-hidden="true"></div>
+        <h2>¿Qué disco tienes?</h2>
+        <p>Haz una foto de la portada, el lomo o la galleta central. Lo identifico al momento.</p>
       </div>
 
-      <img id="capture-preview" alt="Vista previa de la foto" hidden>
-
-      <button type="button" id="capture-identify" hidden>Identificar</button>
-      <p id="capture-status" class="status"></p>
+      <div id="capture-preview-wrap" class="preview-wrap" hidden>
+        <img id="capture-preview" alt="Vista previa de la foto">
+        <div class="preview-busy" aria-hidden="true"><span class="scanline"></span></div>
+      </div>
+      <p id="capture-status" class="status status-card" role="status" aria-live="polite"></p>
+      <button type="button" id="capture-identify" hidden>↻ Reintentar con esta foto</button>
       <pre id="capture-raw-json" class="raw-json" hidden></pre>
+
+      <label class="btn btn-primary btn-xl" for="capture-camera-input" id="capture-camera-label">📷 Hacer foto</label>
+      <input type="file" accept="image/*" capture="environment" id="capture-camera-input" class="visually-hidden">
+
+      <div class="btn-row">
+        <label class="btn btn-soft btn-peach" for="capture-gallery-input">🖼️ Galería</label>
+        <input type="file" accept="image/*" id="capture-gallery-input" class="visually-hidden">
+        <button type="button" id="capture-scan" class="secondary btn-mint">▦ Código de barras</button>
+      </div>
+
+      <div id="scanner" class="scanner" hidden>
+        <div class="scanner-frame">
+          <video id="scanner-video" playsinline muted autoplay></video>
+          <span class="scanner-guide" aria-hidden="true"></span>
+        </div>
+        <p id="scanner-status" class="status">Apunta la cámara al código de barras de la contraportada.</p>
+        <button type="button" id="scanner-photo" hidden>📷 Leer el número con una foto</button>
+        <button type="button" id="scanner-cancel" class="ghost">Cancelar</button>
+      </div>
     </section>
 
     <section id="view-results" class="view">
-      <h2>Candidatos</h2>
+      <h2>¿Es alguno de estos?</h2>
       <p id="results-summary" class="results-summary"></p>
       <div id="results-list"></div>
 
-      <button type="button" id="results-none" class="secondary">Ninguno es</button>
-      <div id="results-manual" hidden>
+      <button type="button" id="results-none" class="secondary">Ninguno es el mío</button>
+      <div id="results-manual" class="panel" hidden>
         <label for="results-manual-input">Escribe artista y título, o el número de catálogo</label>
         <input type="text" id="results-manual-input" enterkeyhint="search">
         <button type="button" id="results-manual-search">Buscar</button>
@@ -131,22 +150,26 @@
         <summary>Ver las pistas usadas en la búsqueda</summary>
         <pre id="results-clues-json" class="raw-json"></pre>
       </details>
-      <button type="button" id="results-back" class="secondary">← Probar con otra foto</button>
+      <button type="button" id="results-back" class="ghost">← Probar con otra foto</button>
     </section>
 
     <section id="view-detail" class="view">
       <div id="detail-content"></div>
-      <p id="detail-saved" class="status"></p>
-      <a id="detail-open" class="guide-link" target="_blank" rel="noopener">Abrir en Discogs ↗</a>
-      <button type="button" id="detail-back" class="secondary">← Volver a los candidatos</button>
-      <button type="button" id="detail-new" class="secondary">📷 Identificar otro disco</button>
+      <p id="detail-saved" class="saved-pill"></p>
+      <button type="button" id="detail-new">📷 Identificar otro disco</button>
+      <a id="detail-open" class="btn btn-soft" target="_blank" rel="noopener">Abrir en Discogs ↗</a>
+      <button type="button" id="detail-back" class="ghost">← Volver a los candidatos</button>
     </section>
 
     <section id="view-history" class="view">
       <h2>Historial</h2>
-      <p id="history-empty">Aún no has confirmado ningún disco. Cuando pulses «✓ Es este» en un candidato, aparecerá aquí.</p>
+      <div id="history-empty" class="empty">
+        <div class="hero-disc hero-disc--small" aria-hidden="true"></div>
+        <p>Aún no has confirmado ningún disco. Cuando pulses «✓ Es este» en un candidato, aparecerá aquí.</p>
+        <button type="button" id="history-start">📷 Identificar mi primer disco</button>
+      </div>
       <div id="history-grid" class="history-grid"></div>
-      <button type="button" id="history-clear" class="secondary" hidden>Borrar todo el historial</button>
+      <button type="button" id="history-clear" class="ghost danger" hidden>Borrar todo el historial</button>
     </section>
   </main>
 
@@ -156,6 +179,6 @@
     <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=1.0.0"></script>
+  <script type="module" src="app.js?v=1.1.0"></script>
 </body>
 </html>
