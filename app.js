@@ -17,6 +17,7 @@ import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
+import { renderGallery } from "./gallery.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -26,21 +27,24 @@ const SEARCH_STEP_LABELS = {
   master: "todas las ediciones del álbum",
 };
 
-const VIEWS = ["guide", "settings", "capture", "results", "detail", "history"];
+const VIEWS = ["guide", "settings", "capture", "results", "detail", "history", "gallery"];
 const GUIDE_SCREENS = ["intro", "ai", "discogs"];
 // Pestaña que se marca en la barra inferior para cada pantalla.
-const TAB_FOR_VIEW = { capture: "capture", results: "capture", detail: "capture", history: "history", settings: "settings" };
+const TAB_FOR_VIEW = { capture: "capture", results: "capture", history: "history", gallery: "gallery", settings: "settings" };
 
 function showView(name) {
   if (name !== "capture") stopScanner();
   if (name === "history") renderHistory();
+  if (name === "gallery") showGallery();
   for (const view of VIEWS) {
     document.getElementById(`view-${view}`).classList.toggle("active", view === name);
   }
   // En la primera visita la guía va sin barra: antes de nada hay que conseguir las llaves.
   document.body.classList.toggle("no-tabbar", name === "guide" && !hasTokens());
   for (const tab of document.querySelectorAll("#tabbar button")) {
-    tab.classList.toggle("active", tab.dataset.view === TAB_FOR_VIEW[name]);
+    // La ficha se marca en la pestaña desde la que se abrió.
+    const activeTab = name === "detail" ? TAB_FOR_VIEW[detailReturnView] : TAB_FOR_VIEW[name];
+    tab.classList.toggle("active", tab.dataset.view === activeTab);
   }
 }
 
@@ -283,12 +287,18 @@ function renderDetail(release) {
 let detailRequest = 0;
 let detailReturnView = "results";
 
-// fromHistory: se abre desde el historial, así que no se vuelve a guardar y "Volver" lleva allí.
-async function openDetail(candidate, { fromHistory = false } = {}) {
-  detailReturnView = fromHistory ? "history" : "results";
-  document.getElementById("detail-back").textContent = fromHistory
-    ? "← Volver al historial"
-    : "← Volver a los candidatos";
+const BACK_LABELS = {
+  results: "← Volver a los candidatos",
+  history: "← Volver al historial",
+  gallery: "← Volver a la galería",
+};
+
+// returnView: pantalla a la que lleva "Volver". Desde el historial o la galería el disco ya está
+// guardado, así que no se vuelve a guardar.
+async function openDetail(candidate, { returnView = "results" } = {}) {
+  const fromHistory = returnView !== "results";
+  detailReturnView = returnView;
+  document.getElementById("detail-back").textContent = BACK_LABELS[returnView];
   const savedNote = document.getElementById("detail-saved");
   savedNote.textContent = "";
 
@@ -368,7 +378,7 @@ function renderHistoryItem(item) {
   }
   open.append(el("span", "history-title", item.title));
   open.append(el("span", "history-meta", [item.year, item.artist].filter(Boolean).join(" · ")));
-  open.addEventListener("click", () => openDetail(historyItemToCandidate(item), { fromHistory: true }));
+  open.addEventListener("click", () => openDetail(historyItemToCandidate(item), { returnView: "history" }));
 
   const remove = el("button", "history-remove", "✕");
   remove.type = "button";
@@ -389,7 +399,15 @@ function renderHistory() {
   document.getElementById("history-clear").hidden = items.length === 0;
 }
 
+function showGallery() {
+  const items = getHistory();
+  document.getElementById("gallery-empty").hidden = items.length > 0;
+  document.getElementById("gallery-content").hidden = items.length === 0;
+  renderGallery(items, (item) => openDetail(historyItemToCandidate(item), { returnView: "gallery" }));
+}
+
 function initHistory() {
+  document.getElementById("gallery-start").addEventListener("click", () => showView("capture"));
   document.getElementById("history-start").addEventListener("click", () => showView("capture"));
   document.getElementById("history-clear").addEventListener("click", () => {
     if (window.confirm("¿Borrar todos los discos del historial? No se puede deshacer.")) {

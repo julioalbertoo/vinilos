@@ -19,6 +19,8 @@ En la pestaña **📷 Identificar** tienes tres caminos, de más a menos preciso
 
 En cada candidato verás qué pistas coinciden (✓ sello, ✓ año, ✓ código de barras…). Pulsa **✓ Es este** en el tuyo: se abre su ficha (canciones, sello, color del vinilo si Discogs lo tiene) y se guarda en **🗂️ Historial**.
 
+En **💿 Galería** ves tus discos uno tras otro deslizando en horizontal: el que queda en el centro sale de su funda y gira. Púlsalo otra vez para abrir su ficha.
+
 **Truco para afinar la edición:** la portada suele ser igual en todas las ediciones. La contraportada y la galleta central traen el sello y el número de catálogo, que son los que distinguen una edición de otra.
 
 ---
@@ -106,6 +108,7 @@ Web estática (HTML + CSS + JavaScript sin frameworks) que habla directamente de
 | `imaging.js` | Reduce la foto (lado largo ~1024 px) antes de enviarla a la IA. |
 | `tokens.js` | Guarda y comprueba las llaves (en el navegador). |
 | `history.js` | Historial de discos confirmados (en el navegador). |
+| `gallery.js` | Galería horizontal: el disco del centro sale de la funda y gira. |
 | `guide.js` | Textos de la guía de bienvenida: si cambian los menús de Google o Discogs, se edita solo aquí. |
 
 **Versiones:** cada publicación sube el número de versión en `index.html`, que también se añade a las direcciones de los archivos (`app.js?v=1.0.0`). Así el móvil descarga siempre la versión nueva en vez de una copia antigua guardada.
