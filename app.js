@@ -274,7 +274,7 @@ function renderDetail(release) {
   if (release.id) {
     const price = el("div", "detail-price");
     price.id = "detail-price";
-    price.append(el("p", "detail-price-title", "💶 Precio de esta edición"), el("p", "detail-price-note", "Buscando precio en Discogs…"));
+    price.append(el("p", "detail-price-title", "💶 Precio de esta edición"), el("p", "detail-price-note", "Buscando precio en Discogs…"), spainLink(release.id));
     nodes.push(price);
   }
   if (release.tracklist.length) {
@@ -299,7 +299,16 @@ function formatMoney({ value, currency }) {
   }
 }
 
-function renderPrices(prices) {
+// Abre en Discogs las copias de esta edición a la venta que se envían desde España.
+function spainLink(id) {
+  const link = el("a", "detail-price-spain", "🇪🇸 Ver las que se venden desde España ↗");
+  link.href = `https://www.discogs.com/sell/release/${id}?ships_from=Spain`;
+  link.target = "_blank";
+  link.rel = "noopener";
+  return link;
+}
+
+function renderPrices(id, prices) {
   const box = document.getElementById("detail-price");
   if (!box) return;
   const nodes = [el("p", "detail-price-title", "💶 Precio de esta edición")];
@@ -325,18 +334,19 @@ function renderPrices(prices) {
     nodes.push(el("p", "detail-price-hint",
       "Para ver el precio sugerido por estado, rellena tus datos de vendedor en Discogs (Ajustes → Vendedor). No hace falta vender nada."));
   }
+  nodes.push(spainLink(id));
   box.replaceChildren(...nodes);
 }
 
 async function loadPrices(id, request) {
   try {
     const prices = await getPrices(id, getDiscogsToken());
-    if (request === detailRequest) renderPrices(prices);
+    if (request === detailRequest) renderPrices(id, prices);
   } catch (err) {
     const box = document.getElementById("detail-price");
     if (request === detailRequest && box) {
       box.replaceChildren(el("p", "detail-price-title", "💶 Precio de esta edición"),
-        el("p", "detail-price-note", `No se pudo consultar el precio: ${err.message}`));
+        el("p", "detail-price-note", `No se pudo consultar el precio: ${err.message}`), spainLink(id));
     }
   }
 }
