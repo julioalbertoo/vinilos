@@ -733,9 +733,13 @@ function initCapture() {
     const ticker = setInterval(renderProgress, 1000);
 
     stopLabelSearch();
-    const result = await identify(preparedImage, getAiKey(), (model, previousFailure) => {
+    const result = await identify(preparedImage, getAiKey(), (model, previousFailure, retry) => {
       currentModel = model;
-      fallbackNote = previousFailure ? `El modelo principal no respondió (${previousFailure}). Reintento con el de respaldo. ` : "";
+      fallbackNote = retry
+        ? `Gemini está saturado. Reintento ${retry} de 2. `
+        : previousFailure
+          ? `El modelo principal no respondió (${previousFailure}). Reintento con el de respaldo. `
+          : "";
       startedAt = Date.now();
       renderProgress();
     });

@@ -122,7 +122,14 @@ async function tryModel(model, aiKey, imageDataUrl) {
   const body = await response.text();
   if (!response.ok) {
     const detail = describeError(response.status, body);
-    return { ok: false, detail, authError: detail === INVALID_KEY_MESSAGE, quotaError: response.status === 429 };
+    return {
+      ok: false,
+      detail,
+      authError: detail === INVALID_KEY_MESSAGE,
+      quotaError: response.status === 429,
+      // 5xx: saturado o caído un momento; merece la pena reintentar.
+      busy: response.status >= 500,
+    };
   }
 
   let text;
@@ -141,12 +148,20 @@ async function tryModel(model, aiKey, imageDataUrl) {
   return { ok: true, data };
 }
 
+const BUSY_RETRIES = 2;
+
 export async function identify(imageDataUrl, aiKey, onAttempt) {
   const models = [CONFIG.AI_PROVIDER.primaryModel, CONFIG.AI_PROVIDER.fallbackModel];
   const attempts = [];
   for (const model of models) {
-    if (onAttempt) onAttempt(model, attempts.at(-1)?.detail);
-    const result = await tryModel(model, aiKey, imageDataUrl);
+    if (onAttempt) onAttempt(model, attempts.at(-1)?.detail, 0);
+    let result = await tryModel(model, aiKey, imageDataUrl);
+    // Si Gemini está saturado (suele durar segundos), se espera un poco y se reintenta hasta 2 veces.
+    for (let retry = 1; retry <= BUSY_RETRIES && result.busy; retry += 1) {
+      if (onAttempt) onAttempt(model, attempts.at(-1)?.detail, retry);
+      await new Promise((resolve) => setTimeout(resolve, retry * 4000));
+      result = await tryModel(model, aiKey, imageDataUrl);
+    }
     if (result.ok) {
       return { ok: true, data: result.data, modelUsed: model, attempts };
     }
