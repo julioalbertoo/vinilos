@@ -829,6 +829,7 @@ function setExploreMode(on) {
   // Color de la franja de la hora en Safari: el mismo que el fondo de la cabecera.
   document.querySelector('meta[name="theme-color"]').content = on ? "#17141f" : "#fbf6f1";
   document.getElementById("explore-toggle").checked = on;
+  document.getElementById("identify-title").textContent = on ? "¿Qué disco exploras?" : "¿Qué disco tienes?";
   try {
     if (on) localStorage.setItem(EXPLORE_KEY, "1");
     else localStorage.removeItem(EXPLORE_KEY);
