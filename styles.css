@@ -1053,6 +1053,13 @@ input[type="text"]:focus {
   font-weight: 700;
 }
 
+.view .gallery-label-status {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gallery-disc { animation: none; }
   .gallery-slide, .gallery-disc-wrap { transition: none; }

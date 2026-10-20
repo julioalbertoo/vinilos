@@ -215,28 +215,40 @@ const LABEL_PROMPT =
   '"box_2d": [ymin, xmin, ymax, xmax] del círculo de la galleta en esa foto, en escala 0-1000}. ' +
   "La caja debe rodear solo la etiqueta de papel, sin los surcos del vinilo.";
 
-// images: lista de data URL (o enlaces, si el navegador no pudo descargarlas).
-// Devuelve { ok: true, index, box } (index null = no hay galleta) o { ok: false, detail, stop }.
+// Para esto se usa la conexión nativa de Gemini: es la única que acepta enlaces a fotos
+// (file_data) además de fotos incrustadas (inline_data).
+const NATIVE_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+
+function imagePart(image) {
+  const match = /^data:([^;]+);base64,(.*)$/.exec(image);
+  if (match) return { inline_data: { mime_type: match[1], data: match[2] } };
+  return { file_data: { mime_type: "image/jpeg", file_uri: image } };
+}
+
+// images: lista de data URL o de enlaces. Devuelve { ok: true, index, box } (index null = no hay
+// galleta) o { ok: false, detail, stop }.
 export async function locateLabel(images, aiKey) {
-  const content = [{ type: "text", text: LABEL_PROMPT }];
-  images.forEach((url, i) => {
-    content.push({ type: "text", text: `Foto ${i}:` });
-    content.push({ type: "image_url", image_url: { url } });
-  });
+  const parts = [{ text: LABEL_PROMPT }];
+  images.forEach((image, i) => parts.push({ text: `Foto ${i}:` }, imagePart(image)));
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
   let response;
   try {
-    response = await postChat(
-      aiKey,
-      {
-        model: CONFIG.AI_PROVIDER.primaryModel,
-        messages: [{ role: "user", content }],
-        temperature: 0,
-        max_tokens: 4096,
-      },
-      MODEL_TIMEOUT_MS
-    );
+    response = await fetch(`${NATIVE_BASE}/${CONFIG.AI_PROVIDER.primaryModel}:generateContent`, {
+      method: "POST",
+      headers: { "x-goog-api-key": aiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: { temperature: 0, responseMimeType: "application/json" },
+      }),
+      signal: controller.signal,
+    });
   } catch (err) {
-    return { ok: false, detail: `error de red: ${err && err.message ? err.message : err}` };
+    const detail = err && err.name === "AbortError" ? "tiempo agotado" : "error de red";
+    return { ok: false, detail, transient: true };
+  } finally {
+    clearTimeout(timer);
   }
   const body = await response.text();
   if (!response.ok) {
@@ -246,7 +258,8 @@ export async function locateLabel(images, aiKey) {
   }
   let data = null;
   try {
-    data = extractJson(JSON.parse(body)?.choices?.[0]?.message?.content);
+    const text = (JSON.parse(body)?.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
+    data = extractJson(text);
   } catch {
     // cae al error de abajo
   }

@@ -410,7 +410,9 @@ function renderCollection() {
   }
   if (empty) return;
   // Busca en segundo plano la galleta real de los discos que aún no la tienen.
-  fillMissingLabels(getAiKey(), getDiscogsToken(), updateSlideLabel);
+  fillMissingLabels(getAiKey(), getDiscogsToken(), updateSlideLabel, (text) => {
+    document.getElementById("gallery-label-status").textContent = text;
+  });
   if (grid) {
     document.getElementById("history-grid").replaceChildren(...items.map(renderHistoryItem));
   } else {
