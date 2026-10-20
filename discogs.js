@@ -102,7 +102,7 @@ function fromMasterVersion(v) {
   return {
     id: v.id,
     title: v.title,
-    year: v.released || "",
+    year: v.released && v.released !== "0" ? v.released : "",
     country: v.country || "",
     label: v.label || "",
     catno: v.catno || "",
@@ -217,26 +217,35 @@ export async function getPrices(id, discogsToken) {
   };
 }
 
+// Solo interesan los vinilos: se descartan CD, casetes, etc.
+const isVinyl = (candidate) => candidate.formats.some((f) => /vinyl|lp\b|acetate|lathe/i.test(f));
+
 async function runSearchSteps(steps, discogsToken, onStep) {
   for (const step of steps) {
     if (onStep) onStep(step.by);
     const data = await discogsGet(
       "/database/search",
-      { ...step.params, type: "release", per_page: "50" },
+      { ...step.params, type: "release", format: "Vinyl", per_page: "50" },
       discogsToken
     );
     const results = data.results || [];
-    if (results.length === 0) continue;
+    const found = results.map(fromSearchResult).filter(isVinyl);
+    if (found.length === 0) continue;
 
     if (step.expandMaster) {
       const masterId = mostCommonMasterId(results);
       if (masterId) {
         if (onStep) onStep("master");
-        const versions = await discogsGet(`/masters/${masterId}/versions`, { per_page: "100" }, discogsToken);
-        return { candidates: (versions.versions || []).map(fromMasterVersion), strategy: step.by, masterId };
+        const versions = await discogsGet(
+          `/masters/${masterId}/versions`,
+          { format: "Vinyl", per_page: "100" },
+          discogsToken
+        );
+        const vinyls = (versions.versions || []).map(fromMasterVersion).filter(isVinyl);
+        if (vinyls.length) return { candidates: vinyls, strategy: step.by, masterId };
       }
     }
-    return { candidates: results.map(fromSearchResult), strategy: step.by, masterId: null };
+    return { candidates: found, strategy: step.by, masterId: null };
   }
   return { candidates: [], strategy: null, masterId: null };
 }
