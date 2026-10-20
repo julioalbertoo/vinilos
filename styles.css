@@ -863,3 +863,14 @@ body.no-tabbar .tabbar {
   background: var(--primary-soft);
   color: var(--primary-press);
 }
+
+.view .card-body .card-color {
+  display: inline-block;
+  margin: 6px 6px 0 0;
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: var(--pink);
+  color: var(--rose-text);
+  font-weight: 700;
+  font-size: 0.8rem;
+}

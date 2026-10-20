@@ -204,6 +204,7 @@ function renderCard(candidate, index) {
   body.append(el("p", null, [candidate.year || "Año ?", candidate.country || "País ?"].join(" · ")));
   body.append(el("p", null, [candidate.label || "Sello ?", candidate.catno || "Nº cat. ?"].join(" · ")));
   body.append(el("p", null, candidate.formats.join(", ")));
+  if (candidate.color) body.append(el("p", "card-color", `🎨 ${candidate.color}`));
   if (candidate.matches.length) {
     body.append(el("p", "card-matches", candidate.matches.map((m) => `✓ ${m}`).join("  ")));
   }

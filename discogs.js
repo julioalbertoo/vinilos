@@ -51,6 +51,16 @@ function releaseUrl(id) {
   return `https://www.discogs.com/release/${id}`;
 }
 
+// Palabras que indican un vinilo de color. "black" va aparte: un disco solo negro no se destaca.
+const COLOR_WORDS =
+  /\b(red|blue|green|yellow|orange|pink|purple|violet|white|clear|transparent|translucent|gold|golden|silver|gr[ae]y|brown|cream|beige|turquoise|teal|magenta|aqua|mint|coral|marbled?|splatter|swirl|smoke|smoky|colou?red|picture disc|rojo|azul|verde|amarillo|naranja|rosa|morado|blanco|transparente|dorado|plateado|gris)\b/i;
+
+// Devuelve el texto del color del vinilo (p. ej. "Orange Translucent"), o "" si es negro o no se sabe.
+export function vinylColor(texts) {
+  const hit = texts.find((t) => t && COLOR_WORDS.test(t));
+  return hit ? hit.trim() : "";
+}
+
 function fromSearchResult(r) {
   return {
     id: r.id,
@@ -60,6 +70,7 @@ function fromSearchResult(r) {
     label: (r.label || [])[0] || "",
     catno: r.catno || "",
     formats: r.format || [],
+    color: vinylColor([...(r.formats || []).map((f) => f.text), ...(r.format || [])]),
     barcodes: r.barcode || [],
     thumb: r.cover_image || r.thumb || "",
     have: r.community?.have || 0,
@@ -76,6 +87,7 @@ function fromMasterVersion(v) {
     label: v.label || "",
     catno: v.catno || "",
     formats: [...(v.major_formats || []), ...(v.format || "").split(", ").filter(Boolean)],
+    color: vinylColor((v.format || "").split(", ")),
     barcodes: [],
     thumb: v.thumb || "",
     have: v.stats?.community?.in_collection || 0,
