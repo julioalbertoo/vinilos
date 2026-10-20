@@ -18,6 +18,38 @@ function coverImg(src, className) {
   return img;
 }
 
+// Colores de galleta genérica; cada disco tiene siempre el mismo.
+const LABEL_COLORS = ["#f6d6c4", "#e3dcff", "#cdeedd", "#ffe9a8", "#ffd3e1", "#cfe4ff"];
+
+// Galleta real (foto de Discogs recortada) o, si aún no se tiene, una genérica con título y artista.
+function fillLabel(label, item) {
+  label.replaceChildren();
+  label.classList.remove("is-real");
+  const real = item.label && item.label.src && item.label.box;
+  if (real) {
+    const { ymin, xmin, ymax, xmax } = item.label.box;
+    // La caja va en escala 0-1000. Se amplía la foto para que la caja llene el círculo.
+    const w = (xmax - xmin) / 1000;
+    const h = (ymax - ymin) / 1000;
+    const img = coverImg(item.label.src, "gallery-label-photo");
+    img.style.width = `${100 / w}%`;
+    img.style.height = `${100 / h}%`;
+    img.style.left = `${-(xmin / 1000 / w) * 100}%`;
+    img.style.top = `${-(ymin / 1000 / h) * 100}%`;
+    label.classList.add("is-real");
+    label.append(img);
+    return;
+  }
+  label.style.background = LABEL_COLORS[Number(item.release_id) % LABEL_COLORS.length] || LABEL_COLORS[0];
+  label.append(el("span", "gallery-label-title", item.title || ""), el("span", "gallery-label-artist", item.artist || ""));
+}
+
+// Cambia la galleta de un disco ya pintado (cuando se encuentra la real en segundo plano).
+export function updateSlideLabel(item) {
+  const label = document.querySelector(`.gallery-slide[data-id="${item.release_id}"] .gallery-label`);
+  if (label) fillLabel(label, item);
+}
+
 function renderSlide(item) {
   const slide = el("button", "gallery-slide");
   slide.type = "button";
@@ -28,7 +60,7 @@ function renderSlide(item) {
   const discWrap = el("span", "gallery-disc-wrap");
   const disc = el("span", "gallery-disc");
   const label = el("span", "gallery-label");
-  if (item.thumb) label.append(coverImg(item.thumb, ""));
+  fillLabel(label, item);
   disc.append(label);
   discWrap.append(disc, el("span", "gallery-shine"));
 

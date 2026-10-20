@@ -168,6 +168,10 @@ export async function getRelease(id, discogsToken) {
     })),
     image: cover ? cover.uri : r.thumb || "",
     thumb: r.thumb || "",
+    // Fotos que no son la portada: entre ellas suele estar la de la galleta.
+    extraImages: images
+      .filter((i) => i !== cover && i.uri)
+      .map((i) => ({ uri: i.uri, uri150: i.uri150 || i.uri })),
     tracklist: (r.tracklist || [])
       .filter((t) => t.type_ === "track")
       .map((t) => ({ position: t.position, title: t.title })),

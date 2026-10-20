@@ -21,7 +21,7 @@ En cada candidato verás qué pistas coinciden (✓ sello, ✓ año, ✓ código
 
 En **💿 Mis discos** tienes dos formas de verlos:
 
-- **Galería** (la de inicio): deslizas en horizontal y el disco del centro sale de su funda y gira. Púlsalo otra vez para abrir su ficha.
+- **Galería** (la de inicio): deslizas en horizontal y el disco del centro sale de su funda y gira. Púlsalo otra vez para abrir su ficha. La galleta del centro es la de verdad: la IA busca su foto entre las de la edición en Discogs (una consulta por disco, solo la primera vez). Si Discogs no tiene foto de la galleta, sale una genérica con el título y el artista.
 - **Cuadrícula**: todas las portadas de un vistazo; aquí puedes borrar discos (✕).
 
 **Truco para afinar la edición:** la portada suele ser igual en todas las ediciones. La contraportada y la galleta central traen el sello y el número de catálogo, que son los que distinguen una edición de otra.
@@ -112,6 +112,7 @@ Web estática (HTML + CSS + JavaScript sin frameworks) que habla directamente de
 | `tokens.js` | Guarda y comprueba las llaves (en el navegador). |
 | `history.js` | Historial de discos confirmados (en el navegador). |
 | `gallery.js` | Galería horizontal: el disco del centro sale de la funda y gira. |
+| `labels.js` | Busca en segundo plano la foto de la galleta de cada disco guardado y la recorta. |
 | `guide.js` | Textos de la guía de bienvenida: si cambian los menús de Google o Discogs, se edita solo aquí. |
 
 **Versiones:** cada publicación sube el número de versión en `index.html`, que también se añade a las direcciones de los archivos (`app.js?v=1.0.0`). Así el móvil descarga siempre la versión nueva en vez de una copia antigua guardada.

@@ -967,11 +967,41 @@ input[type="text"]:focus {
   background: var(--peach);
 }
 
-.gallery-label img {
+/* Galleta genérica: título arriba y artista abajo, con el agujero en medio. */
+.gallery-label:not(.is-real) {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: calc(var(--s) * 0.06) calc(var(--s) * 0.035); /* % se mediría sobre el disco, no la galleta */
+  color: #3a3350;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.gallery-label-title,
+.gallery-label-artist {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(var(--s) * 0.045);
+}
+
+.gallery-label-title {
+  font-weight: 800;
+}
+
+.gallery-label-artist {
+  font-weight: 600;
+}
+
+/* Foto de Discogs ampliada y movida para que la galleta llene el círculo. */
+.gallery-label-photo {
+  position: absolute;
+  display: block;
+  max-width: none;
 }
 
 /* Agujero central. */

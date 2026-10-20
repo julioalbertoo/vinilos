@@ -17,7 +17,8 @@ import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
-import { renderGallery } from "./gallery.js";
+import { renderGallery, updateSlideLabel } from "./gallery.js";
+import { fillMissingLabels } from "./labels.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -408,6 +409,8 @@ function renderCollection() {
     button.setAttribute("aria-pressed", String(active));
   }
   if (empty) return;
+  // Busca en segundo plano la galleta real de los discos que aún no la tienen.
+  fillMissingLabels(getAiKey(), getDiscogsToken(), updateSlideLabel);
   if (grid) {
     document.getElementById("history-grid").replaceChildren(...items.map(renderHistoryItem));
   } else {

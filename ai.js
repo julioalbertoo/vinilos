@@ -206,3 +206,55 @@ export async function testAiConnection(aiKey) {
   }
   return { ok: false, reason: `Respuesta inesperada de Gemini: ${body.slice(0, 120)}` };
 }
+
+const LABEL_PROMPT =
+  "Te doy varias fotos numeradas (empezando en 0) de una misma edición de un disco de vinilo. " +
+  "Busca la que muestre la galleta (la etiqueta de papel redonda del centro del vinilo) entera y de frente; " +
+  "si hay varias, prefiere la cara A. Devuelve SOLO un JSON, sin texto alrededor: " +
+  '{"index": número de la foto o null si ninguna muestra la galleta, ' +
+  '"box_2d": [ymin, xmin, ymax, xmax] del círculo de la galleta en esa foto, en escala 0-1000}. ' +
+  "La caja debe rodear solo la etiqueta de papel, sin los surcos del vinilo.";
+
+// images: lista de data URL (o enlaces, si el navegador no pudo descargarlas).
+// Devuelve { ok: true, index, box } (index null = no hay galleta) o { ok: false, detail, stop }.
+export async function locateLabel(images, aiKey) {
+  const content = [{ type: "text", text: LABEL_PROMPT }];
+  images.forEach((url, i) => {
+    content.push({ type: "text", text: `Foto ${i}:` });
+    content.push({ type: "image_url", image_url: { url } });
+  });
+  let response;
+  try {
+    response = await postChat(
+      aiKey,
+      {
+        model: CONFIG.AI_PROVIDER.primaryModel,
+        messages: [{ role: "user", content }],
+        temperature: 0,
+        max_tokens: 4096,
+      },
+      MODEL_TIMEOUT_MS
+    );
+  } catch (err) {
+    return { ok: false, detail: `error de red: ${err && err.message ? err.message : err}` };
+  }
+  const body = await response.text();
+  if (!response.ok) {
+    const detail = describeError(response.status, body);
+    // Sin llave válida o sin cupo no tiene sentido seguir con más discos.
+    return { ok: false, detail, stop: detail === INVALID_KEY_MESSAGE || response.status === 429 };
+  }
+  let data = null;
+  try {
+    data = extractJson(JSON.parse(body)?.choices?.[0]?.message?.content);
+  } catch {
+    // cae al error de abajo
+  }
+  if (!data || !("index" in data)) return { ok: false, detail: "la IA no devolvió el JSON pedido" };
+  const index = Number.isInteger(data.index) && data.index >= 0 && data.index < images.length ? data.index : null;
+  const box = Array.isArray(data.box_2d) && data.box_2d.length === 4 ? data.box_2d.map(Number) : null;
+  if (index === null || !box || box.some((n) => !Number.isFinite(n))) return { ok: true, index: null };
+  const [ymin, xmin, ymax, xmax] = box;
+  if (xmax - xmin < 50 || ymax - ymin < 50) return { ok: true, index: null };
+  return { ok: true, index, box: { ymin, xmin, ymax, xmax } };
+}

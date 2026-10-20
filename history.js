@@ -25,6 +25,15 @@ export function addToHistory(entry) {
   save(items);
 }
 
+// Cambia campos de un disco sin moverlo de sitio (p. ej. para guardar su galleta).
+export function updateHistoryItem(releaseId, patch) {
+  const items = getHistory();
+  const item = items.find((i) => i.release_id === releaseId);
+  if (!item) return;
+  Object.assign(item, patch);
+  save(items);
+}
+
 export function removeFromHistory(releaseId) {
   save(getHistory().filter((item) => item.release_id !== releaseId));
 }
