@@ -742,6 +742,35 @@ input[type="text"]:focus {
   padding: 8px 0;
 }
 
+/* Interruptor Galería / Cuadrícula de «Mis discos». */
+.segmented {
+  display: flex;
+  gap: 4px;
+  margin: 10px 0 14px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--lilac);
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.segmented button.active {
+  background: var(--surface);
+  color: var(--primary-press);
+  box-shadow: var(--shadow-sm);
+}
+
 .history-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

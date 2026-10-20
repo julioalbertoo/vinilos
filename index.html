@@ -14,21 +14,21 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
-  <link rel="stylesheet" href="styles.css?v=1.4.0">
+  <link rel="stylesheet" href="styles.css?v=1.5.0">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=1.4.0",
-        "./tokens.js": "./tokens.js?v=1.4.0",
-        "./guide.js": "./guide.js?v=1.4.0",
-        "./ai.js": "./ai.js?v=1.4.0",
-        "./discogs.js": "./discogs.js?v=1.4.0",
-        "./imaging.js": "./imaging.js?v=1.4.0",
-        "./scoring.js": "./scoring.js?v=1.4.0",
-        "./barcode.js": "./barcode.js?v=1.4.0",
-        "./history.js": "./history.js?v=1.4.0",
-        "./gallery.js": "./gallery.js?v=1.4.0"
+        "./config.js": "./config.js?v=1.5.0",
+        "./tokens.js": "./tokens.js?v=1.5.0",
+        "./guide.js": "./guide.js?v=1.5.0",
+        "./ai.js": "./ai.js?v=1.5.0",
+        "./discogs.js": "./discogs.js?v=1.5.0",
+        "./imaging.js": "./imaging.js?v=1.5.0",
+        "./scoring.js": "./scoring.js?v=1.5.0",
+        "./barcode.js": "./barcode.js?v=1.5.0",
+        "./history.js": "./history.js?v=1.5.0",
+        "./gallery.js": "./gallery.js?v=1.5.0"
       }
     }
   </script>
@@ -36,7 +36,7 @@
 <body>
   <header class="app-header">
     <h1><span class="logo-disc" aria-hidden="true"></span>Vinilos</h1>
-    <p class="app-version">v1.4.0</p>
+    <p class="app-version">v1.5.0</p>
   </header>
 
   <main id="app">
@@ -162,24 +162,19 @@
       <button type="button" id="detail-back" class="ghost">← Volver a los candidatos</button>
     </section>
 
-    <section id="view-history" class="view">
-      <h2>Historial</h2>
-      <div id="history-empty" class="empty">
+    <section id="view-collection" class="view">
+      <h2>Mis discos</h2>
+      <div id="collection-empty" class="empty" hidden>
         <div class="hero-disc hero-disc--small" aria-hidden="true"></div>
         <p>Aún no has confirmado ningún disco. Cuando pulses «✓ Es este» en un candidato, aparecerá aquí.</p>
-        <button type="button" id="history-start">📷 Identificar mi primer disco</button>
+        <button type="button" id="collection-start">📷 Identificar mi primer disco</button>
       </div>
-      <div id="history-grid" class="history-grid"></div>
-      <button type="button" id="history-clear" class="ghost danger" hidden>Borrar todo el historial</button>
-    </section>
 
-    <section id="view-gallery" class="view">
-      <h2>Galería</h2>
-      <div id="gallery-empty" class="empty" hidden>
-        <div class="hero-disc hero-disc--small" aria-hidden="true"></div>
-        <p>Aquí aparecerán tus discos cuando confirmes alguno con «✓ Es este».</p>
-        <button type="button" id="gallery-start">📷 Identificar mi primer disco</button>
+      <div id="collection-switch" class="segmented" role="group" aria-label="Cómo ver tus discos">
+        <button type="button" data-mode="gallery">💿 Galería</button>
+        <button type="button" data-mode="grid">▦ Cuadrícula</button>
       </div>
+
       <div id="gallery-content">
         <p class="gallery-hint">Desliza para elegir un disco. Púlsalo otra vez para ver su ficha.</p>
         <div id="gallery-track" class="gallery-track" tabindex="0" aria-label="Tus vinilos"></div>
@@ -189,16 +184,18 @@
           <p id="gallery-count" class="gallery-count"></p>
         </div>
       </div>
+
+      <div id="history-grid" class="history-grid" hidden></div>
+      <button type="button" id="history-clear" class="ghost danger" hidden>Borrar todos mis discos</button>
     </section>
   </main>
 
   <nav id="tabbar" class="tabbar">
     <button type="button" data-view="capture"><span aria-hidden="true">📷</span>Identificar</button>
-    <button type="button" data-view="gallery"><span aria-hidden="true">💿</span>Galería</button>
-    <button type="button" data-view="history"><span aria-hidden="true">🗂️</span>Historial</button>
+    <button type="button" data-view="collection"><span aria-hidden="true">💿</span>Mis discos</button>
     <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=1.4.0"></script>
+  <script type="module" src="app.js?v=1.5.0"></script>
 </body>
 </html>

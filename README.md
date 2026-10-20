@@ -17,9 +17,12 @@ En la pestaña **📷 Identificar** tienes tres caminos, de más a menos preciso
 | **📷 Hacer foto** / **🖼️ Galería** | Portada, contraportada, lomo o galleta central. Se identifica sola nada más subir la foto, sin pulsar nada más. La IA lee artista, título, sello, número de catálogo y también los números del código de barras. |
 | **Ninguno es** (en los resultados) | Si ningún candidato es el tuyo: escribe artista y título, o el número de catálogo. |
 
-En cada candidato verás qué pistas coinciden (✓ sello, ✓ año, ✓ código de barras…). Pulsa **✓ Es este** en el tuyo: se abre su ficha (canciones, sello, color del vinilo si Discogs lo tiene) y se guarda en **🗂️ Historial**.
+En cada candidato verás qué pistas coinciden (✓ sello, ✓ año, ✓ código de barras…). Pulsa **✓ Es este** en el tuyo: se abre su ficha (canciones, sello, color del vinilo si Discogs lo tiene) y se guarda en **💿 Mis discos**.
 
-En **💿 Galería** ves tus discos uno tras otro deslizando en horizontal: el que queda en el centro sale de su funda y gira. Púlsalo otra vez para abrir su ficha.
+En **💿 Mis discos** tienes dos formas de verlos:
+
+- **Galería** (la de inicio): deslizas en horizontal y el disco del centro sale de su funda y gira. Púlsalo otra vez para abrir su ficha.
+- **Cuadrícula**: todas las portadas de un vistazo; aquí puedes borrar discos (✕).
 
 **Truco para afinar la edición:** la portada suele ser igual en todas las ediciones. La contraportada y la galleta central traen el sello y el número de catálogo, que son los que distinguen una edición de otra.
 

@@ -27,15 +27,14 @@ const SEARCH_STEP_LABELS = {
   master: "todas las ediciones del álbum",
 };
 
-const VIEWS = ["guide", "settings", "capture", "results", "detail", "history", "gallery"];
+const VIEWS = ["guide", "settings", "capture", "results", "detail", "collection"];
 const GUIDE_SCREENS = ["intro", "ai", "discogs"];
 // Pestaña que se marca en la barra inferior para cada pantalla.
-const TAB_FOR_VIEW = { capture: "capture", results: "capture", history: "history", gallery: "gallery", settings: "settings" };
+const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "collection", settings: "settings" };
 
 function showView(name) {
   if (name !== "capture") stopScanner();
-  if (name === "history") renderHistory();
-  if (name === "gallery") showGallery();
+  if (name === "collection") renderCollection();
   for (const view of VIEWS) {
     document.getElementById(`view-${view}`).classList.toggle("active", view === name);
   }
@@ -289,11 +288,10 @@ let detailReturnView = "results";
 
 const BACK_LABELS = {
   results: "← Volver a los candidatos",
-  history: "← Volver al historial",
-  gallery: "← Volver a la galería",
+  collection: "← Volver a mis discos",
 };
 
-// returnView: pantalla a la que lleva "Volver". Desde el historial o la galería el disco ya está
+// returnView: pantalla a la que lleva "Volver". Desde «Mis discos» el disco ya está
 // guardado, así que no se vuelve a guardar.
 async function openDetail(candidate, { returnView = "results" } = {}) {
   const fromHistory = returnView !== "results";
@@ -378,41 +376,57 @@ function renderHistoryItem(item) {
   }
   open.append(el("span", "history-title", item.title));
   open.append(el("span", "history-meta", [item.year, item.artist].filter(Boolean).join(" · ")));
-  open.addEventListener("click", () => openDetail(historyItemToCandidate(item), { returnView: "history" }));
+  open.addEventListener("click", () => openDetail(historyItemToCandidate(item), { returnView: "collection" }));
 
   const remove = el("button", "history-remove", "✕");
   remove.type = "button";
   remove.setAttribute("aria-label", `Borrar ${item.title} del historial`);
   remove.addEventListener("click", () => {
     removeFromHistory(item.release_id);
-    renderHistory();
+    renderCollection();
   });
 
   wrapper.append(open, remove);
   return wrapper;
 }
 
-function renderHistory() {
-  const items = getHistory();
-  document.getElementById("history-grid").replaceChildren(...items.map(renderHistoryItem));
-  document.getElementById("history-empty").hidden = items.length > 0;
-  document.getElementById("history-clear").hidden = items.length === 0;
-}
+// «Mis discos» se abre en galería; el modo elegido se mantiene al volver de una ficha.
+let collectionMode = "gallery";
 
-function showGallery() {
+function renderCollection() {
   const items = getHistory();
-  document.getElementById("gallery-empty").hidden = items.length > 0;
-  document.getElementById("gallery-content").hidden = items.length === 0;
-  renderGallery(items, (item) => openDetail(historyItemToCandidate(item), { returnView: "gallery" }));
+  const empty = items.length === 0;
+  const grid = collectionMode === "grid";
+  document.getElementById("collection-empty").hidden = !empty;
+  document.getElementById("collection-switch").hidden = empty;
+  document.getElementById("gallery-content").hidden = empty || grid;
+  document.getElementById("history-grid").hidden = empty || !grid;
+  document.getElementById("history-clear").hidden = empty || !grid;
+  for (const button of document.querySelectorAll("#collection-switch button")) {
+    const active = button.dataset.mode === collectionMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+  if (empty) return;
+  if (grid) {
+    document.getElementById("history-grid").replaceChildren(...items.map(renderHistoryItem));
+  } else {
+    renderGallery(items, (item) => openDetail(historyItemToCandidate(item), { returnView: "collection" }));
+  }
 }
 
 function initHistory() {
-  document.getElementById("gallery-start").addEventListener("click", () => showView("capture"));
-  document.getElementById("history-start").addEventListener("click", () => showView("capture"));
+  document.getElementById("collection-start").addEventListener("click", () => showView("capture"));
+  document.getElementById("collection-switch").addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button || button.dataset.mode === collectionMode) return;
+    collectionMode = button.dataset.mode;
+    renderCollection();
+  });
   document.getElementById("history-clear").addEventListener("click", () => {
-    if (window.confirm("¿Borrar todos los discos del historial? No se puede deshacer.")) {
+    if (window.confirm("¿Borrar todos tus discos guardados? No se puede deshacer.")) {
       clearHistory();
-      renderHistory();
+      renderCollection();
     }
   });
 }
