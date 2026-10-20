@@ -1209,3 +1209,21 @@ body.no-tabbar .tabbar {
   font-weight: 700;
   font-size: 0.8rem;
 }
+
+/* ---------- Copia en la nube ---------- */
+
+.cloud-text {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+
+.cloud-status {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--muted) !important;
+}
+
+.cloud-status:empty {
+  display: none;
+}

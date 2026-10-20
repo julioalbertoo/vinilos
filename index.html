@@ -14,22 +14,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
-  <link rel="stylesheet" href="styles.css?v=1.7.1">
+  <link rel="stylesheet" href="styles.css?v=1.8.0">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=1.7.1",
-        "./tokens.js": "./tokens.js?v=1.7.1",
-        "./guide.js": "./guide.js?v=1.7.1",
-        "./ai.js": "./ai.js?v=1.7.1",
-        "./discogs.js": "./discogs.js?v=1.7.1",
-        "./imaging.js": "./imaging.js?v=1.7.1",
-        "./scoring.js": "./scoring.js?v=1.7.1",
-        "./barcode.js": "./barcode.js?v=1.7.1",
-        "./history.js": "./history.js?v=1.7.1",
-        "./gallery.js": "./gallery.js?v=1.7.1",
-        "./labels.js": "./labels.js?v=1.7.1"
+        "./config.js": "./config.js?v=1.8.0",
+        "./tokens.js": "./tokens.js?v=1.8.0",
+        "./guide.js": "./guide.js?v=1.8.0",
+        "./ai.js": "./ai.js?v=1.8.0",
+        "./discogs.js": "./discogs.js?v=1.8.0",
+        "./imaging.js": "./imaging.js?v=1.8.0",
+        "./scoring.js": "./scoring.js?v=1.8.0",
+        "./barcode.js": "./barcode.js?v=1.8.0",
+        "./history.js": "./history.js?v=1.8.0",
+        "./gallery.js": "./gallery.js?v=1.8.0",
+        "./labels.js": "./labels.js?v=1.8.0",
+        "./cloud.js": "./cloud.js?v=1.8.0",
+        "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm"
       }
     }
   </script>
@@ -37,7 +39,7 @@
 <body>
   <header class="app-header">
     <h1><span class="logo-disc" aria-hidden="true"></span>Vinilos</h1>
-    <p class="app-version">v1.7.1</p>
+    <p class="app-version">v1.8.0</p>
   </header>
 
   <main id="app">
@@ -94,6 +96,28 @@
         <p id="settings-test-ai-status" class="status"></p>
         <button type="button" id="settings-test-discogs" class="secondary">Probar conexión Discogs</button>
         <p id="settings-test-discogs-status" class="status"></p>
+      </div>
+
+      <div id="cloud-panel" class="panel">
+        <p class="panel-title">☁️ Copia en la nube de tus discos</p>
+        <div id="cloud-signed-out">
+          <p class="cloud-text">Entra con tu email y «Mis discos» se guardará también en la nube: si cambias de móvil o el navegador borra los datos, no los pierdes. Las llaves no se suben.</p>
+          <label for="cloud-email">Tu email</label>
+          <input type="email" id="cloud-email" autocomplete="email" inputmode="email" placeholder="tu@email.com">
+          <button type="button" id="cloud-send" class="secondary">Enviarme el enlace</button>
+          <div id="cloud-code-box" hidden>
+            <p class="cloud-text">📬 Abre el correo y pulsa el enlace. Si usas la app desde la pantalla de inicio, el enlace se abre en Safari: escribe aquí el código del correo para entrar en esta app.</p>
+            <label for="cloud-code">Código del correo</label>
+            <input type="text" id="cloud-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456">
+            <button type="button" id="cloud-verify" class="secondary">Entrar con el código</button>
+          </div>
+        </div>
+        <div id="cloud-signed-in" hidden>
+          <p class="cloud-text">Conectado como <strong id="cloud-user-email"></strong></p>
+          <button type="button" id="cloud-sync" class="secondary">Sincronizar ahora</button>
+          <button type="button" id="cloud-signout" class="ghost">Cerrar sesión</button>
+        </div>
+        <p id="cloud-status" class="status" role="status"></p>
       </div>
 
       <p id="settings-open-guide" class="link-like"></p>
@@ -188,6 +212,7 @@
       </div>
 
       <div id="history-grid" class="history-grid" hidden></div>
+      <p id="collection-cloud-status" class="cloud-status" role="status"></p>
       <button type="button" id="history-clear" class="ghost danger" hidden>Borrar todos mis discos</button>
     </section>
   </main>
@@ -198,6 +223,6 @@
     <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=1.7.1"></script>
+  <script type="module" src="app.js?v=1.8.0"></script>
 </body>
 </html>

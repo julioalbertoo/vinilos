@@ -19,6 +19,7 @@ import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
 import { fillMissingLabels } from "./labels.js";
+import { initCloud, onCloudStatus, onCloudHistoryChanged, sendMagicLink, verifyCode, signOut, syncAll, isCloudReady } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -505,7 +506,8 @@ function initHistory() {
     renderCollection();
   });
   document.getElementById("history-clear").addEventListener("click", () => {
-    if (window.confirm("¿Borrar todos tus discos guardados? No se puede deshacer.")) {
+    const where = cloudSignedIn ? " También se borrarán de la nube." : "";
+    if (window.confirm(`¿Borrar todos tus discos guardados?${where} No se puede deshacer.`)) {
       clearHistory();
       renderCollection();
     }
@@ -806,6 +808,84 @@ function stopScanner() {
   document.getElementById("scanner").hidden = true;
 }
 
+// ---------- Copia en la nube ----------
+
+let cloudSignedIn = false;
+
+function initCloudSettings() {
+  const signedOut = document.getElementById("cloud-signed-out");
+  const signedIn = document.getElementById("cloud-signed-in");
+  const emailInput = document.getElementById("cloud-email");
+  const codeInput = document.getElementById("cloud-code");
+  const status = document.getElementById("cloud-status");
+  const sendButton = document.getElementById("cloud-send");
+  const verifyButton = document.getElementById("cloud-verify");
+
+  onCloudStatus(({ user, state, text }) => {
+    cloudSignedIn = Boolean(user);
+    signedOut.hidden = cloudSignedIn;
+    signedIn.hidden = !cloudSignedIn;
+    if (user) document.getElementById("cloud-user-email").textContent = user.email || "";
+    status.textContent = state === "off" ? "" : text;
+    document.getElementById("collection-cloud-status").textContent = cloudSignedIn || state === "error" ? text : "";
+  });
+
+  // Si la sincronización trae o quita discos, se repinta «Mis discos» si está a la vista.
+  onCloudHistoryChanged(() => {
+    if (document.getElementById("view-collection").classList.contains("active")) renderCollection();
+  });
+
+  sendButton.addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      status.textContent = "❌ Escribe un email válido.";
+      return;
+    }
+    sendButton.disabled = true;
+    status.textContent = "Enviando…";
+    try {
+      await sendMagicLink(email);
+      status.textContent = `✅ Correo enviado a ${email}.`;
+      document.getElementById("cloud-code-box").hidden = false;
+    } catch (err) {
+      status.textContent = `❌ ${err.message}`;
+    } finally {
+      sendButton.disabled = false;
+    }
+  });
+
+  verifyButton.addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    const code = codeInput.value.replace(/\s/g, "");
+    if (!email || !code) {
+      status.textContent = "❌ Escribe tu email y el código del correo.";
+      return;
+    }
+    verifyButton.disabled = true;
+    status.textContent = "Comprobando…";
+    try {
+      await verifyCode(email, code);
+      codeInput.value = "";
+      document.getElementById("cloud-code-box").hidden = true;
+    } catch (err) {
+      status.textContent = `❌ ${err.message}`;
+    } finally {
+      verifyButton.disabled = false;
+    }
+  });
+
+  document.getElementById("cloud-sync").addEventListener("click", () => syncAll());
+
+  document.getElementById("cloud-signout").addEventListener("click", async () => {
+    await signOut();
+    status.textContent = "Sesión cerrada. Tus discos siguen en este móvil.";
+  });
+
+  initCloud().then(() => {
+    if (!isCloudReady()) sendButton.disabled = true;
+  });
+}
+
 initTabbar();
 populateGuideText();
 initGuideNavigation();
@@ -814,6 +894,7 @@ const resetCapture = initCapture();
 initResults(resetCapture);
 initDetail(resetCapture);
 initHistory();
+initCloudSettings();
 if (areTokensVerified()) showView("capture");
 else if (hasTokens()) showView("settings");
 else openGuide();
