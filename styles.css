@@ -831,6 +831,16 @@ input[type="text"]:focus {
   font-weight: 800;
 }
 
+/* Fila de «Ordenar»: más pegada al selector de arriba y con letra algo menor. */
+.segmented--small {
+  margin-top: -6px;
+}
+
+.segmented--small button {
+  padding: 6px 0;
+  font-size: 0.8rem;
+}
+
 .segmented button.active {
   background: var(--surface);
   color: var(--primary-press);

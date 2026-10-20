@@ -24,6 +24,7 @@ export const CONFIG = {
     discogsToken: "vinilos_discogs_token",
     discogsVerified: "vinilos_discogs_verified",
     history: "vinilos_history",
+    collectionSort: "vinilos_collection_sort",
     cloudSynced: "vinilos_cloud_synced",
     cloudPendingDeletes: "vinilos_cloud_pending_deletes",
   },

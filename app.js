@@ -10,6 +10,7 @@ import {
   hasTokens,
   areTokensVerified,
 } from "./tokens.js";
+import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify } from "./ai.js";
 import { testDiscogsConnection, findCandidates, searchByText, getRelease, getPrices, vinylColor, releaseWeight } from "./discogs.js";
@@ -490,12 +491,56 @@ function renderHistoryItem(item) {
 // «Mis discos» se abre en galería; el modo elegido se mantiene al volver de una ficha.
 let collectionMode = "gallery";
 
+// Orden de «Mis discos». "recent" es el del historial (último confirmado primero). Se recuerda en el móvil.
+const SORT_KEY = CONFIG.STORAGE_KEYS.collectionSort;
+let collectionSort = "recent";
+try {
+  collectionSort = localStorage.getItem(SORT_KEY) || "recent";
+} catch {
+  // Sin almacenamiento: se queda en «Recientes».
+}
+
+const collator = new Intl.Collator("es", { sensitivity: "base", numeric: true });
+
+// Quita "The " / "Los " / "El "... del principio para que "The Beatles" vaya en la B.
+function sortName(text) {
+  return String(text || "").replace(/^(the|los|las|el|la)\s+/i, "").trim();
+}
+
+function sortItems(items) {
+  const list = [...items];
+  const byText = (field) => (a, b) => {
+    const x = sortName(a[field]);
+    const y = sortName(b[field]);
+    if (!x !== !y) return x ? -1 : 1; // los vacíos al final
+    return collator.compare(x, y);
+  };
+  if (collectionSort === "year") {
+    // Del más antiguo al más nuevo; los que no tienen año, al final. A igual año, por artista.
+    const year = (item) => Number.parseInt(item.year, 10) || Infinity;
+    list.sort((a, b) => year(a) - year(b) || byText("artist")(a, b));
+  } else if (collectionSort === "artist") {
+    // A igual artista, sus discos por año.
+    const year = (item) => Number.parseInt(item.year, 10) || Infinity;
+    list.sort((a, b) => byText("artist")(a, b) || year(a) - year(b));
+  } else if (collectionSort === "title") {
+    list.sort(byText("title"));
+  }
+  return list;
+}
+
 function renderCollection() {
-  const items = getHistory();
+  const items = sortItems(getHistory());
   const empty = items.length === 0;
   const grid = collectionMode === "grid";
   document.getElementById("collection-empty").hidden = !empty;
   document.getElementById("collection-switch").hidden = empty;
+  document.getElementById("collection-sort").hidden = empty;
+  for (const button of document.querySelectorAll("#collection-sort button")) {
+    const active = button.dataset.sort === collectionSort;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
   document.getElementById("gallery-content").hidden = empty || grid;
   document.getElementById("history-grid").hidden = empty || !grid;
   document.getElementById("history-clear").hidden = empty || !grid;
@@ -526,6 +571,17 @@ function initHistory() {
     const button = event.target.closest("button");
     if (!button || button.dataset.mode === collectionMode) return;
     collectionMode = button.dataset.mode;
+    renderCollection();
+  });
+  document.getElementById("collection-sort").addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button || button.dataset.sort === collectionSort) return;
+    collectionSort = button.dataset.sort;
+    try {
+      localStorage.setItem(SORT_KEY, collectionSort);
+    } catch {
+      // Si no se puede guardar, el orden vale hasta cerrar la app.
+    }
     renderCollection();
   });
   document.getElementById("history-clear").addEventListener("click", () => {
