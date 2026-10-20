@@ -19,7 +19,7 @@ import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
-import { fillMissingLabels } from "./labels.js";
+import { fillMissingLabels, stopLabelSearch } from "./labels.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
@@ -715,6 +715,7 @@ function initCapture() {
     };
     const ticker = setInterval(renderProgress, 1000);
 
+    stopLabelSearch();
     const result = await identify(preparedImage, getAiKey(), (model, previousFailure) => {
       currentModel = model;
       fallbackNote = previousFailure ? `El modelo principal no respondió (${previousFailure}). Reintento con el de respaldo. ` : "";

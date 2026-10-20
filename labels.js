@@ -4,6 +4,13 @@ import { getHistory, updateHistoryItem } from "./history.js";
 
 const MAX_PHOTOS = 8;
 let running = false;
+let stopRequested = false;
+
+// Para la búsqueda de galletas en curso (al identificar un disco), para no quitarle cupo de Gemini.
+// Se retoma la próxima vez que se abra «Mis discos».
+export function stopLabelSearch() {
+  if (running) stopRequested = true;
+}
 // Discos que fallaron en esta visita: no se reintentan hasta volver a abrir la app.
 const failedThisVisit = new Set();
 
@@ -80,12 +87,14 @@ export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus)
   const labelTotal = pending.filter(needsLabel).length;
   let labelIndex = 0;
   running = true;
+  stopRequested = false;
   let found = 0;
   let without = 0;
   const errors = [];
   let busy = "";
   try {
     for (const item of pending) {
+      if (stopRequested) break;
       const wantsLabel = needsLabel(item);
       if (wantsLabel) onStatus(`Buscando galletas en Discogs: ${++labelIndex} de ${labelTotal}…`);
       let outcome;
@@ -129,6 +138,10 @@ export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus)
     running = false;
   }
   if (!labelTotal) return;
+  if (stopRequested) {
+    onStatus("");
+    return;
+  }
   const parts = [];
   if (found) parts.push(`${found} encontrada${found > 1 ? "s" : ""}`);
   if (without) parts.push(`${without} sin foto de la galleta en Discogs`);

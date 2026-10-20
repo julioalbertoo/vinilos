@@ -168,6 +168,14 @@ export async function identify(imageDataUrl, aiKey, onAttempt) {
       attempts,
     };
   }
+  if (attempts.some((a) => a.quotaError)) {
+    return {
+      ok: false,
+      reason:
+        "Gemini está sin cupo gratuito o saturado ahora mismo. Espera unos minutos y pulsa «Reintentar», o usa el escáner de código de barras, que no gasta cupo de IA.",
+      attempts,
+    };
+  }
   return {
     ok: false,
     reason: "No se pudo identificar el disco. Prueba con otra foto, con más luz, o escanea el código de barras.",
@@ -262,22 +270,19 @@ export async function locateLabel(images, aiKey) {
   const parts = [{ text: LABEL_PROMPT }];
   images.forEach((image, i) => parts.push({ text: `Foto ${i}:` }, imagePart(image)));
 
-  // Primero el modelo ligero: basta para encontrar una galleta y así no se gasta el cupo del
-  // principal, que es el que identifica los discos. Cada modelo tiene su propio cupo gratuito.
-  // Si uno está saturado (5xx) se reintenta una vez; si está sin cupo (429), se pasa al otro.
+  // Solo el modelo ligero: basta para encontrar una galleta. El principal se reserva entero para
+  // identificar discos, porque cada modelo tiene su propio cupo gratuito y no se comparte.
+  // Si está saturado (5xx) se reintenta una vez; si está sin cupo (429), se deja para otro día.
   let body = null;
   let quota = false;
-  for (const model of [CONFIG.AI_PROVIDER.fallbackModel, CONFIG.AI_PROVIDER.primaryModel]) {
-    for (let attempt = 0; attempt < 2 && body === null; attempt += 1) {
-      if (attempt) await new Promise((resolve) => setTimeout(resolve, 3000));
-      const result = await callNative(model, parts, aiKey);
-      if (result.ok) body = result.body;
-      else if (result.quota) {
-        quota = true;
-        break;
-      } else if (!result.busy) return result;
-    }
-    if (body !== null) break;
+  for (let attempt = 0; attempt < 2 && body === null; attempt += 1) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 3000));
+    const result = await callNative(CONFIG.AI_PROVIDER.fallbackModel, parts, aiKey);
+    if (result.ok) body = result.body;
+    else if (result.quota) {
+      quota = true;
+      break;
+    } else if (!result.busy) return result;
   }
   if (body === null) {
     const detail = quota ? "se ha agotado el cupo gratuito de Gemini por ahora" : "Gemini está saturado ahora mismo";
