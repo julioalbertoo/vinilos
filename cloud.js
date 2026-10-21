@@ -283,7 +283,8 @@ export async function loadDetailSummaries() {
     .from(detailsTable)
     .select(
       "release_id, data_at, prices, prices_at, genres:data->genres, styles:data->styles, country:data->>country, " +
-        "labels:data->labels, formats:data->formats, community:data->community, originalYear:data->>originalYear"
+        "labels:data->labels, formats:data->formats, community:data->community, originalYear:data->>originalYear, " +
+        "tracklist:data->tracklist"
     );
   if (error) throw error;
   return data;

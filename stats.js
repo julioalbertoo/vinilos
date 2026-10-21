@@ -1,14 +1,22 @@
-// Pestaña «Datos» de «Mis discos»: valor estimado, géneros, años, países, sellos, curiosidades…
-// Lo que no está en el historial (géneros, país, precios…) sale de la ficha de Discogs de cada disco.
+// Pestaña «Datos» de «Mis discos»: valor estimado, géneros, duración, años, portadas, mapa, curiosidades…
+// Lo que no está en el historial (géneros, país, precios, canciones…) sale de la ficha de Discogs de cada disco.
 // Se guarda un resumen pequeño en el móvil; con cuenta, se leen de golpe las fichas guardadas en la nube
 // y lo que falte se pide a Discogs poco a poco, en segundo plano, mientras la pestaña está abierta.
 import { CONFIG } from "./config.js";
 import { cachedRelease, cachedPrices } from "./details.js";
 import { loadDetailSummaries, cloudUser } from "./cloud.js";
-import { releaseWeight, isHeavy, countryFlag } from "./discogs.js";
+import { releaseWeight, isHeavy, countryFlag, countryCodes } from "./discogs.js";
+import {
+  el, card, tile, mini, plural, level, legend,
+  genreVinylCard, rainbowCard, coverColor, durationCard, timelineCard, mapCard,
+} from "./charts.js";
 
 const CACHE_KEY = CONFIG.STORAGE_KEYS.statsCache;
 const PRICES_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+// Sube cuando el resumen guarda campos nuevos: los resúmenes antiguos se rehacen (2: canciones y duración).
+const SUMMARY_VERSION = 2;
+// Si Discogs no da la duración de ninguna canción de un disco, se cuenta esto por canción.
+const DEFAULT_TRACK_SECONDS = 4 * 60;
 
 // ---------- Resumen guardado en el móvil ----------
 
@@ -21,7 +29,7 @@ function readCache() {
   }
 }
 
-let cache = readCache();
+const cache = readCache();
 
 function writeCache() {
   try {
@@ -33,12 +41,22 @@ function writeCache() {
 
 const cleanName = (name) => String(name || "").replace(/\s*\(\d+\)/g, "").replace(/\*/g, "").trim();
 
+// "3:45" → 225; "1:02:10" → 3730; "" → 0.
+function seconds(duration) {
+  const parts = String(duration || "").split(":").map(Number);
+  if (!parts.length || parts.some((n) => !Number.isFinite(n))) return 0;
+  return parts.reduce((total, n) => total * 60 + n, 0);
+}
+
 // Lo que interesa de una ficha (completa, o el resumen que llega de la nube).
 function summarize(source) {
   const community = source.community || null;
   const labels = Array.isArray(source.labels) ? source.labels : [];
   const formats = Array.isArray(source.formats) ? source.formats : [];
+  const tracks = (Array.isArray(source.tracklist) ? source.tracklist : []).filter((t) => !t.type_ || t.type_ === "track");
+  const timed = tracks.map((t) => seconds(t.duration)).filter((s) => s > 0);
   return {
+    v: SUMMARY_VERSION,
     genres: Array.isArray(source.genres) ? source.genres : [],
     styles: Array.isArray(source.styles) ? source.styles : [],
     country: source.country || "",
@@ -48,6 +66,9 @@ function summarize(source) {
     want: community ? community.want || 0 : null,
     rating: community && community.rating ? community.rating : null,
     originalYear: source.originalYear || "",
+    tracks: tracks.length,
+    timedTracks: timed.length,
+    seconds: timed.reduce((a, b) => a + b, 0),
   };
 }
 
@@ -74,7 +95,7 @@ async function primeFromCloud() {
   for (const row of rows) {
     const id = String(row.release_id);
     const entry = cache[id] || {};
-    if (row.genres && newer(row.data_at, entry.dataAt)) {
+    if (row.genres && (entry.v !== SUMMARY_VERSION || newer(row.data_at, entry.dataAt))) {
       Object.assign(entry, summarize(row), { dataAt: row.data_at });
       changed = true;
     }
@@ -88,7 +109,7 @@ async function primeFromCloud() {
   return changed;
 }
 
-// ---------- Relleno en segundo plano desde Discogs ----------
+// ---------- Relleno en segundo plano ----------
 
 let active = false;
 let running = false;
@@ -103,7 +124,7 @@ function needsWork(item) {
   const id = String(item.release_id);
   if (failed.has(id)) return false;
   const entry = cache[id];
-  return !entry || !entry.dataAt || !isFresh(entry.pricesAt);
+  return !entry || !entry.dataAt || entry.v !== SUMMARY_VERSION || !isFresh(entry.pricesAt);
 }
 
 async function runFill() {
@@ -117,13 +138,13 @@ async function runFill() {
       if (!pending.length) break;
       const item = pending[0];
       const id = String(item.release_id);
-      const done = items.length - pending.length;
-      latest.onStatus(`🔄 Completando datos con Discogs… ${done + 1} de ${items.length}`);
+      latest.onStatus(`🔄 Completando datos con Discogs… ${items.length - pending.length + 1} de ${items.length}`);
       const entry = cache[id] || {};
       try {
-        if (!entry.dataAt) {
+        if (!entry.dataAt || entry.v !== SUMMARY_VERSION) {
+          // Con cuenta, la ficha suele salir de la nube sin preguntar a Discogs.
           const release = await cachedRelease(item.release_id, token);
-          Object.assign(entry, summarize(release), { dataAt: new Date().toISOString() });
+          Object.assign(entry, summarize(release), { dataAt: entry.dataAt || new Date().toISOString() });
         }
         if (!isFresh(entry.pricesAt)) {
           const { prices, at } = await cachedPrices(item.release_id, token);
@@ -140,15 +161,50 @@ async function runFill() {
       writeCache();
       if (active) latest.onUpdate();
     }
-    latest.onStatus(latest.token ? "" : "Añade tu token de Discogs en Ajustes para ver precios y géneros.");
+    latest.onStatus(latest.token ? "" : "Añade tu token de Discogs en Ajustes para ver precios, géneros y duración.");
   } finally {
     running = false;
+  }
+}
+
+// Colores de las portadas: se leen de la foto en el propio móvil, una vez por disco.
+let coloring = false;
+const coverSrc = (item) => item.thumb || item.cover || "";
+const needsColor = (item) => {
+  const entry = cache[String(item.release_id)];
+  return coverSrc(item) && !(entry && "cc" in entry);
+};
+
+async function runColors() {
+  coloring = true;
+  try {
+    let since = 0;
+    while (active) {
+      const batch = latest.items.filter(needsColor).slice(0, 3);
+      if (!batch.length) break;
+      const colors = await Promise.all(batch.map((item) => coverColor(coverSrc(item))));
+      batch.forEach((item, i) => {
+        const id = String(item.release_id);
+        cache[id] = { ...(cache[id] || {}), cc: colors[i] || false }; // false = no se pudo leer
+      });
+      writeCache();
+      since += batch.length;
+      // Se repinta cada pocos discos para no redibujar todo a cada uno.
+      if (since >= 6 && active) {
+        since = 0;
+        latest.onUpdate();
+      }
+    }
+    if (active) latest.onUpdate();
+  } finally {
+    coloring = false;
   }
 }
 
 function startFill(items, token, onUpdate, onStatus) {
   latest = { items, token, onUpdate, onStatus };
   if (!running) runFill().catch(() => {});
+  if (!coloring) runColors().catch(() => {});
 }
 
 // ---------- Cálculos ----------
@@ -174,6 +230,14 @@ function countBy(list) {
   return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"));
 }
 
+// Duración de un disco: la suma de sus canciones; si faltan algunas, se calcula aproximada.
+function recordLength(s) {
+  if (!s.tracks) return null;
+  if (s.timedTracks === s.tracks) return { seconds: s.seconds, estimated: false };
+  if (s.timedTracks) return { seconds: (s.seconds / s.timedTracks) * s.tracks, estimated: true };
+  return { seconds: s.tracks * DEFAULT_TRACK_SECONDS, estimated: true };
+}
+
 function compute(items, yearMode) {
   const rows = items.map((item) => {
     const s = cache[String(item.release_id)] || {};
@@ -195,13 +259,6 @@ function compute(items, yearMode) {
 
 // ---------- Pintar ----------
 
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
 function money(value, currency = "EUR", digits = 0) {
   try {
     return new Intl.NumberFormat("es-ES", {
@@ -215,71 +272,32 @@ function money(value, currency = "EUR", digits = 0) {
   }
 }
 
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-
-function card(title, ...children) {
-  const box = el("section", "stats-card");
-  box.append(el("h3", "stats-title", title), ...children);
-  return box;
-}
-
-function tile(value, label) {
-  const box = el("div", "stats-tile");
-  box.append(el("span", "stats-tile-value", value), el("span", "stats-tile-label", label));
-  return box;
-}
-
 function bars(entries, total, { max = 8, format = (k) => k } = {}) {
   const list = el("div", "stats-bars");
   const top = entries.slice(0, max);
   const peak = top.length ? top[0][1] : 1;
   for (const [key, count] of top) {
     const row = el("div", "stats-bar");
-    const name = el("span", "stats-bar-name", format(key));
     const track = el("span", "stats-bar-track");
     const fill = el("span", "stats-bar-fill");
     fill.style.width = `${Math.max(4, (count / peak) * 100)}%`;
     track.append(fill);
     const pct = total ? Math.round((count / total) * 100) : 0;
-    row.append(name, track, el("span", "stats-bar-count", `${count} · ${pct}%`));
+    row.append(el("span", "stats-bar-name", format(key)), track, el("span", "stats-bar-count", `${count} · ${pct}%`));
     list.append(row);
   }
-  if (entries.length > max) list.append(el("p", "stats-note", `y ${plural(entries.length - max, "más", "más")}`));
+  if (entries.length > max) list.append(el("p", "stats-note", `y ${entries.length - max} más`));
   return list;
 }
 
-function mini(item, extra) {
-  const row = el("div", "stats-mini");
-  const src = item.thumb || item.cover;
-  if (src) {
-    const img = el("img", "stats-mini-cover");
-    img.src = src;
-    img.alt = "";
-    img.loading = "lazy";
-    row.append(img);
-  } else {
-    row.append(el("span", "stats-mini-cover", "💿"));
-  }
-  const text = el("span", "stats-mini-text");
-  text.append(el("span", "stats-mini-title", item.title || ""), el("span", "stats-mini-meta", item.artist || ""));
-  row.append(text, el("span", "stats-mini-extra", extra));
-  row.dataset.id = item.release_id;
-  return row;
-}
-
-// Nivel de color de una casilla, como en GitHub: 0 (vacía) a 4 (la que más).
-function level(count, peak) {
-  if (!count) return 0;
-  if (peak <= 1) return 4;
-  return Math.min(4, Math.ceil((count / peak) * 4));
-}
-
-function legend() {
-  const row = el("div", "stats-legend");
-  row.append(el("span", null, "Menos"));
-  for (let i = 0; i <= 4; i++) row.append(el("span", `stats-cell lvl${i}`));
-  row.append(el("span", null, "Más"));
-  return row;
+// Abre la ficha del disco de una fila .stats-mini tocada dentro de `list`.
+function openable(list, items, onOpen) {
+  list.addEventListener("click", (event) => {
+    const row = event.target.closest(".stats-mini");
+    const item = row && items.find((i) => String(i.release_id) === row.dataset.id);
+    if (item) onOpen(item);
+  });
+  return list;
 }
 
 // Estado de la pantalla que se mantiene entre repintados.
@@ -311,12 +329,10 @@ function yearsCard(data, rerender) {
   const peak = Math.max(...[...byYear.values()].map((list) => list.length));
 
   const grid = el("div", "stats-years");
-  grid.setAttribute("role", "grid");
   const head = el("div", "stats-years-row stats-years-head");
   head.append(el("span", "stats-years-decade"));
   for (let d = 0; d < 10; d++) head.append(el("span", "stats-years-digit", String(d)));
   grid.append(head);
-  const caption = el("p", "stats-years-caption");
 
   for (let decade = first; decade <= last; decade += 10) {
     const row = el("div", "stats-years-row");
@@ -338,6 +354,7 @@ function yearsCard(data, rerender) {
     grid.append(row);
   }
 
+  const caption = el("p", "stats-caption");
   if (selectedYear) {
     const list = byYear.get(selectedYear) || [];
     caption.textContent = list.length
@@ -411,40 +428,31 @@ function calendarCard(items) {
 }
 
 function valueCard(data, items, onOpen) {
-  const nodes = [];
+  const title = "💶 Valor estimado de tu colección";
   if (!data.totals.size) {
-    nodes.push(el("p", "stats-big", "—"), el("p", "stats-note", "Aún no hay precios. Se piden a Discogs poco a poco."));
-    return card("💶 Valor estimado de tu colección", ...nodes);
+    return card(title, el("p", "stats-big", "—"), el("p", "stats-note", "Aún no hay precios. Se piden a Discogs poco a poco."));
   }
   const [mainCurrency] = [...data.totals.entries()].sort((a, b) => b[1] - a[1])[0];
   const total = [...data.totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ");
-  nodes.push(el("p", "stats-big", total));
   const mainPriced = data.priced.filter((r) => r.price.currency === mainCurrency);
   const avg = data.totals.get(mainCurrency) / mainPriced.length;
-  nodes.push(
+  const nodes = [
+    el("p", "stats-big", total),
     el(
       "p",
       "stats-note",
       `Media de ${money(avg, mainCurrency)} por disco · con precio: ${data.priced.length} de ${items.length}. ` +
         "Usa el precio sugerido por Discogs para un disco en estado VG+ (o el más barato a la venta)."
-    )
-  );
+    ),
+  ];
   const top = [...data.priced].sort((a, b) => b.price.value - a.price.value).slice(0, 3);
   if (top.length) {
     nodes.push(el("p", "stats-sub", "Los más valiosos"));
     const list = el("div", "stats-minis");
     for (const r of top) list.append(mini(r.item, money(r.price.value, r.price.currency, 2)));
-    list.addEventListener("click", (event) => openMini(event, items, onOpen));
-    nodes.push(list);
+    nodes.push(openable(list, items, onOpen));
   }
-  return card("💶 Valor estimado de tu colección", ...nodes);
-}
-
-function openMini(event, items, onOpen) {
-  const row = event.target.closest(".stats-mini");
-  if (!row) return;
-  const item = items.find((i) => String(i.release_id) === row.dataset.id);
-  if (item) onOpen(item);
+  return card(title, ...nodes);
 }
 
 function curiositiesCard(data, items, onOpen) {
@@ -462,23 +470,21 @@ function curiositiesCard(data, items, onOpen) {
     list.append(mini(best.item, `⭐ Mejor valorado · ${best.s.rating.average.toFixed(2)} / 5`));
   }
   // La reedición más lejana del original.
-  const gaps = data.rows.filter((r) => r.original && r.edition && r.edition - r.original > 0);
+  const gaps = data.rows.filter((r) => r.original && r.edition && r.edition > r.original);
   if (gaps.length) {
     const far = [...gaps].sort((a, b) => b.edition - b.original - (a.edition - a.original))[0];
     list.append(mini(far.item, `🔁 Reeditado ${far.edition - far.original} años después`));
   }
-  list.addEventListener("click", (event) => openMini(event, items, onOpen));
 
   const colored = items.filter((i) => i.color).length;
   const heavy = data.rows.filter((r) => isHeavy(r.item.weight || r.s.weight)).length;
-  const reissues = data.rows.filter((r) => r.original && r.edition && r.edition > r.original).length;
   const tiles = el("div", "stats-tiles");
   tiles.append(
     tile(String(colored), "de color"),
     tile(String(heavy), "de 180 g o más"),
-    tile(String(reissues), reissues === 1 ? "reedición" : "reediciones")
+    tile(String(gaps.length), gaps.length === 1 ? "reedición" : "reediciones")
   );
-  return card("✨ Curiosidades", tiles, list);
+  return card("✨ Curiosidades", tiles, openable(list, items, onOpen));
 }
 
 // Pinta la pestaña «Datos». onOpen(item) abre la ficha de un disco.
@@ -501,32 +507,62 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl }
 
     const nodes = [summary, valueCard(data, items, onOpen)];
 
-    const pending = items.length - data.withData.length;
-    const coverage = pending ? el("p", "stats-note", `Faltan datos de ${plural(pending, "disco", "discos")}.`) : null;
-
+    // 🎸 Géneros como un vinilo, y los estilos debajo.
     if (genres.length) {
-      const genreCard = card("🎸 Géneros", bars(genres, data.withData.length));
+      const byGenre = new Map();
+      for (const r of data.withData) for (const g of r.s.genres) byGenre.set(g, [...(byGenre.get(g) || []), r.item]);
+      const genreCard = genreVinylCard(genres, byGenre, data.withData.length, draw);
       if (styles.length) {
         genreCard.append(el("p", "stats-sub", "Estilos más repetidos"));
         const chips = el("div", "stats-chips");
         for (const [name, count] of styles.slice(0, 12)) chips.append(el("span", "stats-chip", `${name} · ${count}`));
         genreCard.append(chips);
       }
-      if (coverage) genreCard.append(coverage);
+      const pending = items.length - data.withData.length;
+      if (pending) genreCard.append(el("p", "stats-note", `Faltan datos de ${plural(pending, "disco", "discos")}.`));
       nodes.push(genreCard);
     }
 
+    // ⏱️ Duración.
+    const lengths = data.withData
+      .map((r) => ({ item: r.item, s: r.s, len: recordLength(r.s) }))
+      .filter((r) => r.len)
+      .map((r) => ({ item: r.item, seconds: r.len.seconds, estimated: r.len.estimated, tracks: r.s.tracks }));
+    nodes.push(durationCard(lengths, items.length, onOpen));
+
+    // 📅 Años y 🕰️ línea del tiempo.
     nodes.push(yearsCard(data, draw));
+    nodes.push(timelineCard(data.rows, yearMode, onOpen));
+
+    // 🌈 Portadas por colores y vinilos de color.
+    const colorEntries = items.map((item) => {
+      const entry = cache[String(item.release_id)];
+      return { item, color: entry && entry.cc ? entry.cc : null };
+    });
+    const pendingColors = items.filter(needsColor).length;
+    nodes.push(rainbowCard(colorEntries, items.filter((i) => i.color), onOpen, pendingColors));
+
+    // 🌍 Mapa.
+    if (countries.length) {
+      const codeCounts = new Map();
+      const names = new Map();
+      const extras = new Map();
+      for (const r of data.withData) {
+        const codes = countryCodes(r.s.country).filter((c) => c !== "EU");
+        for (const code of codes) codeCounts.set(code, (codeCounts.get(code) || 0) + 1);
+        if (!codes.length && r.s.country) extras.set(r.s.country, (extras.get(r.s.country) || 0) + 1);
+      }
+      for (const [country] of countries) {
+        for (const part of country.split(/\s*&\s*/)) {
+          const [code] = countryCodes(part);
+          if (code && !names.has(code)) names.set(code, `${countryFlag(part)} ${part}`);
+        }
+      }
+      const countryBars = bars(countries, data.withData.length, { max: 6, format: (c) => `${countryFlag(c)} ${c}`.trim() });
+      nodes.push(mapCard(codeCounts, names, [...extras.entries()].map(([c, n]) => [`${countryFlag(c)} ${c}`.trim(), n]), countryBars, draw));
+    }
 
     if (artists.length) nodes.push(card("🎤 Artistas con más discos", bars(artists, items.length, { max: 5 })));
-    if (countries.length) {
-      nodes.push(
-        card("🌍 Dónde se editaron", bars(countries, data.withData.length, {
-          max: 6,
-          format: (c) => `${countryFlag(c)} ${c}`.trim(),
-        }))
-      );
-    }
     if (labels.length) nodes.push(card("🏷️ Sellos", bars(labels, data.withData.length, { max: 5 })));
 
     nodes.push(curiositiesCard(data, items, onOpen));
@@ -535,9 +571,14 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl }
     container.replaceChildren(...nodes);
   };
   draw();
-  startFill(items, discogsToken, () => {
-    if (active && container.isConnected && !container.hidden) draw();
-  }, (text) => {
-    if (statusEl) statusEl.textContent = text;
-  });
+  startFill(
+    items,
+    discogsToken,
+    () => {
+      if (active && container.isConnected && !container.closest("[hidden]")) draw();
+    },
+    (text) => {
+      if (statusEl) statusEl.textContent = text;
+    }
+  );
 }

@@ -341,6 +341,14 @@ export function countryFlag(country) {
     .join("");
 }
 
+// Códigos de dos letras del país de Discogs: "UK & Europe" → ["GB", "EU"]. [] si no se conoce.
+export function countryCodes(country) {
+  return (country || "")
+    .split(/\s*&\s*/)
+    .map((name) => COUNTRY_CODES[name] || "")
+    .filter(Boolean);
+}
+
 // "Spain 🇪🇸", o solo el país si no hay bandera.
 export function countryWithFlag(country) {
   const flag = countryFlag(country);

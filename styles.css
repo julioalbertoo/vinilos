@@ -1953,3 +1953,315 @@ body.typing .tabbar {
   color: var(--muted);
   font-size: 0.7rem;
 }
+
+.stats-caption {
+  min-height: 2.4em;
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+}
+
+.stats-chip--soft {
+  background: var(--lilac);
+  color: var(--text);
+}
+
+/* Géneros como un vinilo */
+.stats-vinyl-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 12px;
+}
+
+.stats-vinyl {
+  width: min(72vw, 240px);
+  height: auto;
+  filter: drop-shadow(0 8px 14px rgba(40, 30, 80, 0.25));
+}
+
+.stats-vinyl-disc { fill: #1b1a22; }
+.stats-vinyl-slice { fill: none; cursor: pointer; transition: opacity 0.2s; }
+.stats-vinyl-slice.dim { opacity: 0.4; }
+.stats-vinyl-groove { fill: none; stroke: rgba(0, 0, 0, 0.22); stroke-width: 0.6; pointer-events: none; }
+.stats-vinyl-shine {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 2;
+  pointer-events: none;
+}
+.stats-vinyl-label { stroke: rgba(0, 0, 0, 0.15); stroke-width: 1; }
+.stats-vinyl-name { fill: #fff; font-size: 10.5px; font-weight: 800; pointer-events: none; }
+.stats-vinyl-pct { fill: #fff; font-size: 17px; font-weight: 800; pointer-events: none; }
+.stats-vinyl-hole { fill: var(--bg); }
+
+.stats-genre-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stats-genre-key {
+  display: inline-flex;
+  width: auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--lilac);
+  box-shadow: none;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.stats-genre-key.active {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.stats-genre-key b { color: var(--muted); }
+
+.stats-genre-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Duración */
+.stats-analogy {
+  display: inline-block;
+  margin: 10px 0 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--butter);
+  color: var(--butter-text);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.stats-card .stats-tiles .stats-tile-value {
+  font-size: 1.05rem;
+}
+
+/* Línea del tiempo */
+.stats-timeline {
+  margin: 8px -16px 0;
+  padding: 0 16px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stats-timeline::-webkit-scrollbar { display: none; }
+
+.stats-timeline-track {
+  position: relative;
+  min-width: 100%;
+}
+
+.stats-timeline-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.stats-tick {
+  position: absolute;
+  bottom: 15px;
+  width: 1px;
+  height: 4px;
+  background: var(--line);
+}
+
+.stats-tick.five { height: 7px; bottom: 13px; background: var(--muted); }
+.stats-tick.decade { height: 9px; bottom: 12px; width: 2px; background: var(--text); }
+
+.stats-tick-label {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.stats-tick-label.decade { color: var(--text); font-weight: 800; }
+
+.stats-timeline-cover {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 3px;
+  background: var(--lilac);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.stats-timeline-img {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  font-size: 0.8rem;
+}
+
+.stats-timeline-more {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 24, 50, 0.65);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+/* Arcoíris de portadas */
+.stats-palette {
+  display: flex;
+  height: 14px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.stats-palette span { flex: 1; }
+
+.stats-mosaic {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+  gap: 3px;
+}
+
+.stats-mosaic-cell {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 3px;
+  background: var(--lilac);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.stats-mosaic-img {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.stats-discs {
+  display: flex;
+  gap: 12px;
+  margin: 0 -16px;
+  padding: 2px 16px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.stats-discs::-webkit-scrollbar { display: none; }
+
+.stats-disc {
+  display: flex;
+  flex: 0 0 84px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  font-weight: normal;
+}
+
+.stats-disc-face {
+  position: relative;
+  display: block;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  animation: stats-spin 6s linear infinite;
+}
+
+.stats-disc-hole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--surface);
+  transform: translate(-50%, -50%);
+}
+
+.stats-disc-title,
+.stats-disc-color {
+  max-width: 84px;
+  overflow: hidden;
+  font-size: 0.72rem;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stats-disc-title { font-weight: 800; }
+.stats-disc-color { color: var(--muted); }
+
+@keyframes stats-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-disc-face { animation: none; }
+}
+
+/* Mapa */
+.stats-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 8px;
+}
+
+.stats-map-land {
+  fill: var(--line);
+  stroke: var(--surface);
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.stats-map-land.lvl1 { fill: color-mix(in srgb, var(--primary) 30%, var(--line)); }
+.stats-map-land.lvl2 { fill: color-mix(in srgb, var(--primary) 55%, var(--line)); }
+.stats-map-land.lvl3 { fill: color-mix(in srgb, var(--primary) 78%, var(--line)); }
+.stats-map-land.lvl4 { fill: var(--primary); }
+
+.stats-map-bubble circle {
+  fill: var(--rose-text);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.92;
+}
+
+.stats-map-bubble text {
+  fill: #fff;
+  font-weight: 800;
+  pointer-events: none;
+}
