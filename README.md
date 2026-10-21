@@ -19,10 +19,11 @@ En la pestaña **📷 Identificar** tienes tres caminos, de más a menos preciso
 
 En cada candidato verás qué pistas coinciden (✓ sello, ✓ año, ✓ código de barras…). Si ya tienes esa edición en **💿 Mis discos**, sale marcada con **💿 Ya lo tienes**, para no comprarla repetida. Pulsa **✓ Es este** en el tuyo: se abre su ficha (canciones, sello, color del vinilo si Discogs lo tiene) con un botón **🎧 Escuchar en Spotify** que abre el álbum en la app y se guarda en **💿 Mis discos**.
 
-En **💿 Mis discos** tienes dos formas de verlos:
+En **💿 Mis discos** tienes tres formas de verlos:
 
 - **Galería** (la de inicio): deslizas en horizontal y el disco del centro sale de su funda y gira. Púlsalo otra vez para abrir su ficha. La galleta del centro es la de verdad: la IA busca su foto entre las de la edición en Discogs (una consulta por disco, solo la primera vez). Si Discogs no tiene foto de la galleta, sale una genérica con el título y el artista. Si la edición es de vinilo de color (según Discogs), el disco gira de ese color: translúcido, jaspeado o con salpicaduras incluidos.
 - **Cuadrícula**: todas las portadas de un vistazo; aquí puedes borrar discos (✕).
+- **Datos**: el valor estimado de tu colección (precio sugerido de Discogs para estado VG+, o el más barato a la venta) y los más valiosos; géneros y estilos; un mapa de casillas de años, al estilo GitHub (filas por década; toca una casilla para ver qué discos son de ese año); artistas, países y sellos que más se repiten; curiosidades (el más raro, el más deseado, el mejor valorado, la reedición más lejana) y un calendario de cuándo añadiste cada disco. Lo que falta se pide a Discogs poco a poco mientras la pestaña está abierta; con la cuenta en la nube, casi todo sale de ahí de golpe.
 
 ### ☁️ Copia en la nube (opcional)
 

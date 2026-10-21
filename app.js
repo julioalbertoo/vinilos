@@ -20,6 +20,7 @@ import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
 import { cachedRelease, rememberRelease, cachedPrices } from "./details.js";
+import { renderStats, setStatsActive } from "./stats.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
@@ -39,6 +40,7 @@ const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "coll
 function showView(name) {
   if (name !== "capture") stopScanner();
   if (name === "collection") renderCollection();
+  else setStatsActive(false);
   for (const view of VIEWS) {
     document.getElementById(`view-${view}`).classList.toggle("active", view === name);
   }
@@ -760,15 +762,17 @@ function renderCollection() {
   const items = sortItems(getHistory());
   const empty = items.length === 0;
   const grid = collectionMode === "grid";
+  const stats = collectionMode === "stats";
   document.getElementById("collection-empty").hidden = !empty;
   document.getElementById("collection-switch").hidden = empty;
-  document.getElementById("collection-sort").hidden = empty;
+  document.getElementById("collection-sort").hidden = empty || stats;
   for (const button of document.querySelectorAll("#collection-sort button")) {
     const active = button.dataset.sort === collectionSort;
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   }
-  document.getElementById("gallery-content").hidden = empty || grid;
+  document.getElementById("gallery-content").hidden = empty || grid || stats;
+  document.getElementById("stats-wrap").hidden = empty || !stats;
   document.getElementById("history-grid").hidden = empty || !grid;
   document.getElementById("history-clear").hidden = empty || !grid;
   for (const button of document.querySelectorAll("#collection-switch button")) {
@@ -779,8 +783,19 @@ function renderCollection() {
   if (empty) {
     document.getElementById("history-grid").replaceChildren();
     document.getElementById("gallery-track").replaceChildren();
+    document.getElementById("stats-content").replaceChildren();
+    setStatsActive(false);
     return;
   }
+  if (stats) {
+    renderStats(document.getElementById("stats-content"), items, {
+      discogsToken: getDiscogsToken(),
+      statusEl: document.getElementById("stats-status"),
+      onOpen: (item) => openDetail(historyItemToCandidate(item), { returnView: "collection" }),
+    });
+    return;
+  }
+  setStatsActive(false);
   // Busca en segundo plano la galleta real de los discos que aún no la tienen.
   fillMissingLabels(getAiKey(), getDiscogsToken(), updateSlide, (text) => {
     document.getElementById("gallery-label-status").textContent = text;

@@ -275,6 +275,20 @@ export async function loadDetail(releaseId) {
   return data;
 }
 
+// Resumen de todas las fichas guardadas de esta cuenta, de una vez (para la pestaña «Datos»).
+// Solo se piden los campos que hacen falta, no la ficha entera. null sin cuenta.
+export async function loadDetailSummaries() {
+  if (!client || !user) return null;
+  const { data, error } = await client
+    .from(detailsTable)
+    .select(
+      "release_id, data_at, prices, prices_at, genres:data->genres, styles:data->styles, country:data->>country, " +
+        "labels:data->labels, formats:data->formats, community:data->community, originalYear:data->>originalYear"
+    );
+  if (error) throw error;
+  return data;
+}
+
 // fields: solo las columnas que cambian (data y data_at, o prices y prices_at).
 export async function saveDetail(releaseId, fields) {
   if (!client || !user) return;
