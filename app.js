@@ -209,9 +209,10 @@ function el(tag, className, text) {
   return node;
 }
 
-function renderCard(candidate, index) {
+function renderCard(candidate, index, owned) {
   const best = index === 0;
-  const card = el("article", best ? "card card--best" : "card");
+  const have = owned.has(String(candidate.id));
+  const card = el("article", ["card", best && "card--best", have && "card--owned"].filter(Boolean).join(" "));
   if (best) card.append(el("span", "card-badge", "★ Mejor coincidencia"));
 
   if (candidate.thumb) {
@@ -226,6 +227,7 @@ function renderCard(candidate, index) {
 
   const body = el("div", "card-body");
   body.append(el("h3", null, candidate.title));
+  if (have) body.append(el("p", "card-owned", "💿 Ya lo tienes"));
   body.append(el("p", null, [candidate.year || "Año ?", countryWithFlag(candidate.country) || "País ?"].join(" · ")));
   body.append(el("p", null, [candidate.label || "Sello ?", candidate.catno || "Nº cat. ?"].join(" · ")));
   body.append(el("p", null, candidate.formats.join(", ")));
@@ -261,10 +263,12 @@ function renderResults(ranked, total, strategy, clues) {
   const summary = document.getElementById("results-summary");
   const list = document.getElementById("results-list");
   const more = document.getElementById("results-more");
+  // Ediciones que ya están en «Mis discos», para marcarlas con «Ya lo tienes».
+  const owned = new Set(getHistory().map((item) => String(item.release_id)));
   let shown = 0;
   function showMore() {
     const next = ranked.slice(shown, shown + RESULTS_STEP);
-    list.append(...next.map((candidate, i) => renderCard(candidate, shown + i)));
+    list.append(...next.map((candidate, i) => renderCard(candidate, shown + i, owned)));
     shown += next.length;
     summary.textContent = `${total} ediciones encontradas ${how}. Las ${shown} que mejor encajan:`;
     const left = ranked.length - shown;
@@ -575,8 +579,11 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
     }
   }
 
+  const alreadyOwned = getHistory().some((item) => String(item.release_id) === String(candidate.id));
   if (!fromHistory && exploreMode) {
-    savedNote.textContent = "🧭 Modo explorador: no se ha guardado en tu colección";
+    savedNote.textContent = alreadyOwned
+      ? "🧭 Modo explorador · 💿 Ya lo tienes en tu colección"
+      : "🧭 Modo explorador: no se ha guardado en tu colección";
   } else if (!fromHistory) {
     // Si la ficha no llegó, se guarda con los datos del candidato para no perder la confirmación.
     try {
@@ -593,7 +600,7 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
         // Gramaje ("180 g"; "" si Discogs no lo dice).
         weight: release ? releaseWeight(release) : candidate.weight || undefined,
       });
-      if (request === detailRequest) savedNote.textContent = "✓ Guardado en tu historial";
+      if (request === detailRequest) savedNote.textContent = alreadyOwned ? "💿 Ya estaba en tu colección" : "✓ Guardado en tu historial";
     } catch {
       if (request === detailRequest) savedNote.textContent = "❌ No se pudo guardar en el historial (¿memoria del navegador llena?).";
     }

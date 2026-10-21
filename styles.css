@@ -1484,6 +1484,22 @@ body.typing .tabbar {
   font-size: 0.8rem;
 }
 
+/* Edición que ya está en «Mis discos». */
+.card.card--owned {
+  border-color: var(--mint-text);
+}
+
+.view .card-body .card-owned {
+  display: inline-block;
+  margin: 4px 0 2px;
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: var(--mint);
+  color: var(--mint-text);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
 /* ---------- Copia en la nube ---------- */
 
 .cloud-text {
