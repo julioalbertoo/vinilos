@@ -6,7 +6,7 @@ import { CONFIG } from "./config.js";
 import { getHistory, onHistoryChange, replaceHistory } from "./history.js";
 import { getTokenState, onTokensChange, applyTokenState } from "./tokens.js";
 
-const { url, publishableKey, schema, table, settingsTable } = CONFIG.SUPABASE;
+const { url, publishableKey, schema, table, settingsTable, detailsTable } = CONFIG.SUPABASE;
 const SYNCED_KEY = CONFIG.STORAGE_KEYS.cloudSynced;
 const PENDING_KEY = CONFIG.STORAGE_KEYS.cloudPendingDeletes;
 
@@ -259,6 +259,27 @@ async function pushChange(change) {
   } catch {
     setStatus("error", "☁️ Sin conexión con la nube: se subirá la próxima vez que abras la app.");
   }
+}
+
+// ---------- Fichas y precios guardados (los usa details.js) ----------
+
+// Devuelve { data, data_at, prices, prices_at } o null (sin cuenta o sin nada guardado).
+export async function loadDetail(releaseId) {
+  if (!client || !user) return null;
+  const { data, error } = await client
+    .from(detailsTable)
+    .select("data, data_at, prices, prices_at")
+    .eq("release_id", Number(releaseId))
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// fields: solo las columnas que cambian (data y data_at, o prices y prices_at).
+export async function saveDetail(releaseId, fields) {
+  if (!client || !user) return;
+  const { error } = await client.from(detailsTable).upsert({ user_id: user.id, release_id: Number(releaseId), ...fields });
+  if (error) throw error;
 }
 
 // ---------- Llaves ----------

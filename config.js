@@ -21,6 +21,8 @@ export const CONFIG = {
     schema: "vinilos",
     table: "records",
     settingsTable: "settings",
+    // Fichas de Discogs y sus precios, para no volver a pedirlos cada vez (details.js).
+    detailsTable: "details",
   },
   STORAGE_KEYS: {
     aiKey: "vinilos_ai_key",

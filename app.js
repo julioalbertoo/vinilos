@@ -13,12 +13,13 @@ import {
 import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify } from "./ai.js";
-import { testDiscogsConnection, findCandidates, searchByText, getRelease, getMasterYear, bothYears, getPrices, countryWithFlag, vinylColor, releaseWeight } from "./discogs.js";
+import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, bothYears, countryWithFlag, vinylColor, releaseWeight } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
+import { cachedRelease, rememberRelease, cachedPrices } from "./details.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
@@ -498,7 +499,7 @@ function spainLink(id) {
   return link;
 }
 
-function renderPrices(id, prices) {
+function renderPrices(id, prices, at) {
   const box = document.getElementById("detail-price");
   if (!box) return;
   const nodes = [el("p", "detail-price-title", "💶 Precio de esta edición")];
@@ -521,14 +522,25 @@ function renderPrices(id, prices) {
     }
     nodes.push(row);
   }
+  const when = pricesAge(at);
+  if (when) nodes.push(el("p", "detail-price-note", when));
   nodes.push(spainLink(id));
   box.replaceChildren(...nodes);
 }
 
+// Los precios se piden a Discogs como mucho una vez por semana: se dice de cuándo son.
+function pricesAge(at) {
+  if (!at) return "";
+  const days = Math.floor((Date.now() - new Date(at).getTime()) / (24 * 60 * 60 * 1000));
+  if (days < 1) return "Precio consultado hoy";
+  if (days === 1) return "Precio consultado ayer";
+  return `Precio consultado hace ${days} días`;
+}
+
 async function loadPrices(id, request) {
   try {
-    const prices = await getPrices(id, getDiscogsToken());
-    if (request === detailRequest) renderPrices(id, prices);
+    const { prices, at } = await cachedPrices(id, getDiscogsToken());
+    if (request === detailRequest) renderPrices(id, prices, at);
   } catch (err) {
     const box = document.getElementById("detail-price");
     if (request === detailRequest && box) {
@@ -575,19 +587,25 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
   // Año del álbum original (del master): llega después de la ficha. undefined = no se pudo mirar.
   let originalYear;
   try {
-    release = await getRelease(candidate.id, getDiscogsToken());
+    // Si la ficha está guardada en la nube, sale de ahí sin preguntar a Discogs.
+    release = await cachedRelease(candidate.id, getDiscogsToken());
     if (request === detailRequest) {
       renderDetail(release);
       loadPrices(release.id, request);
       if (fromHistory) searchLabelAgain(release, request);
     }
-    try {
-      originalYear = await getMasterYear(release.masterId, getDiscogsToken());
-      release.originalYear = originalYear;
-      const line = document.querySelector("#detail-content .detail-year");
-      if (request === detailRequest && line) line.textContent = detailYearLine(release);
-    } catch {
-      // Sin año original no pasa nada: se rellena más tarde desde «Mis discos».
+    if (release.originalYear !== undefined) {
+      originalYear = release.originalYear;
+    } else {
+      try {
+        originalYear = await getMasterYear(release.masterId, getDiscogsToken());
+        release.originalYear = originalYear;
+        rememberRelease(release);
+        const line = document.querySelector("#detail-content .detail-year");
+        if (request === detailRequest && line) line.textContent = detailYearLine(release);
+      } catch {
+        // Sin año original no pasa nada: se rellena más tarde desde «Mis discos».
+      }
     }
   } catch (err) {
     if (request === detailRequest) {

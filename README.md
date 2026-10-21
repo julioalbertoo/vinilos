@@ -31,6 +31,7 @@ En **⚙️ Ajustes → Copia en la nube** entra con tu **email y contraseña**.
 - **¿Sin contraseña?** Abre la web en Safari, pulsa **✉️ Enviarme un enlace para entrar** y abre el enlace del correo (sirve una sola vez). Ya dentro, en el mismo panel, pon una contraseña. Luego úsala en la app de la pantalla de inicio: el enlace del correo siempre se abre en Safari, no en la app.
 - Sin cuenta, la app funciona igual que siempre.
 - Si una llave ya está en el móvil, manda la del móvil; la de la nube solo se usa cuando aquí falta.
+- Con la cuenta abierta, la ficha de cada disco (canciones, sellos, notas, enlaces de las fotos) también se guarda en la nube y sale de ahí al abrirla, sin preguntar a Discogs. Se renueva cada 30 días. Los precios se piden a Discogs como mucho una vez por semana; en la ficha pone de cuándo son.
 
 **Truco para afinar la edición:** la portada suele ser igual en todas las ediciones. La contraportada y la galleta central traen el sello y el número de catálogo, que son los que distinguen una edición de otra.
 
@@ -120,6 +121,7 @@ Web estática (HTML + CSS + JavaScript sin frameworks) que habla directamente de
 | `imaging.js` | Reduce la foto (lado largo ~1024 px) antes de enviarla a la IA. |
 | `tokens.js` | Guarda y comprueba las llaves (en el navegador). Avisa de cada cambio para que se suba a la nube. |
 | `history.js` | Historial de discos confirmados (en el navegador). Avisa de cada cambio para que se suba a la nube. |
+| `details.js` | Fichas y precios guardados en la nube (tabla `vinilos.details`): la ficha se reutiliza 30 días y los precios 7. Sin cuenta, se pregunta a Discogs como siempre. |
 | `cloud.js` | Copia en la nube con Supabase: entrada por email, sube cada cambio y mezcla lo del móvil con lo de la nube. Los discos van en la tabla `vinilos.records` y las llaves en `vinilos.settings`; cada cuenta solo ve lo suyo (reglas RLS). |
 | `gallery.js` | Galería horizontal: el disco del centro sale de la funda y gira. |
 | `labels.js` | Busca en segundo plano la foto de la galleta de cada disco guardado y la recorta. Como Discogs no deja que una web lea sus fotos, las descarga a través de [wsrv.nl](https://wsrv.nl), que solo recibe el enlace público de cada foto. |

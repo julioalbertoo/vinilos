@@ -1,4 +1,5 @@
-import { getRelease, getMasterYear, mainVinylRelease, vinylColor, releaseWeight } from "./discogs.js";
+import { getMasterYear, mainVinylRelease, vinylColor, releaseWeight } from "./discogs.js";
+import { cachedRelease, rememberRelease } from "./details.js";
 import { locateLabel } from "./ai.js";
 import { getHistory, updateHistoryItem } from "./history.js";
 
@@ -86,7 +87,7 @@ async function findLabel(release, aiKey, discogsToken) {
   if (!mainId) return { label: { none: true, reason: own.none, checkedMain: true } };
   let main;
   try {
-    main = await getRelease(mainId, discogsToken);
+    main = await cachedRelease(mainId, discogsToken);
   } catch (err) {
     return { error: `Discogs (edición principal): ${err && err.message ? err.message : err}`, stop: err && err.authError };
   }
@@ -155,12 +156,18 @@ export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus)
       if (wantsLabel) onStatus(`Buscando galletas en Discogs: ${++labelIndex} de ${labelTotal}…`);
       let outcome;
       try {
-        const release = await getRelease(item.release_id, discogsToken);
+        const release = await cachedRelease(item.release_id, discogsToken);
         const patch = {};
         if (!item.cover && release.image) patch.cover = release.image;
         if (item.color === undefined) patch.color = vinylColor(release.formats.map((f) => f.text));
         if (item.weight === undefined) patch.weight = releaseWeight(release);
-        if (item.originalYear === undefined) patch.originalYear = await getMasterYear(release.masterId, discogsToken);
+        if (item.originalYear === undefined) {
+          if (release.originalYear === undefined) {
+            release.originalYear = await getMasterYear(release.masterId, discogsToken);
+            rememberRelease(release);
+          }
+          patch.originalYear = release.originalYear;
+        }
         if (Object.keys(patch).length) {
           Object.assign(item, patch);
           updateHistoryItem(item.release_id, patch);
