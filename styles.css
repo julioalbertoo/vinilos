@@ -821,6 +821,17 @@ input[type="text"]:focus {
   font-size: 0.9rem;
 }
 
+.view .detail-spotify {
+  display: inline-block;
+  margin: 10px 0 4px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #1db954;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .detail-genres {
   display: flex;
   flex-wrap: wrap;

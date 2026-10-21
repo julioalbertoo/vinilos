@@ -383,6 +383,7 @@ function renderDetail(release) {
     for (const name of release.styles || []) chips.append(el("span", "detail-style", name));
     nodes.push(chips);
   }
+  if (release.title) nodes.push(spotifyLink(release));
   // La caja del precio solo se pone con la ficha completa (tiene id); se rellena al llegar los datos.
   if (release.id) {
     const price = el("div", "detail-price");
@@ -469,6 +470,23 @@ function formatMoney({ value, currency }) {
   } catch {
     return `${Number(value).toFixed(2)} ${currency || ""}`.trim();
   }
+}
+
+// Nombre de artista de Discogs listo para buscar: "Beatles, The" → "The Beatles", sin "(2)" ni "*".
+function plainArtist(name) {
+  return String(name || "")
+    .replace(/\s*\(\d+\)/g, "")
+    .replace(/\*/g, "")
+    .replace(/^(.+),\s*(The|Los|Las|El|La)$/i, "$2 $1")
+    .trim();
+}
+
+// Abre la app de Spotify buscando el álbum (artista + título).
+function spotifyLink(release) {
+  const query = [plainArtist(release.artist), release.title].filter(Boolean).join(" ");
+  const link = el("a", "detail-spotify", "🎧 Escuchar en Spotify");
+  link.href = `spotify:search:${encodeURIComponent(query)}`;
+  return link;
 }
 
 // Abre en Discogs las copias de esta edición a la venta que se envían desde España.

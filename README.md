@@ -17,7 +17,7 @@ En la pestaña **📷 Identificar** tienes tres caminos, de más a menos preciso
 | **📷 Hacer foto** / **🖼️ Galería** | Portada, contraportada, lomo o galleta central. Se identifica sola nada más subir la foto, sin pulsar nada más. La IA lee artista, título, sello, número de catálogo y también los números del código de barras. |
 | **Ninguno es** (en los resultados) | Si ningún candidato es el tuyo: escribe artista y título, o el número de catálogo. |
 
-En cada candidato verás qué pistas coinciden (✓ sello, ✓ año, ✓ código de barras…). Si ya tienes esa edición en **💿 Mis discos**, sale marcada con **💿 Ya lo tienes**, para no comprarla repetida. Pulsa **✓ Es este** en el tuyo: se abre su ficha (canciones, sello, color del vinilo si Discogs lo tiene) y se guarda en **💿 Mis discos**.
+En cada candidato verás qué pistas coinciden (✓ sello, ✓ año, ✓ código de barras…). Si ya tienes esa edición en **💿 Mis discos**, sale marcada con **💿 Ya lo tienes**, para no comprarla repetida. Pulsa **✓ Es este** en el tuyo: se abre su ficha (canciones, sello, color del vinilo si Discogs lo tiene) con un botón **🎧 Escuchar en Spotify** que abre el álbum en la app y se guarda en **💿 Mis discos**.
 
 En **💿 Mis discos** tienes dos formas de verlos:
 
