@@ -17,7 +17,7 @@ import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, bot
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
-import { getHistory, addToHistory, removeFromHistory, clearHistory } from "./history.js";
+import { getHistory, addToHistory, removeFromHistory, clearHistory, updateHistoryItem } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
 import { cachedRelease, rememberRelease, cachedPrices } from "./details.js";
 import { renderStats, setStatsActive } from "./stats.js";
@@ -599,9 +599,14 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
     // Si la ficha está guardada en la nube, sale de ahí sin preguntar a Discogs.
     release = await cachedRelease(candidate.id, getDiscogsToken());
     if (request === detailRequest) {
-      renderDetail(release);
+      // En un disco guardado se enseña la portada que haya elegido el usuario.
+      const saved = fromHistory && getHistory().find((i) => String(i.release_id) === String(release.id));
+      renderDetail(saved && saved.cover ? { ...release, image: saved.cover } : release);
       loadPrices(release.id, request);
-      if (fromHistory) searchLabelAgain(release, request);
+      if (fromHistory) {
+        addCoverPicker(release);
+        searchLabelAgain(release, request);
+      }
     }
     if (release.originalYear !== undefined) {
       originalYear = release.originalYear;
@@ -652,6 +657,55 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
   }
 }
 
+// Todas las fotos de la edición en Discogs, empezando por la portada principal.
+function releasePhotos(release) {
+  const photos = [];
+  if (release.image) photos.push({ uri: release.image, uri150: release.thumb || release.image });
+  for (const p of release.extraImages || []) photos.push(p);
+  return photos.filter((p, i, all) => all.findIndex((q) => q.uri === p.uri) === i);
+}
+
+// «Cambiar portada»: si la foto principal de Discogs es mala, se elige otra de la edición.
+function addCoverPicker(release) {
+  const item = getHistory().find((i) => String(i.release_id) === String(release.id));
+  const photos = releasePhotos(release);
+  if (!item || photos.length < 2) return;
+  const grid = el("div", "cover-picker");
+  const mark = () => {
+    const current = item.cover || release.image;
+    for (const b of grid.children) b.classList.toggle("is-current", b.dataset.uri === current);
+  };
+  for (const photo of photos) {
+    const b = el("button", "cover-picker-option");
+    b.type = "button";
+    b.dataset.uri = photo.uri;
+    b.setAttribute("aria-label", "Usar esta foto como portada");
+    const img = el("img");
+    img.src = photo.uri150;
+    img.alt = "";
+    img.loading = "lazy";
+    b.append(img);
+    b.addEventListener("click", () => {
+      const patch = { cover: photo.uri, thumb: photo.uri150 };
+      Object.assign(item, patch);
+      updateHistoryItem(item.release_id, patch);
+      updateSlide(item);
+      const cover = document.querySelector("#detail-content .detail-cover");
+      if (cover) cover.src = photo.uri;
+      mark();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    grid.append(b);
+  }
+  mark();
+  const box = foldable(`🖼️ Cambiar portada (${photos.length} fotos)`, grid);
+  box.append(el("p", "detail-meta", "Toca una foto para usarla como portada en «Mis discos»."));
+  const content = document.getElementById("detail-content");
+  const price = document.getElementById("detail-price");
+  if (price) content.insertBefore(box, price.nextSibling);
+  else content.append(box);
+}
+
 // Si el disco guardado aún no tiene galleta, se vuelve a buscar al abrir su ficha.
 async function searchLabelAgain(release, request) {
   const item = getHistory().find((i) => i.release_id === release.id);
@@ -676,7 +730,7 @@ function historyItemToCandidate(item) {
     label: "",
     catno: "",
     formats: [],
-    thumb: item.thumb,
+    thumb: item.cover || item.thumb,
     url: `https://www.discogs.com/release/${item.release_id}`,
   };
 }
