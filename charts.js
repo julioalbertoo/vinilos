@@ -82,7 +82,7 @@ export function coverStrip(items, onOpen, label) {
 export function rankList(entries, total, { max = 6, format = (k) => k, byKey, selected, onSelect, onOpen, more = "más" } = {}) {
   const list = el("div", "stats-bars");
   const top = entries.slice(0, max);
-  const peak = top.length ? top[0][1] : 1;
+  const peak = Math.max(1, ...top.map(([, count]) => count)); // no siempre van de mayor a menor
   for (const [key, count] of top) {
     const pickable = Boolean(byKey && onSelect);
     const row = el(pickable ? "button" : "div", "stats-bar");
@@ -123,7 +123,8 @@ export function podium(rows, onOpen) {
   return box;
 }
 
-// Récords («El más raro», «El más largo»…): portada, qué récord es, el dato y el disco. facts: [{ icon, label, item, value }].
+// Récords («El más raro», «El más largo»…): portada, qué récord es, el dato y el disco.
+// facts: [{ icon, label, item, value, detail }]; detail (opcional) va en una línea pequeña al final.
 export function factGrid(facts, onOpen) {
   const list = el("div", "stats-facts");
   for (const fact of facts) {
@@ -136,6 +137,7 @@ export function factGrid(facts, onOpen) {
       el("span", "stats-fact-value", fact.value),
       el("span", "stats-fact-name", itemName(fact.item))
     );
+    if (fact.detail) text.append(el("span", "stats-fact-detail", fact.detail));
     button.append(coverImg(fact.item, "stats-fact-cover"), text);
     button.addEventListener("click", () => onOpen(fact.item));
     list.append(button);
@@ -549,13 +551,17 @@ const COMPARISONS = [
   [10080, "una semana entera sin parar", "📅"],
 ];
 
-function comparison(minutes) {
-  const fit = COMPARISONS.filter(([m]) => m <= minutes).pop();
-  if (!fit) return `${COMPARISONS[0][2]} Casi lo que dura ${COMPARISONS[0][1]}`;
-  const times = minutes / fit[0];
+// Compara una cantidad con la cosa conocida más grande que no la supera: «2,5 veces un gato».
+// list: [[cantidad, «un gato», emoji]] de menor a mayor. almost: cómo empieza si no llega a la primera.
+function compareTo(list, value, almost = "Casi lo que dura") {
+  const fit = list.filter(([m]) => m <= value).pop();
+  if (!fit) return `${list[0][2]} ${almost} ${list[0][1]}`;
+  const times = value / fit[0];
   if (times < 1.25) return `${fit[2]} Como ${fit[1]}`;
   return `${fit[2]} ${times.toLocaleString("es-ES", { maximumFractionDigits: 1 })} veces ${fit[1]}`;
 }
+
+const comparison = (minutes) => compareTo(COMPARISONS, minutes);
 
 export function formatDuration(seconds) {
   const minutes = Math.round(seconds / 60);
@@ -596,6 +602,100 @@ export function durationCard(rows, totalRecords, onOpen) {
   if (estimated) notes.push(`En ${plural(estimated, "disco", "discos")} Discogs no da la duración de todas las canciones: se calcula aproximada.`);
   if (notes.length) nodes.push(note(notes.join(" ")));
   return card({ ...head, sub: "Todo seguido, sin dar la vuelta al disco" }, ...nodes);
+}
+
+// ---------- 4. Tu pila de discos ----------
+
+// Cada disco con su funda: el vinilo (140 g si Discogs no dice el gramaje) más unos 100 g de funda,
+// y unos 3 mm de grosor. Es aproximado: un doble cuenta como uno.
+const SLEEVE_GRAMS = 100;
+const DEFAULT_VINYL_GRAMS = 140;
+const RECORD_MM = 3;
+
+const WEIGHTS = [
+  [1, "un cartón de leche", "🥛"],
+  [4, "un gato", "🐈"],
+  [11, "un perro mediano", "🐕"],
+  [23, "una maleta facturada", "🧳"],
+  [70, "una persona", "🧍"],
+  [250, "un piano vertical", "🎹"],
+];
+
+const HEIGHTS = [
+  [15, "un móvil", "📱"],
+  [20, "un cartón de leche", "🥛"],
+  [30, "una botella de vino", "🍷"],
+  [75, "una mesa", "🪑"],
+  [100, "un niño de 4 años", "🧒"],
+  [170, "una persona", "🧍"],
+  [300, "un piso de un edificio", "🏠"],
+  [900, "un edificio de tres plantas", "🏢"],
+];
+
+const decimals = (n) => n.toLocaleString("es-ES", { maximumFractionDigits: n < 10 ? 1 : 0 });
+const formatWeight = (kg) => (kg < 1 ? `${Math.round(kg * 1000)} g` : `${decimals(kg)} kg`);
+const formatHeight = (cm) => (cm < 100 ? `${decimals(cm)} cm` : `${decimals(cm / 100)} m`);
+
+// rows: [{ item, grams (del vinilo, o null), color (hex de la portada, o null) }], del más antiguo al más nuevo.
+export function stackCard(rows) {
+  const known = rows.filter((r) => r.grams).length;
+  const kg = rows.reduce((sum, r) => sum + (r.grams || DEFAULT_VINYL_GRAMS) + SLEEVE_GRAMS, 0) / 1000;
+  const cm = (rows.length * RECORD_MM) / 10;
+
+  // La pila dibujada: un lomo por disco, del color de su portada, con el más nuevo arriba.
+  const pile = el("div", "stats-stack");
+  pile.style.height = `${Math.min(210, Math.max(40, rows.length * 6))}px`;
+  if (rows.length > 60) pile.classList.add("dense");
+  [...rows].reverse().forEach((r, i) => {
+    const spine = el("span", "stats-stack-spine");
+    if (r.color) spine.style.background = r.color;
+    spine.style.translate = `${((i * 37) % 7) - 3}px 0`; // un poco torcida, como una pila de verdad
+    spine.title = r.item.title || "";
+    pile.append(spine);
+  });
+
+  const facts = el("div", "stats-stack-facts");
+  facts.append(
+    el("p", "stats-big", formatWeight(kg)),
+    el("p", "stats-big-note", "de peso"),
+    pill(compareTo(WEIGHTS, kg, "Casi lo que pesa"), "sky"),
+    el("p", "stats-big", formatHeight(cm)),
+    el("p", "stats-big-note", "de altura, todos apilados"),
+    pill(compareTo(HEIGHTS, cm, "Casi lo que mide"), "sky")
+  );
+  const body = el("div", "stats-stack-body");
+  body.append(pile, facts);
+  const unknown = rows.length - known;
+  return card(
+    { icon: "📦", title: "Tu pila de discos", sub: "Lo que pesan y miden si los apilas", accent: "sky", nav: "stack" },
+    body,
+    note(
+      "Aproximado: cada disco con su funda (unos 100 g y 3 mm)" +
+        (unknown ? `; en ${plural(unknown, "disco", "discos")} sin gramaje en Discogs se cuentan 140 g.` : ".")
+    )
+  );
+}
+
+// Barra partida en dos, con su leyenda: «🥇 12 del año del álbum · 🔁 28 reediciones».
+// parts: [{ label, count, className }].
+export function splitBar(parts) {
+  const total = parts.reduce((sum, p) => sum + p.count, 0);
+  const bar = el("div", "stats-split");
+  const keys = el("div", "stats-split-keys");
+  for (const part of parts) {
+    if (part.count) {
+      const segment = el("span", `stats-split-part ${part.className}`);
+      segment.style.flexGrow = String(part.count);
+      bar.append(segment);
+    }
+    const key = el("span", "stats-split-key");
+    key.append(el("span", `stats-split-dot ${part.className}`), el("span", null, part.label));
+    key.append(el("b", null, ` ${part.count.toLocaleString("es-ES")} · ${total ? Math.round((part.count / total) * 100) : 0}%`));
+    keys.append(key);
+  }
+  const box = el("div", "stats-split-wrap");
+  box.append(bar, keys);
+  return box;
 }
 
 // ---------- 5. Línea del tiempo con portadas ----------

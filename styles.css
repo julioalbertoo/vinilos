@@ -2646,3 +2646,100 @@ button.stats-fact:active {
 :root[data-theme="dark"] .stats-nav-chip.active {
   box-shadow: none;
 }
+
+/* Línea extra de un récord (p. ej., los géneros del más ecléctico). */
+.stats-fact-detail {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Tu pila de discos: el dibujo a la izquierda y las cifras a la derecha. */
+.stats-stack-body {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: end;
+  gap: 18px;
+}
+
+.stats-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 6px;
+  border-bottom: 3px solid var(--line);
+}
+
+.stats-stack.dense {
+  gap: 0;
+}
+
+.stats-stack-spine {
+  flex: 1;
+  min-height: 0;
+  border-radius: 2px;
+  background: var(--muted);
+}
+
+.stats-stack-facts .stats-big {
+  font-size: 1.9rem;
+}
+
+.view .stats-stack-facts .stats-big:not(:first-child) {
+  margin-top: 14px;
+}
+
+.view .stats-stack-facts .stats-pill {
+  margin-top: 6px;
+  font-size: 0.8rem;
+}
+
+.view .stats-pill--sky { background: var(--sky); color: var(--sky-text); }
+
+/* Barra partida: ediciones del año del álbum frente a reediciones. */
+.stats-split {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.stats-split-part {
+  min-width: 4px;
+}
+
+.stats-split-part.first,
+.stats-split-dot.first { background: var(--primary); }
+
+.stats-split-part.later,
+.stats-split-dot.later { background: #e0663a; }
+
+.stats-split-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.stats-split-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stats-split-key b {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.stats-split-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
