@@ -20,17 +20,32 @@ function svgEl(tag, attrs = {}) {
 
 export const plural = (n, one, many) => `${n.toLocaleString("es-ES")} ${n === 1 ? one : many}`;
 
-export function card(title, ...children) {
-  const box = el("section", "stats-card");
-  box.append(el("h3", "stats-title", title), ...children);
+// Tarjeta de un bloque: icono en un círculo pastel, título y una línea que explica qué se ve.
+// head: { icon, title, sub, accent, nav }. accent: lilac | peach | mint | butter | pink | sky.
+// nav: la entrada de la barra de accesos a la que pertenece.
+export function card(head, ...children) {
+  const box = el("section", `stats-card stats-card--${head.accent || "lilac"}`);
+  if (head.nav) box.dataset.nav = head.nav;
+  const top = el("header", "stats-head");
+  const text = el("div", "stats-head-text");
+  text.append(el("h3", "stats-title", head.title));
+  if (head.sub) text.append(el("p", "stats-subtitle", head.sub));
+  top.append(el("span", "stats-icon", head.icon), text);
+  box.append(top, ...children.filter(Boolean));
   return box;
 }
 
-export function tile(value, label) {
-  const box = el("div", "stats-tile");
-  box.append(el("span", "stats-tile-value", value), el("span", "stats-tile-label", label));
+// Cifra suelta con su etiqueta. accent: el pastel de fondo (por defecto, lila).
+export function tile(value, label, { icon, accent } = {}) {
+  const box = el("div", `stats-tile${accent ? ` stats-tile--${accent}` : ""}`);
+  if (icon) box.append(el("span", "stats-tile-icon", icon));
+  // Las cifras largas («27 min», «1.250») van algo más pequeñas para que quepan en la casilla.
+  box.append(el("span", `stats-tile-value${value.length > 4 ? " long" : ""}`, value), el("span", "stats-tile-label", label));
   return box;
 }
+
+export const note = (text) => el("p", "stats-note", text);
+export const hint = (text) => el("p", "stats-hint", `👆 ${text}`);
 
 function coverImg(item, className) {
   const src = item.thumb || item.cover;
@@ -43,16 +58,93 @@ function coverImg(item, className) {
   return img;
 }
 
-// Fila pequeña con portada, título, artista y un dato. data-id para abrir su ficha.
-export function mini(item, extra) {
-  const row = el("div", "stats-mini");
-  row.append(coverImg(item, "stats-mini-cover"));
-  const text = el("span", "stats-mini-text");
-  text.append(el("span", "stats-mini-title", item.title || ""), el("span", "stats-mini-meta", item.artist || ""));
-  row.append(text, el("span", "stats-mini-extra", extra));
-  row.dataset.id = item.release_id;
-  return row;
+const itemName = (item) => `${item.title || ""}${item.artist ? ` · ${item.artist}` : ""}`;
+
+// Fila de portadas que se desliza en horizontal; tocar una abre su ficha.
+export function coverStrip(items, onOpen, label) {
+  const box = el("div", "stats-pick");
+  if (label) box.append(el("p", "stats-pick-label", label));
+  const row = el("div", "stats-strip");
+  for (const item of items) {
+    const button = el("button", "stats-strip-item");
+    button.type = "button";
+    button.setAttribute("aria-label", itemName(item));
+    button.append(coverImg(item, "stats-strip-cover"), el("span", "stats-strip-title", item.title || ""));
+    button.addEventListener("click", () => onOpen(item));
+    row.append(button);
+  }
+  box.append(row);
+  return box;
 }
+
+// Ranking con barras. entries: [[nombre, cuántos]]. Si se pasa byKey (Map nombre → discos),
+// cada fila se puede tocar y debajo salen sus portadas.
+export function rankList(entries, total, { max = 6, format = (k) => k, byKey, selected, onSelect, onOpen, more = "más" } = {}) {
+  const list = el("div", "stats-bars");
+  const top = entries.slice(0, max);
+  const peak = top.length ? top[0][1] : 1;
+  for (const [key, count] of top) {
+    const pickable = Boolean(byKey && onSelect);
+    const row = el(pickable ? "button" : "div", "stats-bar");
+    if (pickable) {
+      row.type = "button";
+      row.setAttribute("aria-expanded", String(key === selected));
+      row.addEventListener("click", () => onSelect(key === selected ? null : key));
+    }
+    if (key === selected) row.classList.add("active");
+    const track = el("span", "stats-bar-track");
+    const fill = el("span", "stats-bar-fill");
+    fill.style.width = `${Math.max(4, (count / peak) * 100)}%`;
+    track.append(fill);
+    const value = el("span", "stats-bar-count");
+    value.append(el("b", null, count.toLocaleString("es-ES")));
+    if (total) value.append(` · ${Math.round((count / total) * 100)}%`);
+    row.append(el("span", "stats-bar-name", format(key)), track, value);
+    list.append(row);
+    if (key === selected) list.append(coverStrip(byKey.get(key) || [], onOpen));
+  }
+  if (entries.length > max) list.append(note(`y ${entries.length - max} ${more}`));
+  return list;
+}
+
+// Los tres primeros, como un podio con sus portadas. rows: [{ item, value }].
+export function podium(rows, onOpen) {
+  const box = el("div", "stats-podium");
+  rows.forEach(({ item, value }, i) => {
+    const button = el("button", "stats-podium-item");
+    button.type = "button";
+    button.setAttribute("aria-label", `${i + 1}º: ${itemName(item)}, ${value}`);
+    const art = el("span", "stats-podium-art");
+    art.append(coverImg(item, "stats-podium-cover"), el("span", "stats-podium-rank", ["🥇", "🥈", "🥉"][i]));
+    button.append(art, el("span", "stats-podium-value", value), el("span", "stats-podium-title", item.title || ""));
+    button.addEventListener("click", () => onOpen(item));
+    box.append(button);
+  });
+  return box;
+}
+
+// Récords («El más raro», «El más largo»…): portada, qué récord es, el dato y el disco. facts: [{ icon, label, item, value }].
+export function factGrid(facts, onOpen) {
+  const list = el("div", "stats-facts");
+  for (const fact of facts) {
+    const button = el("button", "stats-fact");
+    button.type = "button";
+    button.setAttribute("aria-label", `${fact.label}: ${itemName(fact.item)}, ${fact.value}`);
+    const text = el("span", "stats-fact-text");
+    text.append(
+      el("span", "stats-fact-label", `${fact.icon} ${fact.label}`),
+      el("span", "stats-fact-value", fact.value),
+      el("span", "stats-fact-name", itemName(fact.item))
+    );
+    button.append(coverImg(fact.item, "stats-fact-cover"), text);
+    button.addEventListener("click", () => onOpen(fact.item));
+    list.append(button);
+  }
+  return list;
+}
+
+// Dato destacado en una pastilla de color, como «✈️ Como un vuelo a Tokio».
+export const pill = (text, accent = "butter") => el("p", `stats-pill stats-pill--${accent}`, text);
 
 // Nivel de color de una casilla, como en GitHub: 0 (vacía) a 4 (la que más).
 export function level(count, peak) {
@@ -69,7 +161,7 @@ export function legend() {
   return row;
 }
 
-function segmented(options, current, onPick) {
+export function segmented(options, current, onPick) {
   const box = el("div", "segmented segmented--small stats-switch");
   for (const [value, text] of options) {
     const button = el("button", value === current ? "active" : "", text);
@@ -81,18 +173,111 @@ function segmented(options, current, onPick) {
   return box;
 }
 
-const titleList = (items) => items.map((i) => `${i.title}${i.artist ? ` (${i.artist})` : ""}`).join(" · ");
+// ---------- Barra de accesos: salta a cada bloque y marca en cuál estás ----------
+
+let nav = null;
+let navKey = null;
+let navScroll = 0;
+let navLockUntil = 0; // mientras dura el salto animado, la barra no sigue al scroll
+let navTicking = false;
+
+const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const headerHeight = () => {
+  const header = document.querySelector(".app-header");
+  return header ? header.getBoundingClientRect().height : 0;
+};
+
+function markNav(key, follow = true) {
+  if (!nav) return;
+  navKey = key;
+  for (const chip of nav.querySelectorAll(".stats-nav-chip")) {
+    const on = chip.dataset.key === key;
+    chip.classList.toggle("active", on);
+    if (on) chip.setAttribute("aria-current", "true");
+    else chip.removeAttribute("aria-current");
+    // La entrada activa se desliza a la vista dentro de la barra (sin mover la página).
+    if (on && follow) {
+      const left = chip.offsetLeft - (nav.clientWidth - chip.offsetWidth) / 2;
+      nav.scrollTo({ left, behavior: reducedMotion() ? "auto" : "smooth" });
+    }
+  }
+}
+
+// El bloque en el que estás es el último cuyo comienzo ya ha pasado bajo la barra.
+function spyNav() {
+  if (!nav || !nav.isConnected || nav.closest("[hidden]") || !nav.closest(".view.active")) return;
+  const navBox = nav.getBoundingClientRect();
+  nav.classList.toggle("stuck", navBox.top <= headerHeight() + 1);
+  if (Date.now() < navLockUntil) return;
+  const line = navBox.bottom + 24;
+  let current = null;
+  for (const section of nav.parentElement.querySelectorAll("[data-nav]")) {
+    if (section.getBoundingClientRect().top > line) break;
+    current = section.dataset.nav;
+  }
+  // Al llegar al final de la página, el último bloque, aunque no llegue arriba.
+  if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
+    const all = nav.parentElement.querySelectorAll("[data-nav]");
+    if (all.length) current = all[all.length - 1].dataset.nav;
+  }
+  current = current || nav.querySelector(".stats-nav-chip")?.dataset.key;
+  if (current && current !== navKey) markNav(current);
+}
+
+window.addEventListener(
+  "scroll",
+  () => {
+    if (navTicking || !nav) return;
+    navTicking = true;
+    requestAnimationFrame(() => {
+      navTicking = false;
+      spyNav();
+    });
+  },
+  { passive: true }
+);
+
+// sections: [[clave, texto]] en el orden de la página. container: donde están los bloques con data-nav.
+export function navBar(sections, container) {
+  nav = el("nav", "stats-nav");
+  nav.setAttribute("aria-label", "Ir a un bloque");
+  nav.style.setProperty("--stick", `${Math.max(0, headerHeight() - 1)}px`);
+  for (const [key, text] of sections) {
+    const chip = el("button", "stats-nav-chip", text);
+    chip.type = "button";
+    chip.dataset.key = key;
+    chip.addEventListener("click", () => {
+      const target = container.querySelector(`[data-nav="${key}"]`);
+      if (!target) return;
+      const offset = headerHeight() + nav.getBoundingClientRect().height + 10;
+      navLockUntil = Date.now() + 900;
+      markNav(key);
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - offset, behavior: reducedMotion() ? "auto" : "smooth" });
+    });
+    nav.append(chip);
+  }
+  nav.addEventListener("scroll", () => (navScroll = nav.scrollLeft), { passive: true });
+  // Al repintar, la barra sigue donde estaba.
+  const current = nav;
+  requestAnimationFrame(() => {
+    current.scrollLeft = navScroll;
+    if (navKey && sections.some(([key]) => key === navKey)) markNav(navKey, false);
+    spyNav();
+  });
+  return nav;
+}
 
 // ---------- 1. Géneros dibujados como un vinilo ----------
 
-const GENRE_COLORS = ["#7262d8", "#f0866a", "#36b37e", "#f2b93b", "#e5689a", "#4aa3df", "#a77ad6"];
-const OTHER_COLOR = "#9a96a8";
+// Orden fijo, comprobado para que los vecinos se distingan también con daltonismo, sobre el disco negro.
+const GENRE_COLORS = ["#7262d8", "#e0663a", "#1a9f72", "#c98500", "#d55181", "#3987e5", "#3f9a2f"];
+const OTHER_COLOR = "#8d899c";
 const MAX_SLICES = 7;
 
 let selectedGenre = null;
 
 // genres: [[nombre, cuántos]], byGenre: Map nombre → discos, records: discos con datos.
-export function genreVinylCard(genres, byGenre, records, rerender) {
+export function genreVinylCard(genres, byGenre, records, rerender, onOpen) {
   const slices = genres.slice(0, MAX_SLICES).map(([name, count], i) => ({ name, count, color: GENRE_COLORS[i] }));
   const rest = genres.slice(MAX_SLICES);
   if (rest.length) {
@@ -169,21 +354,27 @@ export function genreVinylCard(genres, byGenre, records, rerender) {
     keys.append(key);
   }
 
-  const caption = el("p", "stats-caption");
+  let picked;
   if (selectedGenre) {
     const list = current.others
       ? [...new Set(current.others.flatMap((n) => byGenre.get(n) || []))]
       : byGenre.get(selectedGenre) || [];
-    caption.textContent = current.others
-      ? `${current.others.join(", ")}: ${titleList(list)}`
-      : `${plural(list.length, "disco", "discos")}: ${titleList(list)}`;
+    const label = current.others
+      ? `${current.others.join(", ")} · ${plural(list.length, "disco", "discos")}`
+      : `${selectedGenre} · ${plural(list.length, "disco", "discos")}`;
+    picked = coverStrip(list, onOpen, label);
   } else {
-    caption.textContent = "Toca un color para ver qué discos son de ese género.";
+    picked = hint("Toca un color para ver sus discos.");
   }
 
   const wrap = el("div", "stats-vinyl-wrap");
   wrap.append(svg);
-  return card("🎸 Géneros", wrap, keys, caption);
+  return card(
+    { icon: "🎸", title: "Géneros", sub: "Tu colección, dibujada como un vinilo", accent: "lilac", nav: "genres" },
+    wrap,
+    keys,
+    picked
+  );
 }
 
 // ---------- 2. Arcoíris de portadas ----------
@@ -314,15 +505,15 @@ export function rainbowCard(entries, colored, onOpen, pending) {
   }
   nodes.push(mosaic);
 
-  if (pending) nodes.push(el("p", "stats-note", `🎨 Leyendo los colores de las portadas… faltan ${pending}.`));
+  if (pending) nodes.push(note(`🎨 Leyendo los colores de las portadas… faltan ${pending}.`));
   else if (known.length < entries.length) {
-    nodes.push(el("p", "stats-note", `No se pudo leer el color de ${plural(entries.length - known.length, "portada", "portadas")}: van al final.`));
+    nodes.push(note(`No se pudo leer el color de ${plural(entries.length - known.length, "portada", "portadas")}: van al final.`));
   }
 
   // Vinilos de color, con su color de verdad.
-  nodes.push(el("p", "stats-sub", colored.length ? `Tus vinilos de color (${colored.length})` : "Tus vinilos de color"));
+  nodes.push(el("p", "stats-sub", colored.length ? `💿 Tus vinilos de color (${colored.length})` : "💿 Tus vinilos de color"));
   if (!colored.length) {
-    nodes.push(el("p", "stats-note", "Aún no tienes ninguno: todos son negros."));
+    nodes.push(note("Aún no tienes ninguno: todos son negros."));
   } else {
     const row = el("div", "stats-discs");
     for (const item of colored) {
@@ -337,30 +528,33 @@ export function rainbowCard(entries, colored, onOpen, pending) {
     }
     nodes.push(row);
   }
-  return card("🌈 Tus portadas por colores", ...nodes);
+  return card(
+    { icon: "🌈", title: "Tus portadas por colores", sub: "Del rojo al violeta; toca una para abrirla", accent: "pink", nav: "colors" },
+    ...nodes
+  );
 }
 
 // ---------- 3. Cuánto dura tu colección ----------
 
-// Comparaciones de duración, en minutos.
+// Comparaciones de duración, en minutos, con su dibujo.
 const COMPARISONS = [
-  [90, "un partido de fútbol"],
-  [195, "ver Titanic"],
-  [360, "ir de Madrid a Barcelona en coche"],
-  [480, "un vuelo de Madrid a Nueva York"],
-  [682, "la trilogía de El Señor de los Anillos en versión extendida"],
-  [840, "un vuelo de Madrid a Tokio"],
-  [1440, "un día entero sin parar"],
-  [4200, "ver Juego de Tronos entera"],
-  [10080, "una semana entera sin parar"],
+  [90, "un partido de fútbol", "⚽"],
+  [195, "ver Titanic", "🎬"],
+  [360, "ir de Madrid a Barcelona en coche", "🚗"],
+  [480, "un vuelo de Madrid a Nueva York", "✈️"],
+  [682, "la trilogía de El Señor de los Anillos en versión extendida", "🧙"],
+  [840, "un vuelo de Madrid a Tokio", "✈️"],
+  [1440, "un día entero sin parar", "🌞"],
+  [4200, "ver Juego de Tronos entera", "🐉"],
+  [10080, "una semana entera sin parar", "📅"],
 ];
 
 function comparison(minutes) {
   const fit = COMPARISONS.filter(([m]) => m <= minutes).pop();
-  if (!fit) return `Casi lo que dura ${COMPARISONS[0][1]}`;
+  if (!fit) return `${COMPARISONS[0][2]} Casi lo que dura ${COMPARISONS[0][1]}`;
   const times = minutes / fit[0];
-  if (times < 1.25) return `Como ${fit[1]}`;
-  return `${times.toLocaleString("es-ES", { maximumFractionDigits: 1 })} veces ${fit[1]}`;
+  if (times < 1.25) return `${fit[2]} Como ${fit[1]}`;
+  return `${fit[2]} ${times.toLocaleString("es-ES", { maximumFractionDigits: 1 })} veces ${fit[1]}`;
 }
 
 export function formatDuration(seconds) {
@@ -373,42 +567,35 @@ export function formatDuration(seconds) {
 
 // rows: [{ item, seconds, tracks, estimated }] de los discos con canciones conocidas.
 export function durationCard(rows, totalRecords, onOpen) {
-  if (!rows.length) {
-    return card("⏱️ Cuánto dura tu colección", el("p", "stats-note", "Aún no se sabe: falta la lista de canciones de tus discos."));
-  }
+  const head = { icon: "⏱️", title: "Cuánto dura tu colección", accent: "peach", nav: "duration" };
+  if (!rows.length) return card(head, note("Aún no se sabe: falta la lista de canciones de tus discos."));
   const seconds = rows.reduce((sum, r) => sum + r.seconds, 0);
   const tracks = rows.reduce((sum, r) => sum + r.tracks, 0);
   const estimated = rows.filter((r) => r.estimated).length;
   const nodes = [
     el("p", "stats-big", formatDuration(seconds)),
-    el("p", "stats-note", `de música en ${plural(tracks, "canción", "canciones")}`),
-    el("p", "stats-analogy", `✈️ ${comparison(seconds / 60)}`),
+    el("p", "stats-big-note", `de música en ${plural(tracks, "canción", "canciones")}`),
+    pill(comparison(seconds / 60)),
   ];
   const tiles = el("div", "stats-tiles");
   tiles.append(
-    tile(formatDuration(seconds / rows.length), "media por disco"),
-    tile(String(Math.round(tracks / rows.length)), "canciones por disco"),
-    tile(formatDuration(seconds / tracks), "por canción")
+    tile(formatDuration(seconds / rows.length), "media por disco", { accent: "peach" }),
+    tile(String(Math.round(tracks / rows.length)), "canciones por disco", { accent: "peach" }),
+    tile(formatDuration(seconds / tracks), "por canción", { accent: "peach" })
   );
   nodes.push(tiles);
   const byLength = [...rows].sort((a, b) => b.seconds - a.seconds);
-  const list = el("div", "stats-minis");
-  list.append(mini(byLength[0].item, `🐢 El más largo · ${formatDuration(byLength[0].seconds)}`));
+  const facts = [{ icon: "🐢", label: "El más largo", item: byLength[0].item, value: formatDuration(byLength[0].seconds) }];
   if (byLength.length > 1) {
     const last = byLength[byLength.length - 1];
-    list.append(mini(last.item, `🐇 El más corto · ${formatDuration(last.seconds)}`));
+    facts.push({ icon: "🐇", label: "El más corto", item: last.item, value: formatDuration(last.seconds) });
   }
-  list.addEventListener("click", (event) => {
-    const row = event.target.closest(".stats-mini");
-    const hit = row && rows.find((r) => String(r.item.release_id) === row.dataset.id);
-    if (hit) onOpen(hit.item);
-  });
-  nodes.push(list);
+  nodes.push(factGrid(facts, onOpen));
   const notes = [];
   if (rows.length < totalRecords) notes.push(`Sin contar ${plural(totalRecords - rows.length, "disco", "discos")} sin lista de canciones todavía.`);
   if (estimated) notes.push(`En ${plural(estimated, "disco", "discos")} Discogs no da la duración de todas las canciones: se calcula aproximada.`);
-  if (notes.length) nodes.push(el("p", "stats-note", notes.join(" ")));
-  return card("⏱️ Cuánto dura tu colección", ...nodes);
+  if (notes.length) nodes.push(note(notes.join(" ")));
+  return card({ ...head, sub: "Todo seguido, sin dar la vuelta al disco" }, ...nodes);
 }
 
 // ---------- 5. Línea del tiempo con portadas ----------
@@ -421,8 +608,9 @@ let timelineScroll = null;
 // rows: [{ item, year }]
 export function timelineCard(rows, yearMode, onOpen) {
   const dated = rows.filter((r) => r.year);
-  const title = "🕰️ Línea del tiempo";
-  if (!dated.length) return card(title, el("p", "stats-note", "Aún no se sabe el año de ningún disco."));
+  const what = yearMode === "edition" ? "año de tu edición" : "año original";
+  const head = { icon: "🕰️", title: "Línea del tiempo", sub: `Cada portada en su ${what}`, accent: "mint", nav: "years" };
+  if (!dated.length) return card(head, note("Aún no se sabe el año de ningún disco."));
   const first = Math.floor(Math.min(...dated.map((r) => r.year)) / 5) * 5;
   const last = Math.ceil((Math.max(...dated.map((r) => r.year)) + 1) / 5) * 5;
   const byYear = new Map();
@@ -433,6 +621,17 @@ export function timelineCard(rows, yearMode, onOpen) {
   const track = el("div", "stats-timeline-track");
   track.style.width = `${(last - first + 1) * YEAR_W}px`;
   track.style.height = `${tallest * (COVER + 3) + 26}px`;
+
+  // Una década sí y otra no, con un fondo suave, para leer de un vistazo en qué década cae cada disco.
+  for (let decade = Math.floor(first / 10) * 10; decade <= last; decade += 10) {
+    if ((decade / 10) % 2) continue;
+    const from = Math.max(first, decade);
+    const to = Math.min(last + 1, decade + 10);
+    const band = el("span", "stats-timeline-band");
+    band.style.left = `${(from - first) * YEAR_W}px`;
+    band.style.width = `${(to - from) * YEAR_W}px`;
+    track.append(band);
+  }
 
   for (let year = first; year <= last; year++) {
     const x = (year - first) * YEAR_W;
@@ -465,8 +664,7 @@ export function timelineCard(rows, yearMode, onOpen) {
   requestAnimationFrame(() => {
     scroller.scrollLeft = timelineScroll === null ? scroller.scrollWidth : timelineScroll;
   });
-  const what = yearMode === "edition" ? "año de tu edición" : "año original";
-  return card(title, el("p", "stats-note", `Cada portada en su ${what}. Desliza para recorrerla y toca un disco para abrirlo.`), scroller);
+  return card(head, scroller, hint("Desliza para recorrerla y toca un disco para abrirlo."));
 }
 
 // ---------- 7. Mapa del mundo ----------
@@ -480,7 +678,7 @@ const EUROPE = new Set("ES PT FR GB IE DE NL BE LU CH AT IT SE NO DK FI IS GR PL
 
 // counts: Map código → número de discos. names: Map código → nombre con bandera. extras: [[nombre, número]] sin país en el mapa (p. ej. «Europa»).
 export function mapCard(counts, names, extras, bars, rerender) {
-  const title = "🌍 Dónde se editaron";
+  const title = { icon: "🌍", title: "Dónde se editaron", sub: "El país de cada edición, según Discogs", accent: "sky", nav: "map" };
   if (!mapModule) {
     if (!mapLoading) {
       mapLoading = import("./worldmap.js")
@@ -492,7 +690,7 @@ export function mapCard(counts, names, extras, bars, rerender) {
           mapLoading = null;
         });
     }
-    return card(title, el("p", "stats-note", "Cargando el mapa…"), bars);
+    return card(title, note("Cargando el mapa…"), bars);
   }
   const { VIEWBOX, OTHER, COUNTRIES } = mapModule;
   const located = [...counts.entries()].filter(([code]) => COUNTRIES[code]);
@@ -535,8 +733,8 @@ export function mapCard(counts, names, extras, bars, rerender) {
   if (extras.length) {
     const chips = el("div", "stats-chips");
     for (const [name, n] of extras) chips.append(el("span", "stats-chip stats-chip--soft", `${name}: ${n}`));
-    nodes.push(el("p", "stats-note", "No salen en el mapa (Discogs no dice un país concreto):"), chips);
+    nodes.push(note("No salen en el mapa (Discogs no dice un país concreto):"), chips);
   }
-  nodes.push(bars);
+  nodes.push(el("p", "stats-sub", "Países con más discos"), bars);
   return card(title, ...nodes);
 }

@@ -7,7 +7,7 @@ import { cachedRelease, cachedPrices } from "./details.js";
 import { loadDetailSummaries, cloudUser } from "./cloud.js";
 import { releaseWeight, isHeavy, countryFlag, countryCodes } from "./discogs.js";
 import {
-  el, card, tile, mini, plural, level, legend,
+  el, card, tile, note, hint, pill, plural, level, legend, segmented, coverStrip, rankList, podium, factGrid, navBar,
   genreVinylCard, rainbowCard, coverColor, durationCard, timelineCard, mapCard,
 } from "./charts.js";
 
@@ -272,67 +272,99 @@ function money(value, currency = "EUR", digits = 0) {
   }
 }
 
-function bars(entries, total, { max = 8, format = (k) => k } = {}) {
-  const list = el("div", "stats-bars");
-  const top = entries.slice(0, max);
-  const peak = top.length ? top[0][1] : 1;
-  for (const [key, count] of top) {
-    const row = el("div", "stats-bar");
-    const track = el("span", "stats-bar-track");
-    const fill = el("span", "stats-bar-fill");
-    fill.style.width = `${Math.max(4, (count / peak) * 100)}%`;
-    track.append(fill);
-    const pct = total ? Math.round((count / total) * 100) : 0;
-    row.append(el("span", "stats-bar-name", format(key)), track, el("span", "stats-bar-count", `${count} · ${pct}%`));
-    list.append(row);
-  }
-  if (entries.length > max) list.append(el("p", "stats-note", `y ${entries.length - max} más`));
-  return list;
+// Map clave → discos. keysOf(fila) da las claves de cada disco (un género, un país…).
+function groupBy(rows, keysOf) {
+  const map = new Map();
+  for (const r of rows) for (const key of keysOf(r)) if (key) map.set(key, [...(map.get(key) || []), r.item]);
+  return map;
 }
 
-// Abre la ficha del disco de una fila .stats-mini tocada dentro de `list`.
-function openable(list, items, onOpen) {
-  list.addEventListener("click", (event) => {
-    const row = event.target.closest(".stats-mini");
-    const item = row && items.find((i) => String(i.release_id) === row.dataset.id);
-    if (item) onOpen(item);
-  });
-  return list;
-}
+// "los 70", "los 2000".
+const decadeName = (decade) => `los ${decade < 2000 ? String(decade).slice(2) : decade}`;
 
 // Estado de la pantalla que se mantiene entre repintados.
 let yearMode = "original";
 let selectedYear = null;
+let peopleMode = "artists";
+const picks = { country: null, artists: null, labels: null };
 
-function yearsCard(data, rerender) {
-  const switcher = el("div", "segmented segmented--small stats-switch");
-  for (const [mode, text] of [["original", "Año original"], ["edition", "Año de tu edición"]]) {
-    const button = el("button", mode === yearMode ? "active" : "", text);
-    button.type = "button";
-    button.setAttribute("aria-pressed", String(mode === yearMode));
-    button.addEventListener("click", () => {
-      if (yearMode === mode) return;
-      yearMode = mode;
-      selectedYear = null;
-      rerender();
-    });
-    switcher.append(button);
+// Entradas de la barra de accesos, en el orden de la página.
+const NAV = [
+  ["value", "💶 Valor"],
+  ["genres", "🎸 Géneros"],
+  ["duration", "⏱️ Duración"],
+  ["years", "📅 Años"],
+  ["colors", "🌈 Colores"],
+  ["map", "🌍 Mapa"],
+  ["people", "🎤 Artistas"],
+  ["fun", "✨ Curiosidades"],
+  ["added", "🗓️ Añadidos"],
+];
+
+// Las cuatro cifras de arriba: discos, artistas, países y horas de música.
+function summaryTiles(items, artists, countries, lengths) {
+  const seconds = lengths.reduce((sum, r) => sum + r.seconds, 0);
+  const music = !seconds ? "—" : seconds >= 3600 ? `${Math.round(seconds / 3600).toLocaleString("es-ES")} h` : `${Math.max(1, Math.round(seconds / 60))} min`;
+  const box = el("div", "stats-tiles stats-summary");
+  box.append(
+    tile(items.length.toLocaleString("es-ES"), items.length === 1 ? "disco" : "discos", { icon: "💿", accent: "lilac" }),
+    tile(artists.length.toLocaleString("es-ES"), artists.length === 1 ? "artista" : "artistas", { icon: "🎤", accent: "peach" }),
+    tile(countries.length ? String(countries.length) : "—", countries.length === 1 ? "país" : "países", { icon: "🌍", accent: "sky" }),
+    tile(music, "de música", { icon: "🎧", accent: "mint" })
+  );
+  return box;
+}
+
+function valueCard(data, items, onOpen) {
+  const head = { icon: "💶", title: "Valor estimado", sub: "Según los precios de Discogs", accent: "butter", nav: "value" };
+  if (!data.totals.size) {
+    return card(head, pill("⏳ Aún no hay precios: se piden a Discogs poco a poco.", "butter"));
   }
+  const [mainCurrency] = [...data.totals.entries()].sort((a, b) => b[1] - a[1])[0];
+  const total = [...data.totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ");
+  const mainPriced = data.priced.filter((r) => r.price.currency === mainCurrency);
+  const avg = data.totals.get(mainCurrency) / mainPriced.length;
+  const top = [...data.priced].sort((a, b) => b.price.value - a.price.value).slice(0, 3);
+  const box = card(
+    head,
+    el("p", "stats-big", total),
+    el("p", "stats-big-note", `unos ${money(avg, mainCurrency)} por disco de media`),
+    top.length ? el("p", "stats-sub", "🏆 Los más valiosos") : null,
+    top.length ? podium(top.map((r) => ({ item: r.item, value: money(r.price.value, r.price.currency) })), onOpen) : null,
+    note(
+      `Con precio: ${data.priced.length} de ${items.length}. ` +
+        "Es el precio sugerido por Discogs para un disco en estado VG+ (o el más barato a la venta)."
+    )
+  );
+  box.classList.add("stats-card--hero");
+  return box;
+}
 
-  const byYear = new Map();
-  for (const r of data.rows) if (r.year) byYear.set(r.year, [...(byYear.get(r.year) || []), r.item]);
+function yearsCard(data, rerender, onOpen) {
+  const head = { icon: "📅", title: "Años", sub: "Cada casilla es un año: cuanto más oscura, más discos", accent: "mint", nav: "years" };
+  const switcher = segmented([["original", "Año original"], ["edition", "Año de tu edición"]], yearMode, (mode) => {
+    yearMode = mode;
+    selectedYear = null;
+    rerender();
+  });
+
+  const byYear = groupBy(data.rows, (r) => [r.year]);
   const years = [...byYear.keys()];
-  if (!years.length) return card("📅 Años", switcher, el("p", "stats-note", "Aún no se sabe el año de ningún disco."));
+  if (!years.length) return card(head, switcher, note("Aún no se sabe el año de ningún disco."));
 
   const first = Math.floor(Math.min(...years) / 10) * 10;
   const last = Math.floor(Math.max(...years) / 10) * 10;
   const peak = Math.max(...[...byYear.values()].map((list) => list.length));
+  const perDecade = (decade) => years.filter((y) => y >= decade && y < decade + 10).reduce((n, y) => n + byYear.get(y).length, 0);
+  let topDecade = first;
+  for (let decade = first; decade <= last; decade += 10) if (perDecade(decade) > perDecade(topDecade)) topDecade = decade;
 
   const grid = el("div", "stats-years");
-  const head = el("div", "stats-years-row stats-years-head");
-  head.append(el("span", "stats-years-decade"));
-  for (let d = 0; d < 10; d++) head.append(el("span", "stats-years-digit", String(d)));
-  grid.append(head);
+  const top = el("div", "stats-years-row stats-years-head");
+  top.append(el("span", "stats-years-decade"));
+  for (let d = 0; d < 10; d++) top.append(el("span", "stats-years-digit", String(d)));
+  top.append(el("span", "stats-years-total", "Total"));
+  grid.append(top);
 
   for (let decade = first; decade <= last; decade += 10) {
     const row = el("div", "stats-years-row");
@@ -351,32 +383,75 @@ function yearsCard(data, rerender) {
       });
       row.append(cell);
     }
+    const sum = perDecade(decade);
+    row.append(el("span", `stats-years-total${decade === topDecade ? " top" : ""}`, sum ? String(sum) : "·"));
     grid.append(row);
   }
 
-  const caption = el("p", "stats-caption");
+  let picked;
   if (selectedYear) {
     const list = byYear.get(selectedYear) || [];
-    caption.textContent = list.length
-      ? `${selectedYear}: ${list.map((i) => `${i.title}${i.artist ? ` (${i.artist})` : ""}`).join(" · ")}`
-      : `${selectedYear}: ningún disco`;
+    picked = list.length
+      ? coverStrip(list, onOpen, `${selectedYear} · ${plural(list.length, "disco", "discos")}`)
+      : note(`${selectedYear}: ningún disco.`);
   } else {
-    caption.textContent = "Toca una casilla para ver qué discos son de ese año.";
+    picked = hint("Toca una casilla para ver los discos de ese año.");
   }
 
   // Década favorita, el más antiguo y el más nuevo.
-  const decades = countBy(data.rows.filter((r) => r.year).map((r) => `${Math.floor(r.year / 10) * 10}`));
   const sorted = data.rows.filter((r) => r.year).sort((a, b) => a.year - b.year);
-  const facts = el("div", "stats-facts");
-  if (decades.length) {
-    facts.append(el("p", null, `⭐ Tu década: los ${decades[0][0].slice(2)} (${plural(decades[0][1], "disco", "discos")})`));
-  }
-  facts.append(
-    el("p", null, `⏳ El más antiguo: ${sorted[0].item.title} (${sorted[0].year})`),
-    el("p", null, `🆕 El más nuevo: ${sorted[sorted.length - 1].item.title} (${sorted[sorted.length - 1].year})`)
-  );
+  const oldest = sorted[0];
+  const newest = sorted[sorted.length - 1];
+  const facts = [{ icon: "⏳", label: "El más antiguo", item: oldest.item, value: String(oldest.year) }];
+  if (newest !== oldest) facts.push({ icon: "🆕", label: "El más nuevo", item: newest.item, value: String(newest.year) });
 
-  return card("📅 Años", switcher, grid, legend(), caption, facts);
+  return card(
+    head,
+    switcher,
+    grid,
+    legend(),
+    picked,
+    pill(`⭐ Tu década: ${decadeName(topDecade)} · ${plural(perDecade(topDecade), "disco", "discos")}`, "mint"),
+    factGrid(facts, onOpen)
+  );
+}
+
+// Artistas y sellos que más se repiten, con un selector para cambiar de uno a otro.
+function peopleCard(artists, labels, byArtist, byLabel, rerender, onOpen) {
+  const switcher = segmented([["artists", "🎤 Artistas"], ["labels", "🏷️ Sellos"]], peopleMode, (mode) => {
+    peopleMode = mode;
+    rerender();
+  });
+  const isArtists = peopleMode === "artists";
+  const entries = isArtists ? artists : labels;
+  const repeated = entries.filter(([, n]) => n > 1);
+  const singles = entries.length - repeated.length;
+  const nodes = [switcher];
+  if (!entries.length) {
+    nodes.push(note("Aún no se sabe el sello de tus discos."));
+  } else if (!repeated.length) {
+    const distinct = isArtists ? plural(entries.length, "artista distinto", "artistas distintos") : plural(entries.length, "sello distinto", "sellos distintos");
+    nodes.push(pill(`🎉 ${distinct}: ninguno se repite todavía`, "peach"));
+  } else {
+    nodes.push(
+      rankList(repeated, 0, {
+        max: 6,
+        byKey: isArtists ? byArtist : byLabel,
+        selected: picks[peopleMode],
+        onSelect: (key) => {
+          picks[peopleMode] = key;
+          rerender();
+        },
+        onOpen,
+        more: isArtists ? "artistas más" : "sellos más",
+      })
+    );
+    if (!picks[peopleMode]) nodes.push(hint(`Toca un ${isArtists ? "artista" : "sello"} para ver sus discos.`));
+    if (singles) {
+      nodes.push(note(isArtists ? `Y ${plural(singles, "artista", "artistas")} con un solo disco.` : `Y ${plural(singles, "sello", "sellos")} con un solo disco.`));
+    }
+  }
+  return card({ icon: "🎤", title: "Artistas y sellos", sub: "Los que más se repiten en tu colección", accent: "peach", nav: "people" }, ...nodes);
 }
 
 // Calendario de cuándo se añadió cada disco (las últimas 26 semanas), como el de GitHub.
@@ -388,6 +463,7 @@ function calendarCard(items) {
   const dayIndex = (today.getDay() + 6) % 7; // lunes = 0
   const start = new Date(today.getTime() - (dayIndex + (WEEKS - 1) * 7) * DAY);
   const counts = new Map();
+  const months = new Map();
   for (const item of items) {
     if (!item.date) continue;
     const d = new Date(item.date);
@@ -395,8 +471,26 @@ function calendarCard(items) {
     if (d < start || d > today) continue;
     const key = d.toDateString();
     counts.set(key, (counts.get(key) || 0) + 1);
+    const month = d.toLocaleDateString("es-ES", { month: "long" });
+    months.set(month, (months.get(month) || 0) + 1);
   }
   const peak = Math.max(1, ...counts.values());
+
+  // Nombre del mes encima de la semana en la que empieza.
+  const head = el("div", "stats-calendar-months");
+  head.style.setProperty("--weeks", WEEKS);
+  let previous = null;
+  for (let w = 0; w < WEEKS; w++) {
+    const monday = new Date(start.getTime() + w * 7 * DAY);
+    const month = monday.getMonth();
+    if (month !== previous && (w > 0 || monday.getDate() <= 7)) {
+      const label = el("span", null, monday.toLocaleDateString("es-ES", { month: "short" }).replace(".", ""));
+      label.style.gridColumn = String(w + 1);
+      head.append(label);
+    }
+    previous = month;
+  }
+
   const grid = el("div", "stats-calendar");
   grid.style.setProperty("--weeks", WEEKS);
   let total = 0;
@@ -413,78 +507,57 @@ function calendarCard(items) {
     }
     grid.append(cell);
   }
-  const months = el("div", "stats-calendar-months");
-  months.append(
-    el("span", null, start.toLocaleDateString("es-ES", { month: "short", year: "numeric" })),
-    el("span", null, "hoy")
-  );
-  return card(
-    "🗓️ Cuándo los añadiste",
-    el("p", "stats-note", `${plural(total, "disco añadido", "discos añadidos")} en los últimos 6 meses`),
-    grid,
-    months,
-    legend()
-  );
-}
+  const days = el("div", "stats-calendar-days");
+  for (const day of ["L", "", "X", "", "V", "", ""]) days.append(el("span", null, day));
+  const wrap = el("div", "stats-calendar-wrap");
+  wrap.append(el("span"), head, days, grid);
 
-function valueCard(data, items, onOpen) {
-  const title = "💶 Valor estimado de tu colección";
-  if (!data.totals.size) {
-    return card(title, el("p", "stats-big", "—"), el("p", "stats-note", "Aún no hay precios. Se piden a Discogs poco a poco."));
-  }
-  const [mainCurrency] = [...data.totals.entries()].sort((a, b) => b[1] - a[1])[0];
-  const total = [...data.totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ");
-  const mainPriced = data.priced.filter((r) => r.price.currency === mainCurrency);
-  const avg = data.totals.get(mainCurrency) / mainPriced.length;
   const nodes = [
-    el("p", "stats-big", total),
-    el(
-      "p",
-      "stats-note",
-      `Media de ${money(avg, mainCurrency)} por disco · con precio: ${data.priced.length} de ${items.length}. ` +
-        "Usa el precio sugerido por Discogs para un disco en estado VG+ (o el más barato a la venta)."
-    ),
+    el("p", "stats-big", total.toLocaleString("es-ES")),
+    el("p", "stats-big-note", total === 1 ? "disco añadido en los últimos 6 meses" : "discos añadidos en los últimos 6 meses"),
+    wrap,
+    legend(),
   ];
-  const top = [...data.priced].sort((a, b) => b.price.value - a.price.value).slice(0, 3);
-  if (top.length) {
-    nodes.push(el("p", "stats-sub", "Los más valiosos"));
-    const list = el("div", "stats-minis");
-    for (const r of top) list.append(mini(r.item, money(r.price.value, r.price.currency, 2)));
-    nodes.push(openable(list, items, onOpen));
-  }
-  return card(title, ...nodes);
+  const best = [...months.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (best && best[1] > 1) nodes.push(pill(`📈 Tu mejor mes: ${best[0]} · ${plural(best[1], "disco", "discos")}`, "lilac"));
+  return card({ icon: "🗓️", title: "Cuándo los añadiste", sub: "Cada casilla es un día", accent: "lilac", nav: "added" }, ...nodes);
 }
 
 function curiositiesCard(data, items, onOpen) {
-  const list = el("div", "stats-minis");
+  const facts = [];
   const withCommunity = data.withData.filter((r) => r.s.have !== null && r.s.have !== undefined);
   if (withCommunity.length) {
     const rarest = [...withCommunity].sort((a, b) => a.s.have - b.s.have)[0];
-    list.append(mini(rarest.item, `💎 El más raro · lo tienen ${rarest.s.have.toLocaleString("es-ES")}`));
+    facts.push({ icon: "💎", label: "El más raro", item: rarest.item, value: `lo tienen ${rarest.s.have.toLocaleString("es-ES")}` });
     const wanted = [...withCommunity].sort((a, b) => b.s.want - a.s.want)[0];
-    list.append(mini(wanted.item, `🔥 El más deseado · lo buscan ${wanted.s.want.toLocaleString("es-ES")}`));
+    facts.push({ icon: "🔥", label: "El más deseado", item: wanted.item, value: `lo buscan ${wanted.s.want.toLocaleString("es-ES")}` });
   }
   const rated = data.withData.filter((r) => r.s.rating && r.s.rating.count >= 3);
   if (rated.length) {
     const best = [...rated].sort((a, b) => b.s.rating.average - a.s.rating.average)[0];
-    list.append(mini(best.item, `⭐ Mejor valorado · ${best.s.rating.average.toFixed(2)} / 5`));
+    const stars = best.s.rating.average.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    facts.push({ icon: "⭐", label: "Mejor valorado", item: best.item, value: `${stars} de 5` });
   }
   // La reedición más lejana del original.
   const gaps = data.rows.filter((r) => r.original && r.edition && r.edition > r.original);
   if (gaps.length) {
     const far = [...gaps].sort((a, b) => b.edition - b.original - (a.edition - a.original))[0];
-    list.append(mini(far.item, `🔁 Reeditado ${far.edition - far.original} años después`));
+    facts.push({ icon: "🔁", label: "Reedición tardía", item: far.item, value: `${far.edition - far.original} años después` });
   }
 
   const colored = items.filter((i) => i.color).length;
   const heavy = data.rows.filter((r) => isHeavy(r.item.weight || r.s.weight)).length;
   const tiles = el("div", "stats-tiles");
   tiles.append(
-    tile(String(colored), "de color"),
-    tile(String(heavy), "de 180 g o más"),
-    tile(String(gaps.length), gaps.length === 1 ? "reedición" : "reediciones")
+    tile(String(colored), "de color", { icon: "🎨", accent: "pink" }),
+    tile(String(heavy), "de 180 g o más", { icon: "🏋️", accent: "sky" }),
+    tile(String(gaps.length), gaps.length === 1 ? "reedición" : "reediciones", { icon: "🔁", accent: "mint" })
   );
-  return card("✨ Curiosidades", tiles, openable(list, items, onOpen));
+  return card(
+    { icon: "✨", title: "Curiosidades", sub: "Récords de tu colección según Discogs", accent: "butter", nav: "fun" },
+    tiles,
+    facts.length ? factGrid(facts, onOpen) : null
+  );
 }
 
 // Pinta la pestaña «Datos». onOpen(item) abre la ficha de un disco.
@@ -497,41 +570,37 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl }
     const countries = countBy(data.withData.map((r) => r.s.country));
     const genres = countBy(data.withData.flatMap((r) => r.s.genres));
     const styles = countBy(data.withData.flatMap((r) => r.s.styles));
-
-    const summary = el("div", "stats-tiles");
-    summary.append(
-      tile(String(items.length), items.length === 1 ? "disco" : "discos"),
-      tile(String(artists.length), artists.length === 1 ? "artista" : "artistas"),
-      tile(String(countries.length || "—"), countries.length === 1 ? "país" : "países")
-    );
-
-    const nodes = [summary, valueCard(data, items, onOpen)];
-
-    // 🎸 Géneros como un vinilo, y los estilos debajo.
-    if (genres.length) {
-      const byGenre = new Map();
-      for (const r of data.withData) for (const g of r.s.genres) byGenre.set(g, [...(byGenre.get(g) || []), r.item]);
-      const genreCard = genreVinylCard(genres, byGenre, data.withData.length, draw);
-      if (styles.length) {
-        genreCard.append(el("p", "stats-sub", "Estilos más repetidos"));
-        const chips = el("div", "stats-chips");
-        for (const [name, count] of styles.slice(0, 12)) chips.append(el("span", "stats-chip", `${name} · ${count}`));
-        genreCard.append(chips);
-      }
-      const pending = items.length - data.withData.length;
-      if (pending) genreCard.append(el("p", "stats-note", `Faltan datos de ${plural(pending, "disco", "discos")}.`));
-      nodes.push(genreCard);
-    }
-
-    // ⏱️ Duración.
     const lengths = data.withData
       .map((r) => ({ item: r.item, s: r.s, len: recordLength(r.s) }))
       .filter((r) => r.len)
       .map((r) => ({ item: r.item, seconds: r.len.seconds, estimated: r.len.estimated, tracks: r.s.tracks }));
+
+    const nodes = [summaryTiles(items, artists, countries, lengths), valueCard(data, items, onOpen)];
+
+    // 🎸 Géneros como un vinilo, y los estilos debajo.
+    if (genres.length) {
+      const byGenre = groupBy(data.withData, (r) => r.s.genres);
+      const genreCard = genreVinylCard(genres, byGenre, data.withData.length, draw, onOpen);
+      if (styles.length) {
+        genreCard.append(el("p", "stats-sub", "Estilos más repetidos"));
+        const chips = el("div", "stats-chips");
+        for (const [name, count] of styles.slice(0, 12)) {
+          const chip = el("span", "stats-chip", name);
+          chip.append(el("b", null, String(count)));
+          chips.append(chip);
+        }
+        genreCard.append(chips);
+      }
+      const pending = items.length - data.withData.length;
+      if (pending) genreCard.append(note(`Faltan datos de ${plural(pending, "disco", "discos")}.`));
+      nodes.push(genreCard);
+    }
+
+    // ⏱️ Duración.
     nodes.push(durationCard(lengths, items.length, onOpen));
 
     // 📅 Años y 🕰️ línea del tiempo.
-    nodes.push(yearsCard(data, draw));
+    nodes.push(yearsCard(data, draw, onOpen));
     nodes.push(timelineCard(data.rows, yearMode, onOpen));
 
     // 🌈 Portadas por colores y vinilos de color.
@@ -558,17 +627,36 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl }
           if (code && !names.has(code)) names.set(code, `${countryFlag(part)} ${part}`);
         }
       }
-      const countryBars = bars(countries, data.withData.length, { max: 6, format: (c) => `${countryFlag(c)} ${c}`.trim() });
-      nodes.push(mapCard(codeCounts, names, [...extras.entries()].map(([c, n]) => [`${countryFlag(c)} ${c}`.trim(), n]), countryBars, draw));
+      const countryList = rankList(countries, data.withData.length, {
+        max: 6,
+        format: (c) => `${countryFlag(c)} ${c}`.trim(),
+        byKey: groupBy(data.withData, (r) => [r.s.country]),
+        selected: picks.country,
+        onSelect: (key) => {
+          picks.country = key;
+          draw();
+        },
+        onOpen,
+        more: "países más",
+      });
+      const countryBox = el("div");
+      countryBox.append(countryList);
+      if (!picks.country) countryBox.append(hint("Toca un país para ver sus discos."));
+      nodes.push(mapCard(codeCounts, names, [...extras.entries()].map(([c, n]) => [`${countryFlag(c)} ${c}`.trim(), n]), countryBox, draw));
     }
 
-    if (artists.length) nodes.push(card("🎤 Artistas con más discos", bars(artists, items.length, { max: 5 })));
-    if (labels.length) nodes.push(card("🏷️ Sellos", bars(labels, data.withData.length, { max: 5 })));
+    // 🎤 Artistas y sellos.
+    if (artists.length) {
+      const byArtist = groupBy(data.rows, (r) => [cleanName(r.item.artist)]);
+      const byLabel = groupBy(data.withData, (r) => [r.s.label]);
+      nodes.push(peopleCard(artists, labels, byArtist, byLabel, draw, onOpen));
+    }
 
     nodes.push(curiositiesCard(data, items, onOpen));
     nodes.push(calendarCard(items));
 
-    container.replaceChildren(...nodes);
+    const sections = NAV.filter(([key]) => nodes.some((node) => node.dataset.nav === key));
+    container.replaceChildren(navBar(sections, container), ...nodes);
   };
   draw();
   startFill(
