@@ -257,9 +257,10 @@ function renderCard(candidate, index, owned) {
 
 let lastClues = {};
 
-const RESULTS_STEP = 5;
+const RESULTS_FIRST = 5;
+const RESULTS_STEP = 10;
 
-// ranked: todas las ediciones ordenadas de mejor a peor. Se enseñan de 5 en 5 con «Ver 5 más».
+// ranked: todas las ediciones ordenadas de mejor a peor. Se enseñan 5 al principio y luego de 10 en 10 con «Ver 10 más».
 function renderResults(ranked, total, strategy, clues) {
   lastClues = clues;
   const how = SEARCH_STEP_LABELS[strategy] || "";
@@ -270,7 +271,7 @@ function renderResults(ranked, total, strategy, clues) {
   const owned = new Set(getHistory().map((item) => String(item.release_id)));
   let shown = 0;
   function showMore() {
-    const next = ranked.slice(shown, shown + RESULTS_STEP);
+    const next = ranked.slice(shown, shown + (shown ? RESULTS_STEP : RESULTS_FIRST));
     list.append(...next.map((candidate, i) => renderCard(candidate, shown + i, owned)));
     shown += next.length;
     summary.textContent = `${total} ediciones encontradas ${how}. Las ${shown} que mejor encajan:`;
