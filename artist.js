@@ -9,8 +9,8 @@ import { el, card, tile, note, pill, plural, segmented, coverStrip } from "./cha
 const CACHE_KEY = CONFIG.STORAGE_KEYS.artistCache;
 const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const ALBUMS_SHOWN = 12;
-// Sube cuando la discografía guardada cambia de forma (2: con el tipo de cada disco).
-const ALBUMS_VERSION = 2;
+// Sube cuando la discografía guardada cambia de forma (3: buscada tipo a tipo).
+const ALBUMS_VERSION = 3;
 
 // Filtros de la discografía, en este orden. Por defecto, solo los LP.
 const KINDS = [
@@ -134,14 +134,23 @@ async function loadArtist(id, token) {
   }
 }
 
-async function loadAlbums(entry, token) {
+// La discografía llega tipo a tipo; onProgress repinta con lo que ya hay (primero los LP).
+async function loadAlbums(entry, token, onProgress) {
+  entry.albumsFailed = false;
   try {
-    const { albums, more } = await getArtistAlbums(entry.artist.id, cleanName(entry.artist.name), token);
+    const { albums, more } = await getArtistAlbums(entry.artist.id, cleanName(entry.artist.name), token, (p) => {
+      if (p.done) return;
+      entry.partial = p;
+      onProgress();
+    });
+    delete entry.partial;
     Object.assign(entry, { albums, more, albumsV: ALBUMS_VERSION });
     writeCache();
   } catch {
-    // Sin discografía se enseña igual el resto.
-    if (!Array.isArray(entry.albums)) Object.assign(entry, { albums: [], more: false, albumsFailed: true });
+    // Se enseña lo que haya llegado; la próxima vez se vuelve a intentar.
+    const got = entry.partial ? entry.partial.albums : [];
+    delete entry.partial;
+    Object.assign(entry, { albums: got, more: {}, albumsV: 0, albumsFailed: true });
   }
 }
 
@@ -238,7 +247,7 @@ export async function renderArtistPage(container, target, ctx) {
     draw();
   }
   if (entry && !hasAlbums(entry) && !stale()) {
-    await loadAlbums(entry, ctx.token);
+    await loadAlbums(entry, ctx.token, draw);
     draw();
   }
 }
@@ -275,8 +284,19 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
   else if (status) nodes.push(pill(`❌ No se pudo cargar de Discogs: ${status}`, "peach"));
 
   // Discografía filtrada por tipo (LP, singles…). Sin tipos conocidos, se enseña todo.
-  const allAlbums = (entry && hasAlbums(entry) && entry.albums) || (entry && entry.albumsFailed ? [] : null) || [];
+  const allAlbums = !entry
+    ? []
+    : hasAlbums(entry)
+      ? entry.albums
+      : entry.partial
+        ? entry.partial.albums
+        : entry.albumsFailed
+          ? entry.albums || []
+          : [];
   const albumsLoading = Boolean(entry) && !hasAlbums(entry) && !entry.albumsFailed;
+  // Ya hay algunos tipos y faltan otros.
+  const loadingMore = albumsLoading && Boolean(entry.partial);
+  const moreOf = (kind) => Boolean(entry && ((entry.partial && entry.partial.more) || entry.more || {})[kind]);
   const typed = allAlbums.length > 0 && allAlbums.every((a) => a.kind);
   const counts = new Map();
   for (const a of allAlbums) counts.set(a.kind, (counts.get(a.kind) || 0) + 1);
@@ -305,7 +325,7 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
       { icon: "📅", accent: "sky" }
     ),
     tile(
-      albumsLoading ? "…" : lpCount ? `${lpCount}${entry.more ? "+" : ""}` : "—",
+      albumsLoading && !loadingMore ? "…" : lpCount ? `${lpCount}${moreOf("album") ? "+" : ""}` : "—",
       typed ? "LP en Discogs" : lpCount === 1 ? "álbum en Discogs" : "álbumes en Discogs",
       { icon: "📀", accent: "peach" }
     )
@@ -336,7 +356,7 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
     );
   }
 
-  if (albumsLoading) {
+  if (albumsLoading && !allAlbums.length) {
     nodes.push(card({ icon: "📀", title: "Discografía", accent: "peach" }, pill("⏳ Cargando su discografía de Discogs…", "peach")));
   }
 
@@ -344,8 +364,8 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
   if (albums.length) {
     const what = typed ? `${albums.length} ${kindName}` : plural(albums.length, "álbum", "álbumes");
     const sub = haveCount
-      ? `Tienes ${haveCount} de ${what}${entry.more ? " (y más)" : ""}`
-      : `${what}${entry.more ? " (y más)" : ""} · aún no tienes ninguno`;
+      ? `Tienes ${haveCount} de ${what}${moreOf(filter.kind) ? " (y más)" : ""}`
+      : `${what}${moreOf(filter.kind) ? " (y más)" : ""} · aún no tienes ninguno`;
     const chips = el("div", "artist-kinds");
     if (kinds.length > 1) {
       for (const [k, label] of kinds) {
@@ -380,11 +400,12 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
       text.append(el("span", "artist-album-title", album.title));
       text.append(el("span", "artist-album-year", mine ? `${album.year || ""}${album.year ? " · " : ""}💿 Lo tienes` : album.year || "Sin año"));
       row.append(img, text, el("span", "artist-row-go", "›"));
-      row.disabled = !mine && !album.id;
+      row.disabled = !mine && !album.id && !album.masterId;
       row.addEventListener("click", () => (mine ? ctx.onOpenItem(mine) : ctx.onOpenAlbum(album, name)));
       list.append(row);
     });
-    const box = card({ icon: "📀", title: "Discografía", sub, accent: "peach" }, kinds.length > 1 ? chips : null, list);
+    if (loadingMore) chips.append(el("span", "artist-kind-wait", "⏳ Buscando singles, EP…"));
+    const box = card({ icon: "📀", title: "Discografía", sub, accent: "peach" }, kinds.length > 1 || loadingMore ? chips : null, list);
     if (albums.length > ALBUMS_SHOWN) {
       const more = el("button", "secondary artist-more", `Ver los ${albums.length} ${typed ? kindName : "álbumes"}`);
       more.type = "button";

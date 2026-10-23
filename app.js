@@ -13,7 +13,7 @@ import {
 import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify } from "./ai.js";
-import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, bothYears, countryWithFlag, vinylColor, releaseWeight } from "./discogs.js";
+import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, masterMainRelease, bothYears, countryWithFlag, vinylColor, releaseWeight } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -794,6 +794,19 @@ function albumCandidate(album, artistName) {
   };
 }
 
+// Un álbum de la discografía: si solo se sabe su master, se busca antes su edición principal.
+async function openAlbum(album, name) {
+  if (!album.id && album.masterId) {
+    try {
+      album.id = await masterMainRelease(album.masterId, getDiscogsToken());
+    } catch (err) {
+      window.alert(`No se pudo abrir el álbum: ${err.message}`);
+      return;
+    }
+  }
+  if (album.id) openDetail(albumCandidate(album, name), { returnView: "artist" });
+}
+
 function drawArtistTop() {
   const top = artistStack[artistStack.length - 1];
   if (!top) return;
@@ -805,7 +818,7 @@ function drawArtistTop() {
       items: getHistory(),
       token: getDiscogsToken(),
       onOpenItem: (item) => openDetail(historyItemToCandidate(item), { returnView: "artist" }),
-      onOpenAlbum: (album, name) => openDetail(albumCandidate(album, name), { returnView: "artist" }),
+      onOpenAlbum: openAlbum,
       onArtist: openArtist,
     });
   }

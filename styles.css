@@ -3117,3 +3117,13 @@ button.artist-kind:active {
   background: var(--primary-press);
   color: var(--on-primary);
 }
+
+.artist-kind-wait {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
