@@ -939,19 +939,26 @@ function albumCandidate(album, artistName) {
 
 // Un álbum de la discografía: si solo se sabe su master, se busca antes su edición principal.
 async function openAlbum(album, name) {
-  if (!album.id && (album.masterId || album.mbid)) {
+  // Con master se busca siempre su edición principal en vinilo (la que da Discogs puede ser un CD o digital).
+  if (!album.resolved && (album.masterId || (!album.id && album.mbid))) {
+    const fallback = album.id;
     try {
       // Los de MusicBrainz no tienen id de Discogs: se busca por artista y título.
       album.id = album.masterId
         ? await masterMainRelease(album.masterId, getDiscogsToken())
         : await findAlbumRelease(name, album.title, getDiscogsToken());
+      album.id = album.id || fallback;
+      album.resolved = Boolean(album.id);
       if (!album.id) {
         window.alert(`No encuentro «${album.title}» en Discogs.`);
         return;
       }
     } catch (err) {
-      window.alert(`No se pudo abrir el álbum: ${err.message}`);
-      return;
+      album.id = fallback;
+      if (!album.id) {
+        window.alert(`No se pudo abrir el álbum: ${err.message}`);
+        return;
+      }
     }
   }
   if (album.id) openDetail(albumCandidate(album, name), { returnView: "artist" });

@@ -352,8 +352,8 @@ const sortByYear = (list) => [...list].sort((a, b) => (Number(a.year) || 9999) -
 // Edición de Discogs de un álbum del que solo se sabe artista y título (los de MusicBrainz):
 // la principal de su master si se encuentra; si no, la primera edición en vinilo. null si no hay.
 export async function findAlbumRelease(artist, title, discogsToken) {
-  const masters = await discogsGet("/database/search", { type: "master", artist, release_title: title, per_page: "5" }, discogsToken);
-  const master = (masters.results || [])[0];
+  const masters = await discogsGet("/database/search", { type: "master", artist, release_title: title, per_page: "10" }, discogsToken);
+  const master = bestMaster(masters.results || [], title);
   if (master) {
     const id = await masterMainRelease(master.id, discogsToken);
     if (id) return id;
@@ -362,10 +362,27 @@ export async function findAlbumRelease(artist, title, discogsToken) {
   return ((releases.results || [])[0] || {}).id || null;
 }
 
-// Edición principal de un álbum (para abrir su ficha desde la discografía).
+// De los masters encontrados, el del álbum de verdad: mismo título y el que más gente tiene.
+// Así no sale una edición rara (un VHS, un pirata, un single) que Discogs guarda como master aparte.
+function bestMaster(results, title) {
+  const norm = (t) => String(t || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const wanted = norm(title);
+  const official = results.filter((r) => !lowerWords(r.format).includes("unofficial release"));
+  const same = official.filter((r) => norm(splitSearchTitle(r.title).title) === wanted);
+  const pool = same.length ? same : official.length ? official : results;
+  const have = (r) => r.community?.have || 0;
+  return pool.reduce((best, r) => (!best || have(r) > have(best) ? r : best), null);
+}
+
+// Edición principal de un álbum (para abrir su ficha desde la discografía): la principal del
+// master si es de vinilo; si no (CD, digital…), la edición en vinilo que más gente tiene.
 export async function masterMainRelease(masterId, discogsToken) {
   const master = await discogsGet(`/masters/${masterId}`, null, discogsToken);
-  return master.main_release || null;
+  const versions = await discogsGet(`/masters/${masterId}/versions`, { format: "Vinyl", per_page: "100" }, discogsToken);
+  const vinyls = (versions.versions || []).filter((v) => !/unofficial/i.test(v.format || ""));
+  if (!vinyls.length || vinyls.some((v) => v.id === master.main_release)) return master.main_release || null;
+  const have = (v) => v.stats?.community?.in_collection || 0;
+  return vinyls.reduce((best, v) => (have(v) > have(best) ? v : best)).id;
 }
 
 // Busca un artista por su nombre; devuelve su id o null. Primero el que se llama igual.
