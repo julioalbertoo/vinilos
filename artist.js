@@ -9,6 +9,17 @@ import { el, card, tile, note, pill, plural, segmented, coverStrip } from "./cha
 const CACHE_KEY = CONFIG.STORAGE_KEYS.artistCache;
 const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const ALBUMS_SHOWN = 12;
+// Sube cuando la discografía guardada cambia de forma (2: con el tipo de cada disco).
+const ALBUMS_VERSION = 2;
+
+// Filtros de la discografía, en este orden. Por defecto, solo los LP.
+const KINDS = [
+  ["album", "💿 LP"],
+  ["single", "🎵 Singles"],
+  ["ep", "📀 EP"],
+  ["comp", "📚 Recopilatorios"],
+  ["other", "✨ Otros"],
+];
 
 // ---------- Nombres ----------
 
@@ -104,19 +115,15 @@ async function resolveId(name, items, token) {
   return id;
 }
 
+const hasAlbums = (entry) => entry && entry.albumsV === ALBUMS_VERSION && Array.isArray(entry.albums);
+
+// Ficha del artista (foto, biografía…). La discografía se pide aparte, con loadAlbums.
 async function loadArtist(id, token) {
   const saved = cache.artists[id];
   if (fresh(saved)) return saved;
   try {
     const artist = await getArtist(id, token);
-    let albums = [];
-    let more = false;
-    try {
-      ({ albums, more } = await getArtistAlbums(id, token));
-    } catch {
-      // Sin discografía se enseña igual el resto.
-    }
-    const entry = { artist, albums, more, at: new Date().toISOString() };
+    const entry = { artist, at: new Date().toISOString() };
     cache.artists[id] = entry;
     cache.ids[key(artist.name)] = id;
     writeCache();
@@ -124,6 +131,17 @@ async function loadArtist(id, token) {
   } catch (err) {
     if (saved) return saved; // mejor antigua que nada
     throw err;
+  }
+}
+
+async function loadAlbums(entry, token) {
+  try {
+    const { albums, more } = await getArtistAlbums(entry.artist.id, cleanName(entry.artist.name), token);
+    Object.assign(entry, { albums, more, albumsV: ALBUMS_VERSION });
+    writeCache();
+  } catch {
+    // Sin discografía se enseña igual el resto.
+    if (!Array.isArray(entry.albums)) Object.assign(entry, { albums: [], more: false, albumsFailed: true });
   }
 }
 
@@ -183,6 +201,7 @@ export function renderArtistIndex(container, items, { onArtist }) {
 // ---------- Ficha de un artista ----------
 
 let request = 0;
+let filter = { page: null, kind: null };
 
 // target: { name, id? }. ctx: { items, token, onOpenItem(item), onOpenAlbum(album, artistName), onArtist({ id, name }) }
 export async function renderArtistPage(container, target, ctx) {
@@ -190,32 +209,41 @@ export async function renderArtistPage(container, target, ctx) {
   const stale = () => current !== request || !container.isConnected;
   let entry = target.id && fresh(cache.artists[target.id]) ? cache.artists[target.id] : null;
   let status = entry ? "" : "loading";
+  // El filtro se recuerda mientras sigas en la ficha del mismo artista (al volver de un disco).
+  const pageKey = `${target.id || ""}|${key(target.name)}`;
+  if (filter.page !== pageKey) filter = { page: pageKey, kind: null };
 
   const draw = () => {
+    if (stale()) return;
     const artist = entry && entry.artist;
     const name = artist ? cleanName(artist.name) : cleanName(target.name);
     const owned = ownedBy(ctx.items, [target.name, name]);
-    container.replaceChildren(...pageNodes({ artist, name, owned, entry, status, ctx }));
+    container.replaceChildren(...pageNodes({ artist, name, owned, entry, status, ctx, redraw: draw }));
   };
   draw();
-  if (entry) return;
 
-  try {
-    const id = target.id || (await resolveId(target.name, ownedBy(ctx.items, [target.name]), ctx.token));
-    if (stale()) return;
-    if (!id) {
-      status = "notfound";
-    } else {
-      entry = await loadArtist(id, ctx.token);
-      status = "";
+  if (!entry) {
+    try {
+      const id = target.id || (await resolveId(target.name, ownedBy(ctx.items, [target.name]), ctx.token));
+      if (stale()) return;
+      if (!id) {
+        status = "notfound";
+      } else {
+        entry = await loadArtist(id, ctx.token);
+        status = "";
+      }
+    } catch (err) {
+      status = err.message || "error";
     }
-  } catch (err) {
-    status = err.message || "error";
+    draw();
   }
-  if (!stale()) draw();
+  if (entry && !hasAlbums(entry) && !stale()) {
+    await loadAlbums(entry, ctx.token);
+    draw();
+  }
 }
 
-function pageNodes({ artist, name, owned, entry, status, ctx }) {
+function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
   const nodes = [];
 
   // Cabecera: foto redonda, nombre y nombre real.
@@ -246,8 +274,19 @@ function pageNodes({ artist, name, owned, entry, status, ctx }) {
   else if (status === "notfound") nodes.push(pill("No encuentro a este artista en Discogs.", "peach"));
   else if (status) nodes.push(pill(`❌ No se pudo cargar de Discogs: ${status}`, "peach"));
 
-  // Cifras: tus discos, años y cuántos álbumes tiene.
-  const albums = (entry && entry.albums) || [];
+  // Discografía filtrada por tipo (LP, singles…). Sin tipos conocidos, se enseña todo.
+  const allAlbums = (entry && hasAlbums(entry) && entry.albums) || (entry && entry.albumsFailed ? [] : null) || [];
+  const albumsLoading = Boolean(entry) && !hasAlbums(entry) && !entry.albumsFailed;
+  const typed = allAlbums.length > 0 && allAlbums.every((a) => a.kind);
+  const counts = new Map();
+  for (const a of allAlbums) counts.set(a.kind, (counts.get(a.kind) || 0) + 1);
+  const kinds = typed ? KINDS.filter(([k]) => counts.get(k)) : [];
+  if (typed && !counts.get(filter.kind)) filter.kind = kinds[0][0];
+  const albums = typed ? allAlbums.filter((a) => a.kind === filter.kind) : allAlbums;
+  const kindName = typed ? KINDS.find(([k]) => k === filter.kind)[1].replace(/^\S+\s/, "") : "álbumes";
+  const lpCount = typed ? counts.get("album") || 0 : allAlbums.length;
+
+  // Cifras: tus discos, años y cuántos LP tiene.
   const ownedKeys = new Map();
   for (const item of owned) {
     ownedKeys.set(`id:${item.release_id}`, item);
@@ -265,7 +304,11 @@ function pageNodes({ artist, name, owned, entry, status, ctx }) {
       years.length > 1 ? "de sus años" : "año",
       { icon: "📅", accent: "sky" }
     ),
-    tile(albums.length ? `${albums.length}${entry.more ? "+" : ""}` : "—", albums.length === 1 ? "álbum en Discogs" : "álbumes en Discogs", { icon: "📀", accent: "peach" })
+    tile(
+      albumsLoading ? "…" : lpCount ? `${lpCount}${entry.more ? "+" : ""}` : "—",
+      typed ? "LP en Discogs" : lpCount === 1 ? "álbum en Discogs" : "álbumes en Discogs",
+      { icon: "📀", accent: "peach" }
+    )
   );
   nodes.push(tiles);
 
@@ -293,11 +336,31 @@ function pageNodes({ artist, name, owned, entry, status, ctx }) {
     );
   }
 
+  if (albumsLoading) {
+    nodes.push(card({ icon: "📀", title: "Discografía", accent: "peach" }, pill("⏳ Cargando su discografía de Discogs…", "peach")));
+  }
+
   // Discografía, del primero al último, con los que ya tienes marcados.
   if (albums.length) {
+    const what = typed ? `${albums.length} ${kindName}` : plural(albums.length, "álbum", "álbumes");
     const sub = haveCount
-      ? `Tienes ${haveCount} de ${plural(albums.length, "álbum", "álbumes")}${entry.more ? " (y más)" : ""}`
-      : `${plural(albums.length, "álbum", "álbumes")}${entry.more ? " (y más)" : ""} · aún no tienes ninguno`;
+      ? `Tienes ${haveCount} de ${what}${entry.more ? " (y más)" : ""}`
+      : `${what}${entry.more ? " (y más)" : ""} · aún no tienes ninguno`;
+    const chips = el("div", "artist-kinds");
+    if (kinds.length > 1) {
+      for (const [k, label] of kinds) {
+        const chip = el("button", `artist-kind${k === filter.kind ? " active" : ""}`);
+        chip.type = "button";
+        chip.setAttribute("aria-pressed", String(k === filter.kind));
+        chip.append(label, el("b", null, String(counts.get(k))));
+        chip.addEventListener("click", () => {
+          if (k === filter.kind) return;
+          filter.kind = k;
+          redraw();
+        });
+        chips.append(chip);
+      }
+    }
     const list = el("div", "artist-albums");
     albums.forEach((album, index) => {
       const mine = ownedAlbum(album);
@@ -321,9 +384,9 @@ function pageNodes({ artist, name, owned, entry, status, ctx }) {
       row.addEventListener("click", () => (mine ? ctx.onOpenItem(mine) : ctx.onOpenAlbum(album, name)));
       list.append(row);
     });
-    const box = card({ icon: "📀", title: "Discografía", sub, accent: "peach" }, list);
+    const box = card({ icon: "📀", title: "Discografía", sub, accent: "peach" }, kinds.length > 1 ? chips : null, list);
     if (albums.length > ALBUMS_SHOWN) {
-      const more = el("button", "secondary artist-more", `Ver los ${albums.length} álbumes`);
+      const more = el("button", "secondary artist-more", `Ver los ${albums.length} ${typed ? kindName : "álbumes"}`);
       more.type = "button";
       more.addEventListener("click", () => {
         for (const row of list.children) row.hidden = false;
@@ -331,7 +394,7 @@ function pageNodes({ artist, name, owned, entry, status, ctx }) {
       });
       box.append(more);
     }
-    box.append(note("Álbumes en los que es el artista principal, según Discogs. Los que no tienes se abren sin guardarse en tu colección."));
+    box.append(note("Discos en los que es el artista principal; el tipo (LP, single…) es el que da Discogs. Los que no tienes se abren sin guardarse en tu colección."));
     nodes.push(box);
   }
 

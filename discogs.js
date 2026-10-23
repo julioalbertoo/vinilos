@@ -223,27 +223,83 @@ export async function getArtist(id, discogsToken) {
   };
 }
 
-// Álbumes del artista como protagonista, del más antiguo al más nuevo.
-// Se prefieren los masters (un álbum con todas sus ediciones); si no tiene, sus ediciones sueltas.
-export async function getArtistAlbums(id, discogsToken) {
-  const r = await discogsGet(
-    `/artists/${id}/releases`,
-    { sort: "year", sort_order: "asc", per_page: "100" },
-    discogsToken
-  );
-  const main = (r.releases || []).filter((x) => x.role === "Main");
-  const masters = main.filter((x) => x.type === "master");
-  const list = masters.length ? masters : main;
-  return {
-    albums: list.map((x) => ({
-      id: x.type === "master" ? x.main_release || null : x.id,
-      masterId: x.type === "master" ? x.id : null,
+// Tipo de disco según sus formatos de Discogs ("Vinyl, LP, Album", '7", Single'…):
+// "album" (LP), "single", "ep", "comp" (recopilatorio) u "other".
+export function releaseKind(formats) {
+  const words = (Array.isArray(formats) ? formats : String(formats || "").split(","))
+    .map((f) => String(f).trim().toLowerCase())
+    .filter(Boolean);
+  const has = (w) => words.includes(w);
+  if (has("compilation")) return "comp";
+  if (has("album")) return "album";
+  if (has("ep") || has("mini-album")) return "ep";
+  if (has("single") || has("maxi-single") || has('7"')) return "single";
+  if (has("lp")) return "album";
+  return "other";
+}
+
+const ALBUM_PAGES = 3;
+
+// Discografía del artista como protagonista, del más antiguo al más nuevo, con el tipo de cada disco.
+// Los masters (un álbum con todas sus ediciones) no traen formato en la lista del artista:
+// se mira en el buscador de Discogs. Si el buscador falla, kind queda null (sin filtro).
+export async function getArtistAlbums(id, name, discogsToken) {
+  const main = [];
+  let more = false;
+  for (let page = 1; page <= ALBUM_PAGES; page++) {
+    const r = await discogsGet(
+      `/artists/${id}/releases`,
+      { sort: "year", sort_order: "asc", per_page: "100", page: String(page) },
+      discogsToken
+    );
+    main.push(...(r.releases || []).filter((x) => x.role === "Main"));
+    const pages = (r.pagination && r.pagination.pages) || 1;
+    if (page >= pages) break;
+    if (page === ALBUM_PAGES) more = true;
+  }
+
+  let masterFormats = null;
+  if (main.some((x) => x.type === "master")) {
+    try {
+      masterFormats = new Map();
+      for (let page = 1; page <= 2; page++) {
+        const r = await discogsGet(
+          "/database/search",
+          { type: "master", artist: name, per_page: "100", page: String(page) },
+          discogsToken
+        );
+        for (const x of r.results || []) masterFormats.set(x.id, x.format || []);
+        if (page >= ((r.pagination && r.pagination.pages) || 1)) break;
+      }
+    } catch {
+      masterFormats = null;
+    }
+  }
+
+  // Un mismo título solo una vez (las ediciones sueltas suelen repetir el del master).
+  const seen = new Set();
+  const titleOf = (x) => String(x.title || "").toLowerCase().trim();
+  for (const x of main) if (x.type === "master") seen.add(titleOf(x));
+  const albums = [];
+  for (const x of main) {
+    const isMaster = x.type === "master";
+    if (!isMaster) {
+      if (seen.has(titleOf(x))) continue;
+      seen.add(titleOf(x));
+    }
+    let kind = null;
+    if (!isMaster) kind = releaseKind(x.format);
+    else if (masterFormats) kind = masterFormats.has(x.id) ? releaseKind(masterFormats.get(x.id)) : "other";
+    albums.push({
+      id: isMaster ? x.main_release || null : x.id,
+      masterId: isMaster ? x.id : null,
       title: x.title || "",
       year: x.year ? String(x.year) : "",
       thumb: x.thumb || "",
-    })),
-    more: (r.pagination && r.pagination.pages > 1) || false,
-  };
+      kind,
+    });
+  }
+  return { albums, more };
 }
 
 // Busca un artista por su nombre; devuelve su id o null. Primero el que se llama igual.

@@ -3073,3 +3073,47 @@ button.artist-bio-toggle {
   object-fit: cover;
   font-size: 1.4rem;
 }
+
+/* Filtros de la discografía: LP, singles, EP… */
+.artist-kinds {
+  display: flex;
+  gap: 6px;
+  margin: 0 -16px 10px;
+  padding: 0 16px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.artist-kinds::-webkit-scrollbar { display: none; }
+
+button.artist-kind {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 12px;
+  gap: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: none;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+button.artist-kind b {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+button.artist-kind.active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+button.artist-kind:active {
+  background: var(--primary-press);
+  color: var(--on-primary);
+}
