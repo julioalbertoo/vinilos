@@ -257,17 +257,28 @@ function splitSearchTitle(text) {
   return { artist: clean(artistPart).toLowerCase(), title: clean(title) };
 }
 
+// Discogs no marca los directos: se reconocen por el título ("Live At…", "En directo", "At The Hollywood Bowl"…).
+const LIVE_TITLE =
+  /\blive\b(?!\s+(and|through|forever|to|with|your|my|it|this|that|like|or|for|is|fast|wire)\b)|\b(alive|en directo|en vivo|ao vivo|in concert|concierto|unplugged)\b|\bat the [^()]*\b(bowl|club|hall|theat(re|er)|garden|arena|stadium|fillmore|palladium|forum|apollo|budokan|olympia|bbc)\b|\bbudokan\b/i;
+// "Long Live Rock 'n' Roll", "Live Through This"… no son directos.
+const NOT_LIVE = /\blong live\b|\bto live\b|\blive (a|the) /i;
+
+export const isLiveTitle = (title) => LIVE_TITLE.test(String(title || "")) && !NOT_LIVE.test(String(title || ""));
+
 // Tipo final de un disco encontrado buscando `wanted`: los no oficiales van a «otros», y los
 // álbumes que no salieron nunca en vinilo, también (es una app de vinilos).
-function searchKind(wanted, formats) {
+function searchKind(wanted, formats, title) {
   const words = lowerWords(formats);
   if (words.includes("unofficial release")) return "other";
   if (wanted === "album") {
     if (words.includes("compilation")) return "comp";
-    return words.includes("vinyl") || words.includes("lp") ? "album" : "other";
+    if (!words.includes("vinyl") && !words.includes("lp")) return "other";
+    return isLiveTitle(title) ? "live" : "album";
   }
   return wanted;
 }
+
+const liveIfAlbum = (kind, title) => (kind === "album" && isLiveTitle(title) ? "live" : kind);
 
 // Plan B para artistas sin masters en el buscador: sus ediciones de la lista del artista.
 async function artistReleaseList(id, discogsToken) {
@@ -284,7 +295,7 @@ async function artistReleaseList(id, discogsToken) {
       title: x.title || "",
       year: x.year ? String(x.year) : "",
       thumb: x.thumb || "",
-      kind: x.type === "master" ? "album" : releaseKind(x.format),
+      kind: liveIfAlbum(x.type === "master" ? "album" : releaseKind(x.format), x.title),
     });
   }
   return { albums, more: (r.pagination && r.pagination.pages > 1) || false };
@@ -311,7 +322,7 @@ export async function getArtistAlbums(id, name, discogsToken, onProgress = () =>
         // El buscador también trae otros artistas con nombre parecido ("The Beatles Revival Band"):
         // solo valen los suyos, o los que comparte con «&» ("Lou Reed & John Cale").
         if (artist !== wanted && !artist.split(/\s+&\s+/).includes(wanted)) continue;
-        const k = searchKind(kind, x.format);
+        const k = searchKind(kind, x.format, title);
         // Un mismo título solo una vez por tipo (hay singles con varios masters casi iguales).
         const same = `${k}|${title.toLowerCase()}`;
         if (seen.has(x.id) || seen.has(same)) continue;

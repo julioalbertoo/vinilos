@@ -9,12 +9,13 @@ import { el, card, tile, note, pill, plural, segmented, coverStrip } from "./cha
 const CACHE_KEY = CONFIG.STORAGE_KEYS.artistCache;
 const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const ALBUMS_SHOWN = 12;
-// Sube cuando la discografía guardada cambia de forma (3: buscada tipo a tipo).
-const ALBUMS_VERSION = 3;
+// Sube cuando la discografía guardada cambia de forma (4: los directos aparte).
+const ALBUMS_VERSION = 4;
 
 // Filtros de la discografía, en este orden. Por defecto, solo los LP.
 const KINDS = [
   ["album", "💿 LP"],
+  ["live", "🎤 Directos"],
   ["single", "🎵 Singles"],
   ["ep", "📀 EP"],
   ["comp", "📚 Recopilatorios"],
