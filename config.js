@@ -37,6 +37,8 @@ export const CONFIG = {
     // Resumen de cada disco para la pestaña «Datos» (géneros, país, precios…).
     statsCache: "vinilos_stats_cache",
     cloudPendingDeletes: "vinilos_cloud_pending_deletes",
+    // Fichas de artistas de Discogs (foto, biografía, discografía), 30 días.
+    artistCache: "vinilos_artist_cache",
   },
   IMAGE: {
     maxDim: 1024,

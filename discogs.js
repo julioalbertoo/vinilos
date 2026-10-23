@@ -167,6 +167,8 @@ export async function getRelease(id, discogsToken) {
     id: r.id,
     masterId: r.master_id || null,
     artist: r.artists_sort || "",
+    // Cada artista con su id, para abrir su ficha.
+    artists: (r.artists || []).filter((a) => a.id).map((a) => ({ id: a.id, name: a.name })),
     title: r.title || "",
     year: r.year || "",
     country: r.country || "",
@@ -198,6 +200,59 @@ export async function getRelease(id, discogsToken) {
     community: communityData(r.community),
     url: r.uri || releaseUrl(r.id),
   };
+}
+
+// ---------- Artistas ----------
+
+// Ficha del artista: foto, biografía, miembros o grupos y enlaces.
+export async function getArtist(id, discogsToken) {
+  const a = await discogsGet(`/artists/${id}`, null, discogsToken);
+  const images = a.images || [];
+  const photo = images.find((i) => i.type === "primary") || images[0];
+  const people = (list) => (list || []).filter((p) => p.id).map((p) => ({ id: p.id, name: p.name, active: p.active !== false }));
+  return {
+    id: a.id,
+    name: a.name || "",
+    realname: a.realname || "",
+    profile: cleanNotes(a.profile).replace(/\[[amlr]\d+\]/gi, "").replace(/[ \t]{2,}/g, " ").trim(),
+    image: photo ? photo.uri : "",
+    members: people(a.members),
+    groups: people(a.groups),
+    urls: (a.urls || []).filter(Boolean),
+    url: a.uri || `https://www.discogs.com/artist/${a.id}`,
+  };
+}
+
+// Álbumes del artista como protagonista, del más antiguo al más nuevo.
+// Se prefieren los masters (un álbum con todas sus ediciones); si no tiene, sus ediciones sueltas.
+export async function getArtistAlbums(id, discogsToken) {
+  const r = await discogsGet(
+    `/artists/${id}/releases`,
+    { sort: "year", sort_order: "asc", per_page: "100" },
+    discogsToken
+  );
+  const main = (r.releases || []).filter((x) => x.role === "Main");
+  const masters = main.filter((x) => x.type === "master");
+  const list = masters.length ? masters : main;
+  return {
+    albums: list.map((x) => ({
+      id: x.type === "master" ? x.main_release || null : x.id,
+      masterId: x.type === "master" ? x.id : null,
+      title: x.title || "",
+      year: x.year ? String(x.year) : "",
+      thumb: x.thumb || "",
+    })),
+    more: (r.pagination && r.pagination.pages > 1) || false,
+  };
+}
+
+// Busca un artista por su nombre; devuelve su id o null. Primero el que se llama igual.
+export async function findArtistId(name, discogsToken) {
+  const r = await discogsGet("/database/search", { type: "artist", q: name, per_page: "10" }, discogsToken);
+  const results = r.results || [];
+  const norm = (t) => String(t || "").replace(/\s*\(\d+\)/g, "").toLowerCase().trim();
+  const same = results.find((x) => norm(x.title) === norm(name));
+  return (same || results[0] || {}).id || null;
 }
 
 // Las notas de Discogs traen marcas propias: [a=Artista], [l=Sello], [url=…]texto[/url], [b]…[/b].

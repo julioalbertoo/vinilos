@@ -2770,3 +2770,306 @@ button.stats-fact:active {
   height: 10px;
   border-radius: 50%;
 }
+
+/* ---------- Ficha del artista ---------- */
+
+/* La casilla «artistas» de «Datos» se puede tocar: flecha en la esquina. */
+button.stats-tile {
+  position: relative;
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  font-weight: inherit;
+  color: inherit;
+  box-shadow: none;
+}
+
+button.stats-tile:active {
+  transform: scale(0.96);
+  background: var(--peach);
+}
+
+.stats-tile--link::after {
+  content: "›";
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  color: var(--tile-text);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.stats-tile--link .stats-tile-label {
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+}
+
+button.stats-artist-go {
+  min-height: 44px;
+  font-size: 0.92rem;
+}
+
+button.stats-artist-all {
+  min-height: 40px;
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
+
+/* Botón al artista en la ficha del disco. */
+.detail-artists {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 6px;
+}
+
+button.detail-artist-link {
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 14px;
+  gap: 6px;
+  background: var(--peach);
+  color: var(--peach-text);
+  box-shadow: none;
+  font-size: 0.92rem;
+}
+
+button.detail-artist-link:active {
+  background: var(--peach);
+}
+
+.detail-artist-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Cabecera: foto redonda y nombre. */
+.artist-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.artist-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 148px;
+  height: 148px;
+  border-radius: 50%;
+  border: 4px solid var(--peach);
+  background: var(--peach);
+  object-fit: cover;
+  box-shadow: var(--shadow);
+  font-size: 3.5rem;
+}
+
+.artist-photo--cover {
+  border-radius: 10px;
+}
+
+.view .artist-name {
+  margin: 14px 0 0;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.view .artist-realname {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+}
+
+.artist-page > .stats-tiles {
+  margin-top: 0;
+}
+
+.artist-page > .stats-pill {
+  margin: 0 auto;
+}
+
+.artist-links {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.view .artist-link {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--lilac);
+  color: var(--primary-press);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.view .artist-link--spotify {
+  background: #1db954;
+  color: #ffffff;
+}
+
+/* Discografía: una fila por álbum; los tuyos, resaltados. */
+.artist-albums {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+button.artist-album,
+button.artist-row {
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 0;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+button.artist-album:active,
+button.artist-row:active {
+  background: var(--line);
+}
+
+button.artist-album:disabled {
+  opacity: 1;
+}
+
+button.artist-album.is-owned {
+  background: var(--accent);
+}
+
+.artist-album-cover {
+  display: flex;
+  flex: 0 0 52px;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 4px;
+  background: var(--lilac);
+  object-fit: cover;
+  box-shadow: var(--shadow-sm);
+  font-size: 1.4rem;
+}
+
+.artist-album-text,
+.artist-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.artist-album-title,
+.artist-row-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.artist-album-year,
+.artist-row-meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.artist-album.is-owned .artist-album-year {
+  color: var(--accent-text);
+  font-weight: 800;
+}
+
+.artist-row-go {
+  color: var(--muted);
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+button.artist-more {
+  min-height: 44px;
+  font-size: 0.92rem;
+}
+
+/* Miembros y grupos. */
+.artist-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+button.artist-person {
+  width: auto;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 14px;
+  background: var(--mint);
+  color: var(--mint-text);
+  box-shadow: none;
+  font-size: 0.9rem;
+}
+
+button.artist-person.is-past {
+  background: var(--line);
+  color: var(--muted);
+}
+
+/* Biografía: recortada a unas líneas hasta pulsar «Leer más». */
+.view .artist-bio {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.artist-bio.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+button.artist-bio-toggle {
+  min-height: 40px;
+  margin-top: 4px;
+}
+
+/* Lista de tus artistas. */
+.view .artist-index-sub {
+  margin: 0 0 4px;
+  font-size: 0.88rem;
+}
+
+.artist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 12px;
+}
+
+.artist-avatar {
+  display: flex;
+  flex: 0 0 52px;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--peach);
+  object-fit: cover;
+  font-size: 1.4rem;
+}

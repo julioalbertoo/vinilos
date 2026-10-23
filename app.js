@@ -21,6 +21,7 @@ import { getHistory, addToHistory, removeFromHistory, clearHistory, updateHistor
 import { renderGallery, updateSlide } from "./gallery.js";
 import { cachedRelease, rememberRelease, cachedPrices } from "./details.js";
 import { renderStats, setStatsActive } from "./stats.js";
+import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
@@ -32,7 +33,7 @@ const SEARCH_STEP_LABELS = {
   master: "todas las ediciones del álbum",
 };
 
-const VIEWS = ["guide", "settings", "capture", "results", "detail", "collection"];
+const VIEWS = ["guide", "settings", "capture", "results", "detail", "collection", "artist"];
 const GUIDE_SCREENS = ["intro", "ai", "discogs"];
 // Pestaña que se marca en la barra inferior para cada pantalla.
 const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "collection", settings: "settings" };
@@ -47,10 +48,24 @@ function showView(name) {
   // En la primera visita la guía va sin barra: antes de nada hay que conseguir las llaves.
   document.body.classList.toggle("no-tabbar", name === "guide" && !hasTokens());
   for (const tab of document.querySelectorAll("#tabbar button")) {
-    // La ficha se marca en la pestaña desde la que se abrió.
-    const activeTab = name === "detail" ? TAB_FOR_VIEW[detailReturnView] : TAB_FOR_VIEW[name];
-    tab.classList.toggle("active", tab.dataset.view === activeTab);
+    tab.classList.toggle("active", tab.dataset.view === tabFor(name));
   }
+}
+
+// Pestaña de la barra inferior que se marca: las fichas, en la pestaña desde la que se abrieron.
+function tabFor(name) {
+  if (name === "detail") return detailReturnView === "artist" ? artistTab : TAB_FOR_VIEW[detailReturnView];
+  if (name === "artist") return artistTab;
+  return TAB_FOR_VIEW[name];
+}
+
+function activeView() {
+  return VIEWS.find((view) => document.getElementById(`view-${view}`).classList.contains("active"));
+}
+
+// Vuelve a donde estaba la pantalla al irse de ella.
+function restoreScroll(y) {
+  requestAnimationFrame(() => window.scrollTo(0, y || 0));
 }
 
 // Muestra un error en `statusEl`; si es un problema de llaves, añade un botón para ir a Ajustes.
@@ -372,6 +387,8 @@ function renderDetail(release) {
     nodes.push(img);
   }
   nodes.push(el("h2", null, release.artist ? `${release.artist} – ${release.title}` : release.title));
+  const artistLinks = detailArtistLinks(release);
+  if (artistLinks) nodes.push(artistLinks);
   nodes.push(el("p", "detail-meta detail-year", detailYearLine(release)));
   for (const label of release.labels) {
     nodes.push(el("p", "detail-meta", `${label.name || "Sello ?"} · ${label.catno || "Nº cat. ?"}`));
@@ -419,6 +436,24 @@ function renderDetail(release) {
     nodes.push(foldable(title, communityList(release.community)));
   }
   document.getElementById("detail-content").replaceChildren(...nodes);
+}
+
+// Botón a la ficha de cada artista del disco (con su id si ya llegó la ficha completa).
+function detailArtistLinks(release) {
+  const artists = (release.artists && release.artists.length ? release.artists : [{ name: release.artist }]).filter((a) =>
+    hasArtistPage(a.name)
+  );
+  if (!artists.length) return null;
+  const row = el("div", "detail-artists");
+  for (const artist of artists) {
+    const button = el("button", "detail-artist-link");
+    button.type = "button";
+    button.append(el("span", null, "🎤"), el("span", "detail-artist-name", cleanArtistName(artist.name)), el("span", null, "›"));
+    button.setAttribute("aria-label", `Ver la ficha de ${cleanArtistName(artist.name)}`);
+    button.addEventListener("click", () => openArtist({ name: artist.name, id: artist.id || null }));
+    row.append(button);
+  }
+  return row;
 }
 
 // Apartado plegable de la ficha: empieza cerrado y se abre al tocar el título.
@@ -562,15 +597,23 @@ async function loadPrices(id, request) {
 let detailRequest = 0;
 let detailReturnView = "results";
 
+let detailScroll = 0;
+// Último disco abierto, para volver a él desde la ficha de un artista.
+let lastDetail = null;
+
 const BACK_LABELS = {
   results: "← Volver a los candidatos",
   collection: "← Volver a mis discos",
+  artist: "← Volver al artista",
 };
 
 // returnView: pantalla a la que lleva "Volver". Desde «Mis discos» el disco ya está
-// guardado, así que no se vuelve a guardar.
-async function openDetail(candidate, { returnView = "results" } = {}) {
-  const fromHistory = returnView !== "results";
+// guardado, así que no se vuelve a guardar; desde un artista, tampoco (si no lo tienes, no se guarda).
+// reopen: se vuelve a una ficha ya vista; no se guarda otra vez ni se mueve el scroll.
+async function openDetail(candidate, { returnView = "results", reopen = false } = {}) {
+  const fromHistory = returnView !== "results" || reopen;
+  if (!reopen && activeView() !== "detail") detailScroll = window.scrollY;
+  lastDetail = { candidate, returnView };
   detailReturnView = returnView;
   document.getElementById("detail-back").textContent = BACK_LABELS[returnView];
   const savedNote = document.getElementById("detail-saved");
@@ -589,7 +632,7 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
     url: candidate.url,
   });
   showView("detail");
-  window.scrollTo(0, 0);
+  if (!reopen) window.scrollTo(0, 0);
 
   const request = ++detailRequest;
   let release = null;
@@ -630,11 +673,15 @@ async function openDetail(candidate, { returnView = "results" } = {}) {
   }
 
   const alreadyOwned = getHistory().some((item) => String(item.release_id) === String(candidate.id));
-  if (!fromHistory && exploreMode) {
+  if (returnView === "artist" && !alreadyOwned) {
+    if (request === detailRequest) savedNote.textContent = "Edición principal del álbum · no está en tu colección";
+  } else if (fromHistory) {
+    // Ya guardado: no se toca.
+  } else if (exploreMode) {
     savedNote.textContent = alreadyOwned
       ? "🧭 Modo explorador · 💿 Ya lo tienes en tu colección"
       : "🧭 Modo explorador: no se ha guardado en tu colección";
-  } else if (!fromHistory) {
+  } else {
     // Si la ficha no llegó, se guarda con los datos del candidato para no perder la confirmación.
     try {
       addToHistory({
@@ -718,6 +765,107 @@ async function searchLabelAgain(release, request) {
   if (request !== detailRequest) return;
   if (text) note.textContent = text;
   else note.remove();
+}
+
+// ---------- Ficha del artista ----------
+
+// Pila de pantallas de artistas: la lista de tus artistas y las fichas que se van abriendo.
+// back: a dónde lleva «Volver» ("prev" = la anterior de la pila); scroll: dónde estaba esa pantalla.
+const artistStack = [];
+let artistTab = "collection";
+
+const sameArtist = (state, target) =>
+  state.kind === "artist" &&
+  ((state.id && target.id && String(state.id) === String(target.id)) ||
+    cleanArtistName(state.name).toLowerCase() === cleanArtistName(target.name).toLowerCase());
+
+function albumCandidate(album, artistName) {
+  return {
+    id: album.id,
+    artist: artistName,
+    title: album.title,
+    year: album.year,
+    country: "",
+    label: "",
+    catno: "",
+    formats: [],
+    thumb: album.thumb,
+    url: `https://www.discogs.com/release/${album.id}`,
+  };
+}
+
+function drawArtistTop() {
+  const top = artistStack[artistStack.length - 1];
+  if (!top) return;
+  const box = document.getElementById("artist-content");
+  if (top.state.kind === "index") {
+    renderArtistIndex(box, getHistory(), { onArtist: openArtist });
+  } else {
+    renderArtistPage(box, top.state, {
+      items: getHistory(),
+      token: getDiscogsToken(),
+      onOpenItem: (item) => openDetail(historyItemToCandidate(item), { returnView: "artist" }),
+      onOpenAlbum: (album, name) => openDetail(albumCandidate(album, name), { returnView: "artist" }),
+      onArtist: openArtist,
+    });
+  }
+  const back = top.back;
+  const prev = artistStack[artistStack.length - 2];
+  let label = "← Volver";
+  if (back === "prev" && prev) label = prev.state.kind === "index" ? "← Volver a tus artistas" : `← Volver a ${cleanArtistName(prev.state.name)}`;
+  else if (back === "collection") label = "← Volver a mis discos";
+  else if (back === "detail") label = "← Volver al disco";
+  document.getElementById("artist-back").textContent = label;
+}
+
+function pushArtist(state) {
+  const from = activeView();
+  // Desde fuera de las fichas (p. ej. «Datos»), se empieza una pila nueva.
+  const chained = from === "artist" || (from === "detail" && detailReturnView === "artist");
+  if (!chained) {
+    artistStack.length = 0;
+    artistTab = tabFor(from) || "collection";
+  }
+  artistStack.push({ state, back: from === "artist" ? "prev" : from, scroll: window.scrollY, detail: from === "detail" ? lastDetail : null });
+  drawArtistTop();
+  showView("artist");
+  window.scrollTo(0, 0);
+}
+
+// target: { name, id? }
+function openArtist(target) {
+  if (!hasArtistPage(target.name)) return;
+  const top = artistStack[artistStack.length - 1];
+  // Desde un disco abierto desde esta misma ficha: se vuelve a ella.
+  if (activeView() === "detail" && detailReturnView === "artist" && top && sameArtist(top.state, target)) {
+    showView("artist");
+    restoreScroll(detailScroll);
+    return;
+  }
+  pushArtist({ kind: "artist", name: target.name, id: target.id || null });
+}
+
+function openArtistIndex() {
+  pushArtist({ kind: "index" });
+}
+
+function artistBack() {
+  const entry = artistStack.pop();
+  if (!entry) return showView("collection");
+  if (entry.back === "prev" && artistStack.length) {
+    drawArtistTop();
+    restoreScroll(entry.scroll);
+    return;
+  }
+  // La pantalla de artista de debajo se deja lista por si se vuelve a ella.
+  drawArtistTop();
+  if (entry.back === "detail" && entry.detail) {
+    if (entry.detail !== lastDetail) openDetail(entry.detail.candidate, { returnView: entry.detail.returnView, reopen: true });
+    else showView("detail");
+  } else {
+    showView(entry.back);
+  }
+  restoreScroll(entry.scroll);
 }
 
 function historyItemToCandidate(item) {
@@ -847,6 +995,8 @@ function renderCollection() {
       discogsToken: getDiscogsToken(),
       statusEl: document.getElementById("stats-status"),
       onOpen: (item) => openDetail(historyItemToCandidate(item), { returnView: "collection" }),
+      onArtists: openArtistIndex,
+      onArtist: (name) => openArtist({ name }),
     });
     return;
   }
@@ -933,7 +1083,11 @@ function initResults(resetCapture) {
 }
 
 function initDetail() {
-  document.getElementById("detail-back").addEventListener("click", () => showView(detailReturnView));
+  document.getElementById("detail-back").addEventListener("click", () => {
+    showView(detailReturnView);
+    restoreScroll(detailScroll);
+  });
+  document.getElementById("artist-back").addEventListener("click", artistBack);
 }
 
 // Modo explorador: tema oscuro y lo que se identifica no se guarda en «Mis discos».

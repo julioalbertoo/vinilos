@@ -36,8 +36,14 @@ export function card(head, ...children) {
 }
 
 // Cifra suelta con su etiqueta. accent: el pastel de fondo (por defecto, lila).
-export function tile(value, label, { icon, accent } = {}) {
-  const box = el("div", `stats-tile${accent ? ` stats-tile--${accent}` : ""}`);
+// onClick: la casilla se puede tocar (lleva una flecha pequeña en la esquina).
+export function tile(value, label, { icon, accent, onClick, ariaLabel } = {}) {
+  const box = el(onClick ? "button" : "div", `stats-tile${accent ? ` stats-tile--${accent}` : ""}${onClick ? " stats-tile--link" : ""}`);
+  if (onClick) {
+    box.type = "button";
+    box.addEventListener("click", onClick);
+    if (ariaLabel) box.setAttribute("aria-label", `${value} ${label}. ${ariaLabel}`);
+  }
   if (icon) box.append(el("span", "stats-tile-icon", icon));
   // Las cifras largas («27 min», «1.250») van algo más pequeñas para que quepan en la casilla.
   box.append(el("span", `stats-tile-value${value.length > 4 ? " long" : ""}`, value), el("span", "stats-tile-label", label));

@@ -304,13 +304,13 @@ const NAV = [
 ];
 
 // Las cuatro cifras de arriba: discos, artistas, países y horas de música.
-function summaryTiles(items, artists, countries, lengths) {
+function summaryTiles(items, artists, countries, lengths, onArtists) {
   const seconds = lengths.reduce((sum, r) => sum + r.seconds, 0);
   const music = !seconds ? "—" : seconds >= 3600 ? `${Math.round(seconds / 3600).toLocaleString("es-ES")} h` : `${Math.max(1, Math.round(seconds / 60))} min`;
   const box = el("div", "stats-tiles stats-summary");
   box.append(
     tile(items.length.toLocaleString("es-ES"), items.length === 1 ? "disco" : "discos", { icon: "💿", accent: "lilac" }),
-    tile(artists.length.toLocaleString("es-ES"), artists.length === 1 ? "artista" : "artistas", { icon: "🎤", accent: "peach" }),
+    tile(artists.length.toLocaleString("es-ES"), artists.length === 1 ? "artista" : "artistas", { icon: "🎤", accent: "peach", onClick: onArtists, ariaLabel: "Ver tus artistas" }),
     tile(countries.length ? String(countries.length) : "—", countries.length === 1 ? "país" : "países", { icon: "🌍", accent: "sky" }),
     tile(music, "de música", { icon: "🎧", accent: "mint" })
   );
@@ -515,7 +515,7 @@ function rarityCard(data, rerender, onOpen) {
 }
 
 // Artistas y sellos que más se repiten, con un selector para cambiar de uno a otro.
-function peopleCard(artists, labels, byArtist, byLabel, rerender, onOpen) {
+function peopleCard(artists, labels, byArtist, byLabel, rerender, onOpen, onArtist) {
   const switcher = segmented([["artists", "🎤 Artistas"], ["labels", "🏷️ Sellos"]], peopleMode, (mode) => {
     peopleMode = mode;
     rerender();
@@ -545,6 +545,13 @@ function peopleCard(artists, labels, byArtist, byLabel, rerender, onOpen) {
       })
     );
     if (!picks[peopleMode]) nodes.push(hint(`Toca un ${isArtists ? "artista" : "sello"} para ver sus discos.`));
+    if (isArtists && picks.artists && onArtist) {
+      const pick = picks.artists;
+      const go = el("button", "secondary stats-artist-go", `🎤 Ver la ficha de ${pick}`);
+      go.type = "button";
+      go.addEventListener("click", () => onArtist(pick));
+      nodes.push(go);
+    }
     if (singles) {
       nodes.push(note(isArtists ? `Y ${plural(singles, "artista", "artistas")} con un solo disco.` : `Y ${plural(singles, "sello", "sellos")} con un solo disco.`));
     }
@@ -662,7 +669,7 @@ function curiositiesCard(data, items, styles, onOpen) {
 }
 
 // Pinta la pestaña «Datos». onOpen(item) abre la ficha de un disco.
-export function renderStats(container, items, { discogsToken, onOpen, statusEl }) {
+export function renderStats(container, items, { discogsToken, onOpen, statusEl, onArtists, onArtist }) {
   setStatsActive(true);
   const draw = () => {
     const data = compute(items, yearMode);
@@ -676,7 +683,7 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl }
       .filter((r) => r.len)
       .map((r) => ({ item: r.item, seconds: r.len.seconds, estimated: r.len.estimated, tracks: r.s.tracks }));
 
-    const nodes = [summaryTiles(items, artists, countries, lengths), valueCard(data, items, onOpen)];
+    const nodes = [summaryTiles(items, artists, countries, lengths, onArtists), valueCard(data, items, onOpen)];
 
     // 🎸 Géneros como un vinilo, y los estilos debajo.
     if (genres.length) {
@@ -763,7 +770,13 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl }
     if (artists.length) {
       const byArtist = groupBy(data.rows, (r) => [cleanName(r.item.artist)]);
       const byLabel = groupBy(data.withData, (r) => [r.s.label]);
-      nodes.push(peopleCard(artists, labels, byArtist, byLabel, draw, onOpen));
+      nodes.push(peopleCard(artists, labels, byArtist, byLabel, draw, onOpen, onArtist));
+      if (onArtists) {
+        const all = el("button", "ghost stats-artist-all", `Ver tus ${plural(artists.length, "artista", "artistas")} ›`);
+        all.type = "button";
+        all.addEventListener("click", onArtists);
+        nodes[nodes.length - 1].append(all);
+      }
     }
 
     nodes.push(curiositiesCard(data, items, styles, onOpen));
