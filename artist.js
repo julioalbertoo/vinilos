@@ -10,8 +10,8 @@ import { el, card, tile, note, pill, plural, segmented, coverStrip } from "./cha
 const CACHE_KEY = CONFIG.STORAGE_KEYS.artistCache;
 const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const ALBUMS_SHOWN = 12;
-// Sube cuando la discografía guardada cambia de forma (6: MusicBrainz sin discos piratas).
-const ALBUMS_VERSION = 6;
+// Sube cuando la discografía guardada cambia de forma (7: los piratas, aparte).
+const ALBUMS_VERSION = 7;
 
 // Filtros de la discografía, en este orden. Por defecto, solo los LP.
 const KINDS = [
@@ -20,6 +20,7 @@ const KINDS = [
   ["single", "🎵 Singles"],
   ["ep", "📀 EP"],
   ["comp", "📚 Recopilatorios"],
+  ["bootleg", "🏴‍☠️ Piratas"],
   ["other", "✨ Otros"],
 ];
 
@@ -426,7 +427,7 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
       row.addEventListener("click", () => (mine ? ctx.onOpenItem(mine) : ctx.onOpenAlbum(album, name)));
       list.append(row);
     });
-    if (loadingMore) chips.append(el("span", "artist-kind-wait", "⏳ Buscando singles, EP…"));
+    if (loadingMore) chips.append(el("span", "artist-kind-wait", "⏳ Buscando singles, EP, piratas…"));
     const box = card({ icon: "📀", title: "Discografía", sub, accent: "peach" }, kinds.length > 1 || loadingMore ? chips : null, list);
     if (albums.length > ALBUMS_SHOWN) {
       const more = el("button", "secondary artist-more", `Ver los ${albums.length} ${typed ? kindName : "álbumes"}`);

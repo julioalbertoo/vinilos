@@ -78,11 +78,13 @@ function kindOf(group) {
 }
 
 // Lo que se pide, en este orden (primero los álbumes, que es lo que se enseña al abrir), y cuántas páginas de 100.
+// El último paso pide los álbumes sin filtro: los que no habían salido son los piratas.
 const TYPE_PAGES = [
-  ["album", 3],
-  ["ep", 1],
-  ["single", 2],
-  ["broadcast|other", 1],
+  ["album", 3, "official"],
+  ["ep", 1, "official"],
+  ["single", 2, "official"],
+  ["broadcast|other", 1, "official"],
+  ["album", 4, "bootleg"],
 ];
 
 // Discografía del artista (sus «release groups»: un álbum con todas sus ediciones), del más antiguo al más nuevo.
@@ -91,8 +93,8 @@ const TYPE_PAGES = [
 // su web: esconde los álbumes que solo tienen ediciones piratas. Si algún día no lo acepta, se pide sin filtro.
 let statusFilter = true;
 
-async function releaseGroups(params) {
-  if (statusFilter) {
+async function releaseGroups(params, filtered = true) {
+  if (filtered && statusFilter) {
     try {
       return await mbGet("/release-group", { ...params, "release-group-status": "website-default" });
     } catch (err) {
@@ -107,9 +109,12 @@ export async function mbDiscography(mbid, onProgress = () => {}) {
   const albums = [];
   const more = {};
   const seen = new Set();
-  for (const [type, maxPages] of TYPE_PAGES) {
+  for (const [type, maxPages, mode] of TYPE_PAGES) {
+    const bootlegs = mode === "bootleg";
+    // Sin el filtro no se pueden separar los piratas: se queda todo junto, como antes.
+    if (bootlegs && !statusFilter) continue;
     for (let page = 0; page < maxPages; page++) {
-      const r = await releaseGroups({ artist: mbid, type, limit: "100", offset: String(page * 100) });
+      const r = await releaseGroups({ artist: mbid, type, limit: "100", offset: String(page * 100) }, !bootlegs);
       const groups = (r && r["release-groups"]) || [];
       for (const g of groups) {
         if (seen.has(g.id)) continue;
@@ -121,14 +126,19 @@ export async function mbDiscography(mbid, onProgress = () => {}) {
           title: g.title || "",
           year: (g["first-release-date"] || "").slice(0, 4),
           thumb: `https://coverartarchive.org/release-group/${g.id}/front-250`,
-          kind: kindOf(g),
+          kind: bootlegs ? "bootleg" : kindOf(g),
         });
       }
       const total = (r && r["release-group-count"]) || 0;
       if ((page + 1) * 100 >= total) break;
       if (page === maxPages - 1) {
         // Lo que no se ha traído es de este tipo: se marca en los tipos de la app que pueda tener.
-        for (const k of type === "album" ? ["album", "live", "comp", "other"] : [type === "ep" ? "ep" : type === "single" ? "single" : "other"]) more[k] = true;
+        const kinds = bootlegs
+          ? ["bootleg"]
+          : type === "album"
+            ? ["album", "live", "comp", "other"]
+            : [type === "ep" ? "ep" : type === "single" ? "single" : "other"];
+        for (const k of kinds) more[k] = true;
       }
     }
     onProgress({ albums: sortByYear(albums), more });

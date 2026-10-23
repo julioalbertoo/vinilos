@@ -265,11 +265,11 @@ const NOT_LIVE = /\blong live\b|\bto live\b|\blive (a|the) /i;
 
 export const isLiveTitle = (title) => LIVE_TITLE.test(String(title || "")) && !NOT_LIVE.test(String(title || ""));
 
-// Tipo final de un disco encontrado buscando `wanted`: los no oficiales van a «otros», y los
+// Tipo final de un disco encontrado buscando `wanted`: los no oficiales van a «piratas», y los
 // álbumes que no salieron nunca en vinilo, también (es una app de vinilos).
 function searchKind(wanted, formats, title) {
   const words = lowerWords(formats);
-  if (words.includes("unofficial release")) return "other";
+  if (words.includes("unofficial release")) return "bootleg";
   if (wanted === "album") {
     if (words.includes("compilation")) return "comp";
     if (!words.includes("vinyl") && !words.includes("lp")) return "other";
