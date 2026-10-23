@@ -38,7 +38,51 @@ const GUIDE_SCREENS = ["intro", "ai", "discogs"];
 // Pestaña que se marca en la barra inferior para cada pantalla.
 const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "collection", settings: "settings" };
 
+// ---------- Botón «atrás» del navegador ----------
+// La app es una sola página: para que «atrás» (o deslizar desde el borde en el iPhone) haga lo mismo que
+// «← Volver», cada pantalla de detalle (candidatos, ficha, artista) deja una marca en el historial.
+const SUB_VIEWS = ["results", "detail", "artist"];
+let navDepth = 0;
+let skipPop = false;
+
+function pushNav() {
+  navDepth += 1;
+  history.pushState({ vinilos: navDepth }, "");
+}
+
+// «← Volver» de la app: pasa por el historial para que el navegador no se descuadre.
+function navBack() {
+  if (navDepth > 0) history.back();
+  else goBack();
+}
+
+// Lo que hace «Volver» en la pantalla que se ve ahora.
+function goBack() {
+  const view = activeView();
+  if (view === "artist") artistBack();
+  else if (view === "detail") detailBack();
+  else if (view === "results") resultsBack();
+}
+
+window.addEventListener("popstate", (event) => {
+  const depth = (event.state && event.state.vinilos) || 0;
+  if (skipPop) {
+    skipPop = false;
+    navDepth = depth;
+    return;
+  }
+  const back = depth < navDepth;
+  navDepth = depth;
+  if (back) goBack();
+});
+
 function showView(name) {
+  // Al irse a una pestaña principal se borran las marcas: «atrás» ya no tiene a qué volver dentro de la app.
+  if (!SUB_VIEWS.includes(name) && navDepth > 0) {
+    skipPop = true;
+    history.go(-navDepth);
+    navDepth = 0;
+  }
   if (name !== "capture") stopScanner();
   if (name === "collection") renderCollection();
   else setStatsActive(false);
@@ -299,6 +343,7 @@ function renderResults(ranked, total, strategy, clues) {
   more.onclick = showMore;
   showMore();
   document.getElementById("results-clues-json").textContent = JSON.stringify(clues, null, 2);
+  if (activeView() !== "results") pushNav();
   showView("results");
   window.scrollTo(0, 0);
 }
@@ -707,7 +752,10 @@ const BACK_LABELS = {
 // reopen: se vuelve a una ficha ya vista; no se guarda otra vez ni se mueve el scroll.
 async function openDetail(candidate, { returnView = "results", reopen = false } = {}) {
   const fromHistory = returnView !== "results" || reopen;
-  if (!reopen && activeView() !== "detail") detailScroll = window.scrollY;
+  if (!reopen && activeView() !== "detail") {
+    detailScroll = window.scrollY;
+    pushNav();
+  }
   lastDetail = { candidate, returnView };
   detailReturnView = returnView;
   document.getElementById("detail-back").textContent = BACK_LABELS[returnView];
@@ -942,6 +990,7 @@ function pushArtist(state) {
     artistTab = tabFor(from) || "collection";
   }
   artistStack.push({ state, back: from === "artist" ? "prev" : from, scroll: window.scrollY, detail: from === "detail" ? lastDetail : null });
+  pushNav();
   drawArtistTop();
   showView("artist");
   window.scrollTo(0, 0);
@@ -953,8 +1002,7 @@ function openArtist(target) {
   const top = artistStack[artistStack.length - 1];
   // Desde un disco abierto desde esta misma ficha: se vuelve a ella.
   if (activeView() === "detail" && detailReturnView === "artist" && top && sameArtist(top.state, target)) {
-    showView("artist");
-    restoreScroll(detailScroll);
+    navBack();
     return;
   }
   pushArtist({ kind: "artist", name: target.name, id: target.id || null });
@@ -1161,10 +1209,11 @@ function initResults(resetCapture) {
   const status = document.getElementById("results-manual-status");
   const searchButton = document.getElementById("results-manual-search");
 
-  document.getElementById("results-back").addEventListener("click", () => {
+  resultsBack = () => {
     resetCapture();
     showView("capture");
-  });
+  };
+  document.getElementById("results-back").addEventListener("click", navBack);
 
   document.getElementById("results-none").addEventListener("click", () => {
     manual.hidden = false;
@@ -1197,12 +1246,16 @@ function initResults(resetCapture) {
   });
 }
 
+let resultsBack = () => showView("capture");
+
+function detailBack() {
+  showView(detailReturnView);
+  restoreScroll(detailScroll);
+}
+
 function initDetail() {
-  document.getElementById("detail-back").addEventListener("click", () => {
-    showView(detailReturnView);
-    restoreScroll(detailScroll);
-  });
-  document.getElementById("artist-back").addEventListener("click", artistBack);
+  document.getElementById("detail-back").addEventListener("click", navBack);
+  document.getElementById("artist-back").addEventListener("click", navBack);
 }
 
 // Modo explorador: tema oscuro y lo que se identifica no se guarda en «Mis discos».
