@@ -349,6 +349,19 @@ export async function getArtistAlbums(id, name, discogsToken, onProgress = () =>
 // Del más antiguo al más nuevo; los que no tienen año, al final.
 const sortByYear = (list) => [...list].sort((a, b) => (Number(a.year) || 9999) - (Number(b.year) || 9999));
 
+// Edición de Discogs de un álbum del que solo se sabe artista y título (los de MusicBrainz):
+// la principal de su master si se encuentra; si no, la primera edición en vinilo. null si no hay.
+export async function findAlbumRelease(artist, title, discogsToken) {
+  const masters = await discogsGet("/database/search", { type: "master", artist, release_title: title, per_page: "5" }, discogsToken);
+  const master = (masters.results || [])[0];
+  if (master) {
+    const id = await masterMainRelease(master.id, discogsToken);
+    if (id) return id;
+  }
+  const releases = await discogsGet("/database/search", { type: "release", artist, release_title: title, format: "Vinyl", per_page: "5" }, discogsToken);
+  return ((releases.results || [])[0] || {}).id || null;
+}
+
 // Edición principal de un álbum (para abrir su ficha desde la discografía).
 export async function masterMainRelease(masterId, discogsToken) {
   const master = await discogsGet(`/masters/${masterId}`, null, discogsToken);

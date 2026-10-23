@@ -4,13 +4,14 @@
 import { CONFIG } from "./config.js";
 import { getArtist, getArtistAlbums, findArtistId } from "./discogs.js";
 import { cachedRelease } from "./details.js";
+import { findMbArtist, mbDiscography } from "./musicbrainz.js";
 import { el, card, tile, note, pill, plural, segmented, coverStrip } from "./charts.js";
 
 const CACHE_KEY = CONFIG.STORAGE_KEYS.artistCache;
 const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const ALBUMS_SHOWN = 12;
-// Sube cuando la discografía guardada cambia de forma (4: los directos aparte).
-const ALBUMS_VERSION = 4;
+// Sube cuando la discografía guardada cambia de forma (5: de MusicBrainz, con Discogs de reserva).
+const ALBUMS_VERSION = 5;
 
 // Filtros de la discografía, en este orden. Por defecto, solo los LP.
 const KINDS = [
@@ -136,16 +137,34 @@ async function loadArtist(id, token) {
 }
 
 // La discografía llega tipo a tipo; onProgress repinta con lo que ya hay (primero los LP).
+// Primero MusicBrainz, que dice qué es cada disco (LP, directo, recopilatorio…); si no conoce al
+// artista o falla, la de Discogs.
 async function loadAlbums(entry, token, onProgress) {
   entry.albumsFailed = false;
+  const progress = (p) => {
+    if (p.done) return;
+    entry.partial = p;
+    onProgress();
+  };
   try {
-    const { albums, more } = await getArtistAlbums(entry.artist.id, cleanName(entry.artist.name), token, (p) => {
-      if (p.done) return;
-      entry.partial = p;
-      onProgress();
-    });
+    let result = null;
+    let source = "discogs";
+    try {
+      const mb = await findMbArtist(entry.artist.id, cleanName(entry.artist.name));
+      if (mb) {
+        result = await mbDiscography(mb.id, progress);
+        if (result.albums.length) source = "musicbrainz";
+        else result = null;
+      }
+    } catch {
+      result = null; // se usa Discogs
+    }
+    if (!result) {
+      delete entry.partial;
+      result = await getArtistAlbums(entry.artist.id, cleanName(entry.artist.name), token, progress);
+    }
     delete entry.partial;
-    Object.assign(entry, { albums, more, albumsV: ALBUMS_VERSION });
+    Object.assign(entry, { albums: result.albums, more: result.more, source, albumsV: ALBUMS_VERSION });
     writeCache();
   } catch {
     // Se enseña lo que haya llegado; la próxima vez se vuelve a intentar.
@@ -327,7 +346,7 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
     ),
     tile(
       albumsLoading && !loadingMore ? "…" : lpCount ? `${lpCount}${moreOf("album") ? "+" : ""}` : "—",
-      typed ? "LP en Discogs" : lpCount === 1 ? "álbum en Discogs" : "álbumes en Discogs",
+      typed ? "LP de estudio" : lpCount === 1 ? "álbum" : "álbumes",
       { icon: "📀", accent: "peach" }
     )
   );
@@ -358,7 +377,7 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
   }
 
   if (albumsLoading && !allAlbums.length) {
-    nodes.push(card({ icon: "📀", title: "Discografía", accent: "peach" }, pill("⏳ Cargando su discografía de Discogs…", "peach")));
+    nodes.push(card({ icon: "📀", title: "Discografía", accent: "peach" }, pill("⏳ Cargando su discografía…", "peach")));
   }
 
   // Discografía, del primero al último, con los que ya tienes marcados.
@@ -394,6 +413,8 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
         img.src = src;
         img.alt = "";
         img.loading = "lazy";
+        // Hay álbumes sin portada en el archivo de MusicBrainz: se pone un disco.
+        img.addEventListener("error", () => img.replaceWith(el("span", "artist-album-cover", "💿")), { once: true });
       } else {
         img.textContent = "💿";
       }
@@ -401,7 +422,7 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
       text.append(el("span", "artist-album-title", album.title));
       text.append(el("span", "artist-album-year", mine ? `${album.year || ""}${album.year ? " · " : ""}💿 Lo tienes` : album.year || "Sin año"));
       row.append(img, text, el("span", "artist-row-go", "›"));
-      row.disabled = !mine && !album.id && !album.masterId;
+      row.disabled = !mine && !album.id && !album.masterId && !album.mbid;
       row.addEventListener("click", () => (mine ? ctx.onOpenItem(mine) : ctx.onOpenAlbum(album, name)));
       list.append(row);
     });
@@ -416,7 +437,13 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
       });
       box.append(more);
     }
-    box.append(note("Discos en los que es el artista principal; el tipo (LP, single…) es el que da Discogs. Los que no tienes se abren sin guardarse en tu colección."));
+    box.append(
+      note(
+        entry.source === "musicbrainz"
+          ? "Discografía y tipos (LP, directo, recopilatorio…) según MusicBrainz; precios y fichas, de Discogs. Los que no tienes se abren sin guardarse en tu colección."
+          : "Discos en los que es el artista principal; el tipo (LP, single…) es el que da Discogs. Los que no tienes se abren sin guardarse en tu colección."
+      )
+    );
     nodes.push(box);
   }
 

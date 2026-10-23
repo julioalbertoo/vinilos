@@ -13,7 +13,7 @@ import {
 import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify } from "./ai.js";
-import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, masterMainRelease, bothYears, countryWithFlag, vinylColor, releaseWeight } from "./discogs.js";
+import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, masterMainRelease, findAlbumRelease, bothYears, countryWithFlag, vinylColor, releaseWeight } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -879,9 +879,16 @@ function albumCandidate(album, artistName) {
 
 // Un álbum de la discografía: si solo se sabe su master, se busca antes su edición principal.
 async function openAlbum(album, name) {
-  if (!album.id && album.masterId) {
+  if (!album.id && (album.masterId || album.mbid)) {
     try {
-      album.id = await masterMainRelease(album.masterId, getDiscogsToken());
+      // Los de MusicBrainz no tienen id de Discogs: se busca por artista y título.
+      album.id = album.masterId
+        ? await masterMainRelease(album.masterId, getDiscogsToken())
+        : await findAlbumRelease(name, album.title, getDiscogsToken());
+      if (!album.id) {
+        window.alert(`No encuentro «${album.title}» en Discogs.`);
+        return;
+      }
     } catch (err) {
       window.alert(`No se pudo abrir el álbum: ${err.message}`);
       return;
