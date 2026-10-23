@@ -543,20 +543,32 @@ function outLink(text, href) {
   return link;
 }
 
+// Estados de G hacia arriba, tal como los escribe Discogs: se piden para el disco y para la portada.
+const GOOD_OR_BETTER = ["Mint (M)", "Near Mint (NM or M-)", "Very Good Plus (VG+)", "Very Good (VG)", "Good Plus (G+)", "Good (G)"];
+
+// Tienda de Discogs con lo que se vende desde España en vinilo, con disco y portada en G o mejor,
+// del más barato al más caro. which: ["release", id] o ["master", id].
+function spainShopUrl([key, id]) {
+  const params = new URLSearchParams([
+    [key, String(id)],
+    ["formatName", "Vinyl"],
+    ...GOOD_OR_BETTER.map((c) => ["mediaCondition", c]),
+    ...GOOD_OR_BETTER.map((c) => ["sleeveCondition", c]),
+    ["shipsFrom", "Spain"],
+    ["sort", "price"],
+    ["sortOrder", "ascending"],
+  ]);
+  return `https://www.discogs.com/shop/list?${params}`;
+}
+
 // Abre en Discogs las copias a la venta que se envían desde España: de esta edición y,
-// si se sabe el álbum (master), de cualquiera de sus ediciones en vinilo, de la más barata a la más cara.
-// La API de Discogs no deja buscar anuncios por país, así que no se puede poner aquí el precio.
+// si se sabe el álbum (master), de cualquiera de sus ediciones en vinilo.
+// La API de Discogs no deja buscar anuncios por país ni por estado, así que no se puede poner aquí el precio.
 function spainLink(id, masterId = document.getElementById("detail-price")?.dataset.master) {
   const box = el("div", "detail-price-links");
-  box.append(outLink("🇪🇸 Esta edición desde España ↗", `https://www.discogs.com/sell/release/${id}?ships_from=Spain&sort=price%2Casc`));
-  if (masterId) {
-    box.append(
-      outLink(
-        "🇪🇸 Cualquier edición en vinilo desde España ↗",
-        `https://www.discogs.com/sell/list?master_id=${masterId}&format=Vinyl&ships_from=Spain&sort=price%2Casc`
-      )
-    );
-  }
+  box.append(outLink("🇪🇸 Esta edición desde España ↗", spainShopUrl(["release", id])));
+  if (masterId) box.append(outLink("🇪🇸 Cualquier edición en vinilo desde España ↗", spainShopUrl(["master", masterId])));
+  box.append(el("p", "detail-price-note", "Solo copias con disco y portada en G o mejor."));
   return box;
 }
 

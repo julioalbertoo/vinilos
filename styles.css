@@ -3168,3 +3168,8 @@ button.artist-kind:active {
   font-weight: 800;
   text-decoration: none;
 }
+
+.view .detail-price-links .detail-price-note {
+  width: 100%;
+  margin: 0;
+}
