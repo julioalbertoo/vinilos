@@ -10,8 +10,8 @@ import { el, card, tile, note, pill, plural, segmented, coverStrip } from "./cha
 const CACHE_KEY = CONFIG.STORAGE_KEYS.artistCache;
 const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const ALBUMS_SHOWN = 12;
-// Sube cuando la discografía guardada cambia de forma (5: de MusicBrainz, con Discogs de reserva).
-const ALBUMS_VERSION = 5;
+// Sube cuando la discografía guardada cambia de forma (6: MusicBrainz sin discos piratas).
+const ALBUMS_VERSION = 6;
 
 // Filtros de la discografía, en este orden. Por defecto, solo los LP.
 const KINDS = [

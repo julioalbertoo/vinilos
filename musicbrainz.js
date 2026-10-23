@@ -18,7 +18,11 @@ async function mbGet(path, params = {}) {
     throw new Error("No se pudo contactar con MusicBrainz.");
   }
   if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`MusicBrainz respondió con un error (código ${response.status}).`);
+  if (!response.ok) {
+    const error = new Error(`MusicBrainz respondió con un error (código ${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
   return response.json();
 }
 
@@ -83,13 +87,29 @@ const TYPE_PAGES = [
 
 // Discografía del artista (sus «release groups»: un álbum con todas sus ediciones), del más antiguo al más nuevo.
 // onProgress({ albums, more }) tras cada tipo. more: { tipo: true } si hay más de los que se han traído.
+// MusicBrainz guarda también los discos piratas (bootlegs). «website-default» deja solo lo que enseña
+// su web: esconde los álbumes que solo tienen ediciones piratas. Si algún día no lo acepta, se pide sin filtro.
+let statusFilter = true;
+
+async function releaseGroups(params) {
+  if (statusFilter) {
+    try {
+      return await mbGet("/release-group", { ...params, "release-group-status": "website-default" });
+    } catch (err) {
+      if (err.status !== 400) throw err;
+      statusFilter = false;
+    }
+  }
+  return mbGet("/release-group", params);
+}
+
 export async function mbDiscography(mbid, onProgress = () => {}) {
   const albums = [];
   const more = {};
   const seen = new Set();
   for (const [type, maxPages] of TYPE_PAGES) {
     for (let page = 0; page < maxPages; page++) {
-      const r = await mbGet("/release-group", { artist: mbid, type, limit: "100", offset: String(page * 100) });
+      const r = await releaseGroups({ artist: mbid, type, limit: "100", offset: String(page * 100) });
       const groups = (r && r["release-groups"]) || [];
       for (const g of groups) {
         if (seen.has(g.id)) continue;
