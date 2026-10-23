@@ -34,7 +34,7 @@ En **⚙️ Ajustes → Copia en la nube** entra con tu **email y contraseña**.
 - **¿Sin contraseña?** Abre la web en Safari, pulsa **✉️ Enviarme un enlace para entrar** y abre el enlace del correo (sirve una sola vez). Ya dentro, en el mismo panel, pon una contraseña. Luego úsala en la app de la pantalla de inicio: el enlace del correo siempre se abre en Safari, no en la app.
 - Sin cuenta, la app funciona igual que siempre.
 - Si una llave ya está en el móvil, manda la del móvil; la de la nube solo se usa cuando aquí falta.
-- Con la cuenta abierta, la ficha de cada disco (canciones, sellos, notas, enlaces de las fotos) también se guarda en la nube y sale de ahí al abrirla, sin preguntar a Discogs. Se renueva cada 30 días. Los precios se piden a Discogs como mucho una vez por semana; en la ficha pone de cuándo son.
+- Con la cuenta abierta, la ficha de cada disco (canciones, sellos, notas, enlaces de las fotos) también se guarda en la nube y sale de ahí al abrirla, sin preguntar a Discogs. Se renueva cada 30 días. Los precios se piden a Discogs como mucho una vez por semana; en la ficha pone de cuándo son. Debajo del precio hay dos botones que abren Discogs con lo que se vende desde España, del más barato al más caro: esa edición, o cualquier edición en vinilo del álbum (Discogs no deja ver esos precios desde la app, solo en su web).
 
 **Truco para afinar la edición:** la portada suele ser igual en todas las ediciones. La contraportada y la galleta central traen el sello y el número de catálogo, que son los que distinguen una edición de otra.
 

@@ -3127,3 +3127,15 @@ button.artist-kind:active {
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* Enlaces a Discogs con lo que se vende desde España. */
+.detail-price-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.view .detail-price-links .detail-price-spain {
+  margin-top: 0;
+}

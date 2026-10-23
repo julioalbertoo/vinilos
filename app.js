@@ -410,7 +410,8 @@ function renderDetail(release) {
   if (release.id) {
     const price = el("div", "detail-price");
     price.id = "detail-price";
-    price.append(el("p", "detail-price-title", "💶 Precio de esta edición"), el("p", "detail-price-note", "Buscando precio en Discogs…"), spainLink(release.id));
+    if (release.masterId) price.dataset.master = String(release.masterId);
+    price.append(el("p", "detail-price-title", "💶 Precio de esta edición"), el("p", "detail-price-note", "Buscando precio en Discogs…"), spainLink(release.id, release.masterId));
     nodes.push(price);
   }
   if (release.tracklist.length) {
@@ -534,13 +535,29 @@ function spotifyLink(release) {
   return link;
 }
 
-// Abre en Discogs las copias de esta edición a la venta que se envían desde España.
-function spainLink(id) {
-  const link = el("a", "detail-price-spain", "🇪🇸 En venta desde España ↗");
-  link.href = `https://www.discogs.com/sell/release/${id}?ships_from=Spain`;
+function outLink(text, href) {
+  const link = el("a", "detail-price-spain", text);
+  link.href = href;
   link.target = "_blank";
   link.rel = "noopener";
   return link;
+}
+
+// Abre en Discogs las copias a la venta que se envían desde España: de esta edición y,
+// si se sabe el álbum (master), de cualquiera de sus ediciones en vinilo, de la más barata a la más cara.
+// La API de Discogs no deja buscar anuncios por país, así que no se puede poner aquí el precio.
+function spainLink(id, masterId = document.getElementById("detail-price")?.dataset.master) {
+  const box = el("div", "detail-price-links");
+  box.append(outLink("🇪🇸 Esta edición desde España ↗", `https://www.discogs.com/sell/release/${id}?ships_from=Spain&sort=price%2Casc`));
+  if (masterId) {
+    box.append(
+      outLink(
+        "🇪🇸 Cualquier edición en vinilo desde España ↗",
+        `https://www.discogs.com/sell/list?master_id=${masterId}&format=Vinyl&ships_from=Spain&sort=price%2Casc`
+      )
+    );
+  }
+  return box;
 }
 
 function renderPrices(id, prices, at) {
