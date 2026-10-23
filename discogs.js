@@ -435,6 +435,58 @@ export async function getPrices(id, discogsToken) {
   };
 }
 
+// Cuántas ediciones en vinilo de un álbum se miran para buscar la más barata.
+// Discogs no da precios en la lista de ediciones: hay que pedirlos uno a uno (1 por segundo).
+const CHEAPEST_CHECKS = 10;
+
+// La edición en vinilo más barata a la venta de un álbum, entre las más comunes
+// (las que más gente tiene: suele haber más copias y más baratas).
+// known: precios ya sabidos { [id]: { lowest } } (p. ej. la edición abierta), para no pedirlos otra vez.
+// onProgress({ best, checked, total, versions }) tras cada edición; stop() corta la búsqueda.
+export async function cheapestVinyl(masterId, discogsToken, { known = {}, onProgress = () => {}, stop = () => false } = {}) {
+  const versions = [];
+  let total = 0;
+  for (let page = 1; page <= 2; page++) {
+    const r = await discogsGet(`/masters/${masterId}/versions`, { format: "Vinyl", per_page: "100", page: String(page) }, discogsToken);
+    versions.push(...(r.versions || []));
+    total = (r.pagination && r.pagination.items) || versions.length;
+    if (page >= ((r.pagination && r.pagination.pages) || 1) || stop()) break;
+  }
+  const have = (v) => (v.stats && v.stats.community && v.stats.community.in_collection) || 0;
+  const picks = versions.sort((a, b) => have(b) - have(a)).slice(0, CHEAPEST_CHECKS);
+  let best = null;
+  let checked = 0;
+  const consider = (v, lowest) => {
+    if (lowest && lowest.value && (!best || lowest.value < best.value)) {
+      best = {
+        value: lowest.value,
+        currency: lowest.currency,
+        id: v.id,
+        country: v.country || "",
+        year: v.released && v.released !== "0" ? String(v.released).slice(0, 4) : "",
+        label: v.label || "",
+      };
+    }
+  };
+  for (const v of picks) {
+    if (stop()) return null;
+    if (known[v.id]) {
+      consider(v, known[v.id].lowest);
+    } else {
+      try {
+        const stats = await discogsGet(`/marketplace/stats/${v.id}`, { curr_abbr: "EUR" }, discogsToken);
+        if (!stats.blocked_from_sale) consider(v, stats.lowest_price);
+      } catch (err) {
+        if (err.authError) throw err;
+        // Si una falla, se sigue con las demás.
+      }
+    }
+    checked += 1;
+    onProgress({ best, checked, total: picks.length, versions: total });
+  }
+  return { best, checked, total: picks.length, versions: total };
+}
+
 // Solo interesan los vinilos: se descartan CD, casetes, etc.
 const isVinyl = (candidate) => candidate.formats.some((f) => /vinyl|lp\b|acetate|lathe/i.test(f));
 

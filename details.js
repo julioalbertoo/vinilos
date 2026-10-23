@@ -2,7 +2,8 @@
 // - La ficha (canciones, sellos, notas, enlaces de las fotos…) se reutiliza durante 30 días.
 // - Los precios, durante 7 días.
 // Sin cuenta en la nube, o si Supabase no responde, se pregunta a Discogs como siempre.
-import { getRelease, getPrices } from "./discogs.js";
+import { getRelease, getPrices, cheapestVinyl } from "./discogs.js";
+import { CONFIG } from "./config.js";
 import { loadDetail, saveDetail } from "./cloud.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -75,4 +76,35 @@ export async function cachedPrices(id, discogsToken) {
     if (row && row.prices) return { prices: row.prices, at: row.prices_at };
     throw err;
   }
+}
+
+// Vinilo más barato de un álbum (entre sus ediciones más comunes), guardado en el móvil 7 días.
+const CHEAPEST_KEY = CONFIG.STORAGE_KEYS.cheapestCache;
+
+function readCheapest() {
+  try {
+    return JSON.parse(localStorage.getItem(CHEAPEST_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+// Devuelve { best, checked, total, versions, at } o null si se cortó (stop).
+export async function cachedCheapest(masterId, discogsToken, options = {}) {
+  const all = readCheapest();
+  const saved = all[masterId];
+  if (saved && isFresh(saved.at, PRICES_MAX_AGE)) return saved;
+  const result = await cheapestVinyl(masterId, discogsToken, options);
+  if (!result) return null;
+  const entry = { ...result, at: new Date().toISOString() };
+  const fresh = readCheapest();
+  // Solo se guardan los álbumes de la última semana, para no llenar el móvil.
+  for (const [key, value] of Object.entries(fresh)) if (!isFresh(value.at, PRICES_MAX_AGE)) delete fresh[key];
+  fresh[masterId] = entry;
+  try {
+    localStorage.setItem(CHEAPEST_KEY, JSON.stringify(fresh));
+  } catch {
+    // Sin espacio: se vuelve a buscar la próxima vez.
+  }
+  return entry;
 }

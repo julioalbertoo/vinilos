@@ -19,7 +19,7 @@ import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory, updateHistoryItem } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
-import { cachedRelease, rememberRelease, cachedPrices } from "./details.js";
+import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest } from "./details.js";
 import { renderStats, setStatsActive } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
@@ -563,15 +563,24 @@ function spainLink(id, masterId = document.getElementById("detail-price")?.datas
 function renderPrices(id, prices, at) {
   const box = document.getElementById("detail-price");
   if (!box) return;
-  const nodes = [el("p", "detail-price-title", "💶 Precio de esta edición")];
+  const nodes = [el("p", "detail-price-title", "💶 Precio en Discogs")];
+  const own = el("div", "detail-price-row");
+  own.append(el("p", "detail-price-label", "Esta edición"));
   if (prices.blocked) {
-    nodes.push(el("p", "detail-price-note", "Discogs no permite vender esta edición."));
+    own.append(el("p", "detail-price-note", "Discogs no permite venderla."));
   } else if (prices.lowest) {
     const copies = prices.forSale === 1 ? "1 copia" : `${prices.forSale} copias`;
-    nodes.push(el("p", "detail-price-main", `En venta desde ${formatMoney(prices.lowest)}`));
-    nodes.push(el("p", "detail-price-note", `${copies} a la venta ahora`));
+    own.append(el("p", "detail-price-main", `desde ${formatMoney(prices.lowest)}`));
+    own.append(el("p", "detail-price-note", `${copies} a la venta ahora`));
   } else {
-    nodes.push(el("p", "detail-price-note", "Ahora mismo nadie la vende en Discogs."));
+    own.append(el("p", "detail-price-note", "Ahora mismo nadie la vende."));
+  }
+  nodes.push(own);
+  // Cualquier edición en vinilo del álbum: se rellena aparte (renderAllVinyl).
+  if (box.dataset.master) {
+    const all = el("div", "detail-price-row");
+    all.id = "detail-price-all";
+    nodes.push(all);
   }
   if (prices.suggested.length) {
     nodes.push(el("p", "detail-price-sub", "Precio sugerido según el estado:"));
@@ -587,6 +596,59 @@ function renderPrices(id, prices, at) {
   if (when) nodes.push(el("p", "detail-price-note", when));
   nodes.push(spainLink(id));
   box.replaceChildren(...nodes);
+  renderAllVinyl();
+}
+
+// Precio más bajo de cualquier edición en vinilo del álbum. state: { request, status, best, checked, total, versions, error }
+let allVinyl = null;
+
+function renderAllVinyl() {
+  const row = document.getElementById("detail-price-all");
+  if (!row || !allVinyl || allVinyl.request !== detailRequest) return;
+  const { status, best, checked, total, versions, error } = allVinyl;
+  const nodes = [el("p", "detail-price-label", "Cualquier edición en vinilo")];
+  if (best) nodes.push(el("p", "detail-price-main", `desde ${formatMoney(best)}`));
+  if (status === "loading") {
+    nodes.push(el("p", "detail-price-note", total ? `⏳ Mirando precios: ${checked} de ${total} ediciones…` : "⏳ Buscando las ediciones del álbum…"));
+  } else if (status === "error") {
+    nodes.push(el("p", "detail-price-note", `No se pudo consultar: ${error}`));
+  } else if (!best) {
+    nodes.push(el("p", "detail-price-note", `Nadie vende ahora ninguna de sus ${total} ediciones más comunes.`));
+  }
+  if (best) {
+    const where = [best.country, best.year, best.label].filter(Boolean).join(" · ");
+    const link = outLink(`${where || "Ver edición"} ↗`, `https://www.discogs.com/sell/release/${best.id}?sort=price%2Casc`);
+    link.className = "detail-price-best";
+    nodes.push(link);
+    if (status === "done") {
+      const of = versions > total ? ` (tiene ${new Intl.NumberFormat("es-ES").format(versions)} en total)` : "";
+      nodes.push(el("p", "detail-price-note", `La más barata entre sus ${total} ediciones en vinilo más comunes${of}.`));
+    }
+  }
+  row.replaceChildren(...nodes);
+}
+
+async function loadCheapest(release, prices, request) {
+  allVinyl = { request, status: "loading", best: null, checked: 0, total: 0, versions: 0 };
+  renderAllVinyl();
+  const known = prices && !prices.blocked ? { [release.id]: { lowest: prices.lowest } } : {};
+  try {
+    const result = await cachedCheapest(release.masterId, getDiscogsToken(), {
+      known,
+      stop: () => request !== detailRequest,
+      onProgress: (p) => {
+        if (request !== detailRequest) return;
+        allVinyl = { request, status: "loading", ...p };
+        renderAllVinyl();
+      },
+    });
+    if (!result || request !== detailRequest) return;
+    allVinyl = { request, status: "done", ...result };
+  } catch (err) {
+    if (request !== detailRequest) return;
+    allVinyl = { ...allVinyl, status: "error", error: err.message };
+  }
+  renderAllVinyl();
 }
 
 // Los precios se piden a Discogs como mucho una vez por semana: se dice de cuándo son.
@@ -598,10 +660,13 @@ function pricesAge(at) {
   return `Precio consultado hace ${days} días`;
 }
 
-async function loadPrices(id, request) {
+async function loadPrices(release, request) {
+  const id = release.id;
+  let prices = null;
   try {
-    const { prices, at } = await cachedPrices(id, getDiscogsToken());
-    if (request === detailRequest) renderPrices(id, prices, at);
+    const result = await cachedPrices(id, getDiscogsToken());
+    prices = result.prices;
+    if (request === detailRequest) renderPrices(id, result.prices, result.at);
   } catch (err) {
     const box = document.getElementById("detail-price");
     if (request === detailRequest && box) {
@@ -609,6 +674,7 @@ async function loadPrices(id, request) {
         el("p", "detail-price-note", `No se pudo consultar el precio: ${err.message}`), spainLink(id));
     }
   }
+  if (release.masterId && request === detailRequest) loadCheapest(release, prices, request);
 }
 
 let detailRequest = 0;
@@ -662,7 +728,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
       // En un disco guardado se enseña la portada que haya elegido el usuario.
       const saved = fromHistory && getHistory().find((i) => String(i.release_id) === String(release.id));
       renderDetail(saved && saved.cover ? { ...release, image: saved.cover } : release);
-      loadPrices(release.id, request);
+      loadPrices(release, request);
       if (fromHistory) {
         addCoverPicker(release);
         searchLabelAgain(release, request);

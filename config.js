@@ -39,6 +39,8 @@ export const CONFIG = {
     cloudPendingDeletes: "vinilos_cloud_pending_deletes",
     // Fichas de artistas de Discogs (foto, biografía, discografía), 30 días.
     artistCache: "vinilos_artist_cache",
+    // Vinilo más barato de cada álbum entre sus ediciones más comunes, 7 días.
+    cheapestCache: "vinilos_cheapest_cache",
   },
   IMAGE: {
     maxDim: 1024,
