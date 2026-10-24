@@ -16,31 +16,32 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
   <!-- Pone el tema oscuro del modo explorador antes de pintar, para que no parpadee en claro. -->
   <script>try { if (localStorage.getItem("vinilos_explore_mode") === "1") document.documentElement.dataset.theme = "dark"; } catch {}</script>
-  <link rel="stylesheet" href="styles.css?v=1.46.0">
+  <link rel="stylesheet" href="styles.css?v=1.47.0">
   <!-- Al publicar, sustituye la versión en TODO este archivo; cada módulo nuevo debe añadirse aquí. -->
   <script type="importmap">
     {
       "imports": {
-        "./config.js": "./config.js?v=1.46.0",
-        "./tokens.js": "./tokens.js?v=1.46.0",
-        "./guide.js": "./guide.js?v=1.46.0",
-        "./ai.js": "./ai.js?v=1.46.0",
-        "./discogs.js": "./discogs.js?v=1.46.0",
-        "./imaging.js": "./imaging.js?v=1.46.0",
-        "./scoring.js": "./scoring.js?v=1.46.0",
-        "./barcode.js": "./barcode.js?v=1.46.0",
-        "./history.js": "./history.js?v=1.46.0",
-        "./gallery.js": "./gallery.js?v=1.46.0",
-        "./labels.js": "./labels.js?v=1.46.0",
-        "./trivia.js": "./trivia.js?v=1.46.0",
-        "./wantlist.js": "./wantlist.js?v=1.46.0",
-        "./cloud.js": "./cloud.js?v=1.46.0",
-        "./details.js": "./details.js?v=1.46.0",
-        "./stats.js": "./stats.js?v=1.46.0",
-        "./charts.js": "./charts.js?v=1.46.0",
-        "./worldmap.js": "./worldmap.js?v=1.46.0",
-        "./artist.js": "./artist.js?v=1.46.0",
-        "./musicbrainz.js": "./musicbrainz.js?v=1.46.0",
+        "./config.js": "./config.js?v=1.47.0",
+        "./tokens.js": "./tokens.js?v=1.47.0",
+        "./guide.js": "./guide.js?v=1.47.0",
+        "./ai.js": "./ai.js?v=1.47.0",
+        "./discogs.js": "./discogs.js?v=1.47.0",
+        "./imaging.js": "./imaging.js?v=1.47.0",
+        "./scoring.js": "./scoring.js?v=1.47.0",
+        "./barcode.js": "./barcode.js?v=1.47.0",
+        "./history.js": "./history.js?v=1.47.0",
+        "./gallery.js": "./gallery.js?v=1.47.0",
+        "./labels.js": "./labels.js?v=1.47.0",
+        "./trivia.js": "./trivia.js?v=1.47.0",
+        "./wantlist.js": "./wantlist.js?v=1.47.0",
+        "./quota.js": "./quota.js?v=1.47.0",
+        "./cloud.js": "./cloud.js?v=1.47.0",
+        "./details.js": "./details.js?v=1.47.0",
+        "./stats.js": "./stats.js?v=1.47.0",
+        "./charts.js": "./charts.js?v=1.47.0",
+        "./worldmap.js": "./worldmap.js?v=1.47.0",
+        "./artist.js": "./artist.js?v=1.47.0",
+        "./musicbrainz.js": "./musicbrainz.js?v=1.47.0",
         "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm"
       }
     }
@@ -49,7 +50,7 @@
 <body>
   <header class="app-header">
     <h1><span class="logo-disc" aria-hidden="true"></span>Vinilos</h1>
-    <p class="app-version">v1.46.0</p>
+    <p class="app-version">v1.47.0</p>
   </header>
 
   <main id="app">
@@ -107,6 +108,13 @@
         <p id="settings-test-ai-status" class="status"></p>
         <button type="button" id="settings-test-discogs" class="secondary">Probar conexión Discogs</button>
         <p id="settings-test-discogs-status" class="status"></p>
+      </div>
+
+      <div class="panel">
+        <p class="panel-title">📊 Cupo de Gemini</p>
+        <div id="quota-list"></div>
+        <button type="button" id="quota-check" class="secondary">🔄 Comprobar ahora</button>
+        <p class="quota-note">Google no deja ver cuánto cupo te queda: solo avisa cuando se agota (y dice el límite y cuándo vuelve). Aquí se cuenta lo que gasta este móvil y lo último que dijo Google de cada modelo. «Comprobar ahora» hace una pregunta mínima a cada modelo, y gasta una consulta en los que responden. El uso exacto está en <a href="https://aistudio.google.com/usage" target="_blank" rel="noopener">Google AI Studio</a>.</p>
       </div>
 
       <div id="cloud-panel" class="panel" tabindex="-1">
@@ -270,6 +278,6 @@
     <button type="button" data-view="settings"><span aria-hidden="true">⚙️</span>Ajustes</button>
   </nav>
 
-  <script type="module" src="app.js?v=1.46.0"></script>
+  <script type="module" src="app.js?v=1.47.0"></script>
 </body>
 </html>

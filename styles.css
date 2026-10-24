@@ -3277,3 +3277,62 @@ button.artist-kind:active {
   width: 100%;
   margin: 0;
 }
+
+/* Cupo de Gemini en Ajustes: una fila por modelo. */
+.quota-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.quota-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.quota-row--quota {
+  background: var(--pink);
+}
+
+.quota-row--ok {
+  background: var(--mint);
+}
+
+.quota-icon {
+  flex: 0 0 auto;
+  width: 1.4em;
+  text-align: center;
+}
+
+.quota-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.quota-model {
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.quota-state {
+  font-size: 0.88rem;
+}
+
+.quota-used {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.view .quota-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}

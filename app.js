@@ -12,7 +12,8 @@ import {
 } from "./tokens.js";
 import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
-import { testAiConnection, identify } from "./ai.js";
+import { testAiConnection, identify, geminiModels, probeModel } from "./ai.js";
+import { quotaReport, nextPacificMidnight } from "./quota.js";
 import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, masterMainRelease, findAlbumRelease, bothYears, countryWithFlag, vinylColor, releaseWeight } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
@@ -89,6 +90,7 @@ function showView(name) {
   if (name !== "capture") stopScanner();
   if (name === "collection") renderCollection();
   if (name === "wantlist") renderWantlist();
+  if (name === "settings") renderQuota();
   else setStatsActive(false);
   for (const view of VIEWS) {
     document.getElementById(`view-${view}`).classList.toggle("active", view === name);
@@ -266,6 +268,88 @@ function initSettings() {
     markDiscogsVerified(ok);
     result.textContent = `${ok ? "✅" : "❌"} ${reason}`;
   });
+
+  document.getElementById("quota-check").addEventListener("click", checkQuotaNow);
+}
+
+// ---------- Cupo de Gemini ----------
+
+const clock = (iso) => {
+  const date = new Date(iso);
+  const sameDay = date.toDateString() === new Date().toDateString();
+  const time = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  return sameDay ? `las ${time}` : `el ${date.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" })} a las ${time}`;
+};
+
+function quotaState(row) {
+  const limit = row.limit ? ` · límite: ${row.limit} ${row.perDay ? "al día" : "por minuto"}` : "";
+  switch (row.state) {
+    case "ok":
+      return ["✅", `Disponible · respondió a ${clock(row.at)}`];
+    case "quota":
+      return row.perDay
+        ? ["⛔", `Sin cupo diario hasta ${clock(row.until)}${limit}`]
+        : ["⏳", `Sin cupo por minuto hasta ${clock(row.until)}${limit}`];
+    case "back":
+      return ["🔄", `Debería tener cupo otra vez (se agotó a ${clock(row.at)})${limit}`];
+    case "busy":
+      return ["⚠️", `Saturado o sin respuesta a ${clock(row.at)}`];
+    case "gone":
+      return ["🚫", "Google ya no ofrece este modelo"];
+    default:
+      return ["·", "Sin noticias todavía: pulsa «Comprobar ahora»"];
+  }
+}
+
+let quotaModels = null;
+
+async function renderQuota() {
+  const box = document.getElementById("quota-list");
+  if (!getAiKey()) {
+    box.replaceChildren(el("p", "quota-note", "Pon tu llave de Google Gemini para ver su cupo."));
+    return;
+  }
+  if (!quotaModels) {
+    box.replaceChildren(el("p", "quota-note", "Buscando tus modelos…"));
+    try {
+      quotaModels = await geminiModels(getAiKey());
+    } catch {
+      quotaModels = [CONFIG.AI_PROVIDER.fallbackModel, CONFIG.AI_PROVIDER.primaryModel];
+    }
+  }
+  const rows = quotaReport(quotaModels).map((row) => {
+    const [icon, text] = quotaState(row);
+    const li = el("li", `quota-row quota-row--${row.state}`);
+    const used = row.used
+      ? `Hoy, desde este móvil: ${row.used} ${row.used === 1 ? "consulta" : "consultas"}${row.search ? ` (${row.search} con búsqueda de Google)` : ""}`
+      : "Hoy, desde este móvil: ninguna consulta";
+    const left = row.perDay && row.limit && row.state !== "quota" ? ` · quedan como mucho ${Math.max(0, row.limit - row.used)}` : "";
+    const info = el("span", "quota-text");
+    info.append(el("span", "quota-model", row.model), el("span", "quota-state", text), el("span", "quota-used", used + left));
+    li.append(el("span", "quota-icon", icon), info);
+    return li;
+  });
+  const reset = nextPacificMidnight().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const list = el("ul", "quota-rows");
+  list.append(...rows);
+  box.replaceChildren(list, el("p", "quota-note", `Los cupos diarios se renuevan a las ${reset} (medianoche en California).`));
+}
+
+// Pregunta a cada modelo si responde ahora. Gasta una consulta en los que tienen cupo.
+async function checkQuotaNow() {
+  const button = document.getElementById("quota-check");
+  if (!getAiKey()) return renderQuota();
+  button.disabled = true;
+  button.textContent = "Comprobando…";
+  try {
+    if (!quotaModels) quotaModels = await geminiModels(getAiKey());
+    await Promise.all(quotaModels.map((model) => probeModel(model, getAiKey()).catch(() => null)));
+  } catch {
+    // Lo que se haya podido comprobar ya está apuntado.
+  }
+  button.disabled = false;
+  button.textContent = "🔄 Comprobar ahora";
+  renderQuota();
 }
 
 function el(tag, className, text) {

@@ -1,4 +1,5 @@
 import { CONFIG } from "./config.js";
+import { recordCall } from "./quota.js";
 
 const RESPONSE_FIELDS = [
   "artist",
@@ -83,7 +84,7 @@ async function postChat(aiKey, body, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(CONFIG.AI_PROVIDER.endpoint, {
+    const response = await fetch(CONFIG.AI_PROVIDER.endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${aiKey}`,
@@ -92,6 +93,16 @@ async function postChat(aiKey, body, timeoutMs) {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+    // Se apunta para el cupo de Ajustes (una copia, para no gastar la respuesta).
+    response
+      .clone()
+      .text()
+      .then((text) => recordCall(body.model, { status: response.status, body: text }))
+      .catch(() => {});
+    return response;
+  } catch (err) {
+    recordCall(body.model, { status: 0 });
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -369,6 +380,7 @@ async function callNative(model, parts, aiKey, options = {}) {
       signal: controller.signal,
     });
   } catch (err) {
+    recordCall(model, { status: 0 });
     const detail =
       err && err.name === "AbortError" ? "tiempo agotado" : `error de red (${err && err.message ? err.message : err})`;
     return { ok: false, detail, busy: true };
@@ -376,6 +388,7 @@ async function callNative(model, parts, aiKey, options = {}) {
     clearTimeout(timer);
   }
   const body = await response.text();
+  recordCall(model, { status: response.status, body, search: Boolean(options.body && options.body.tools) });
   if (response.ok) return { ok: true, body };
   const detail = describeError(response.status, body);
   if (response.status >= 500) return { ok: false, detail, busy: true };
@@ -444,4 +457,15 @@ export async function askWithGoogleSearch(prompt, aiKey) {
 // Gemma sí vale aquí, como último recurso. Devuelve lo mismo que askWithGoogleSearch.
 export async function askPlain(prompt, aiKey) {
   return firstAnswer(await allModels(aiKey, { gemma: true }), [{ text: prompt }], aiKey, { generationConfig: { temperature: 0.8 } });
+}
+
+// Modelos que se enseñan en el cupo de Ajustes: todos los que usa la app con esta llave.
+export async function geminiModels(aiKey) {
+  return allModels(aiKey, { gemma: true });
+}
+
+// Pregunta mínima a un modelo para saber si ahora mismo tiene cupo (gasta una consulta si responde).
+export async function probeModel(model, aiKey) {
+  const result = await callNative(model, [{ text: "Responde solo: ok" }], aiKey, { body: { generationConfig: { maxOutputTokens: 5 } } });
+  return result;
 }
