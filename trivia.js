@@ -1,8 +1,11 @@
 // «¿Sabías que…?» de la ficha: un dato curioso del disco, de esta edición en vinilo o de una canción.
 // Lo escribe Gemini con la búsqueda de Google activada. Google devuelve qué páginas respaldan cada
 // frase (groundingMetadata): si el dato no viene respaldado por páginas reales, no se enseña.
+// Si la búsqueda de Google no tiene cupo en ningún modelo, plan B: se lee un artículo de Wikipedia
+// del disco o de una canción, la IA elige un dato y copia la frase que lo prueba, y solo se enseña si esa
+// frase está, letra por letra, en el artículo (el enlace lleva justo a ella).
 // Cada vez que se abre la ficha sale un dato nuevo: se le pasan a la IA los ya contados para que no los repita.
-import { askWithGoogleSearch } from "./ai.js";
+import { askWithGoogleSearch, askPlain } from "./ai.js";
 
 const SEEN_KEY = "vinilos_trivia_seen";
 const SEEN_PER_DISC = 10;
@@ -129,6 +132,150 @@ function groundedSources(candidate, text) {
 
 const ATTEMPTS = 2;
 
+// ---------- Plan B: Wikipedia ----------
+
+const WIKI_ATTEMPTS = 2;
+const WIKI_WINDOW = 9000;
+
+// Minúsculas, sin acentos ni comillas tipográficas y con los espacios juntos, para comparar textos.
+const plain = (text) =>
+  String(text || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[‘’´`]/g, "'")
+    .replace(/[“”«»]/g, '"')
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .trim();
+
+// «Prince (2)» o «Siouxsie*» en Discogs → «Prince», «Siouxsie».
+const cleanArtist = (name) => String(name || "").replace(/\s*\(\d+\)/g, "").replace(/\*/g, "").trim();
+
+async function wikiJson(lang, params) {
+  const query = new URLSearchParams({ ...params, format: "json", origin: "*" });
+  const response = await fetch(`https://${lang}.wikipedia.org/w/api.php?${query}`);
+  if (!response.ok) throw new Error(`Wikipedia respondió ${response.status}`);
+  return response.json();
+}
+
+// Primer artículo de la búsqueda que hable de verdad de ese disco o canción (nombra al artista y el título).
+async function findArticle(lang, search, mustHave) {
+  const found = await wikiJson(lang, { action: "query", list: "search", srsearch: search, srlimit: "3" });
+  for (const hit of (found.query && found.query.search) || []) {
+    const data = await wikiJson(lang, { action: "query", prop: "extracts", explaintext: "1", pageids: String(hit.pageid) });
+    const page = data.query && data.query.pages && data.query.pages[hit.pageid];
+    const text = page && page.extract;
+    if (!text || text.length < 400) continue;
+    const head = plain(`${hit.title} ${text.slice(0, 1500)}`);
+    if (mustHave.every((word) => head.includes(plain(word)))) return { lang, title: hit.title, text };
+  }
+  return null;
+}
+
+// Trozo al azar del artículo (empezando en un párrafo), para que cada vez salga un dato distinto.
+function randomWindow(text) {
+  if (text.length <= WIKI_WINDOW) return text;
+  const starts = [0];
+  for (let i = text.indexOf("\n"); i !== -1 && i < text.length - 2000; i = text.indexOf("\n", i + 1)) starts.push(i + 1);
+  const start = starts[Math.floor(Math.random() * starts.length)];
+  return text.slice(start, start + WIKI_WINDOW);
+}
+
+function wikiPlans(release) {
+  const artist = cleanArtist(release.artist);
+  const tracks = (release.tracklist || []).map((t) => t.title).filter((t) => t && t.length > 2);
+  const plans = [
+    { lang: "es", search: `${release.title} ${artist} álbum`, must: [artist, release.title], topic: "este álbum o esta edición en vinilo" },
+    { lang: "en", search: `${release.title} ${artist} album`, must: [artist, release.title], topic: "este álbum o esta edición en vinilo" },
+  ];
+  if (tracks.length) {
+    const track = pick(tracks);
+    plans.push(
+      { lang: "en", search: `${track} ${artist} song`, must: [artist, track], topic: `la canción «${track}»` },
+      { lang: "es", search: `${track} ${artist} canción`, must: [artist, track], topic: `la canción «${track}»` }
+    );
+  }
+  // Orden al azar, para que no salga siempre del mismo artículo.
+  return plans.sort(() => Math.random() - 0.5);
+}
+
+function wikiPrompt(release, topic, excerpt, seen) {
+  return [
+    `Te doy un fragmento de un artículo de Wikipedia relacionado con el disco «${release.title}» de ${cleanArtist(release.artist)}.`,
+    `Elige UN dato curioso, sorprendente y poco conocido sobre ${topic} que aparezca en el texto.`,
+    "Devuelve SOLO un JSON, sin texto alrededor:",
+    '{"dato": "el dato en castellano, 1 a 3 frases, como mucho 60 palabras, sin introducción ni markdown", "cita": "la frase del texto que lo demuestra, copiada letra por letra, en su idioma original"}',
+    "Usa solo lo que dice el texto; no añadas nada de memoria.",
+    seen.length ? "No repitas ninguno de estos datos, ya contados:\n" + seen.map((t) => `· ${t}`).join("\n") : null,
+    `Si el texto no tiene nada curioso, devuelve {"dato": null, "cita": null}.`,
+    "",
+    "Texto:",
+    excerpt,
+  ]
+    .filter((l) => l !== null)
+    .join("\n");
+}
+
+function parseJson(text) {
+  const match = String(text || "").match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    return null;
+  }
+}
+
+// El dato solo vale si la cita está tal cual en el artículo y sus cifras (años, puestos…) también.
+function verifiedFact(answer, excerpt) {
+  const dato = String((answer && answer.dato) || "").trim();
+  const cita = String((answer && answer.cita) || "").trim().replace(/^["'«“]+|["'»”.]+$/g, "");
+  if (!dato || cita.length < 25) return null;
+  const source = plain(excerpt);
+  if (!source.includes(plain(cita))) return null;
+  const numbers = dato.match(/\d+/g) || [];
+  if (numbers.some((n) => !source.includes(n))) return null;
+  return { dato, cita };
+}
+
+// Enlace que abre el artículo justo en la frase citada (Safari y Chrome lo resaltan).
+function wikiLink(article, cita) {
+  const page = `https://${article.lang}.wikipedia.org/wiki/${encodeURIComponent(article.title.replace(/ /g, "_"))}`;
+  const words = cita.split(/\s+/).slice(0, 8).join(" ");
+  const fragment = encodeURIComponent(words).replace(/-/g, "%2D").replace(/,/g, "%2C").replace(/&/g, "%26");
+  return `${page}#:~:text=${fragment}`;
+}
+
+async function wikipediaTrivia(release, aiKey, seen) {
+  let calls = 0;
+  for (const plan of wikiPlans(release)) {
+    if (calls >= WIKI_ATTEMPTS) break;
+    let article = null;
+    try {
+      article = await findArticle(plan.lang, plan.search, plan.must);
+    } catch {
+      continue;
+    }
+    if (!article) continue;
+    const excerpt = randomWindow(article.text);
+    calls += 1;
+    const answer = await askPlain(wikiPrompt(release, plan.topic, excerpt, seen), aiKey);
+    if (!answer.ok) return { ok: false, quota: answer.quota, stop: answer.stop, detail: answer.detail };
+    const fact = verifiedFact(parseJson(answerText(answer.candidate)), excerpt);
+    if (!fact) continue;
+    return {
+      ok: true,
+      text: fact.dato,
+      sources: [{ title: `Wikipedia (${article.lang}): ${article.title}`, url: wikiLink(article, fact.cita) }],
+      searchHtml: "",
+    };
+  }
+  return { ok: false };
+}
+
+// ---------- Dato curioso ----------
+
 // Devuelve { ok: true, text, sources, searchHtml } o { ok: false, message }.
 export async function loadTrivia(release, aiKey) {
   if (!aiKey) return { ok: false, message: "Hace falta la llave de Google Gemini para buscar datos curiosos." };
@@ -138,8 +285,11 @@ export async function loadTrivia(release, aiKey) {
     const answer = await askWithGoogleSearch(buildPrompt(release, chooseTopic(release), seen), aiKey);
     if (!answer.ok) {
       if (answer.stop) return { ok: false, message: answer.detail };
-      if (answer.quota) return { ok: false, message: "Gemini está sin cupo gratuito o saturado ahora mismo. Inténtalo en un rato." };
-      return { ok: false, message: `No se pudo buscar el dato: ${answer.detail}` };
+      // Sin cupo de búsqueda en ningún modelo (o error): se pasa al plan B.
+      lastProblem = answer.quota
+        ? "La búsqueda de Google está sin cupo gratuito en todos los modelos de Gemini."
+        : `No se pudo buscar el dato: ${answer.detail}.`;
+      break;
     }
     const text = answerText(answer.candidate);
     if (!text || text.includes(NO_FACT)) continue;
@@ -151,5 +301,12 @@ export async function loadTrivia(release, aiKey) {
     rememberFact(release, text.slice(0, 220));
     return { ok: true, text, sources: grounded.sources, searchHtml: grounded.searchHtml };
   }
-  return { ok: false, message: lastProblem };
+  const wiki = await wikipediaTrivia(release, aiKey, seen);
+  if (wiki.ok) {
+    rememberFact(release, wiki.text.slice(0, 220));
+    return wiki;
+  }
+  if (wiki.stop) return { ok: false, message: wiki.detail };
+  if (wiki.quota) return { ok: false, message: "Gemini está sin cupo gratuito o saturado ahora mismo, en todos sus modelos. Inténtalo en un rato." };
+  return { ok: false, message: `${lastProblem} Tampoco salió un dato comprobable en Wikipedia. Inténtalo en un rato.` };
 }

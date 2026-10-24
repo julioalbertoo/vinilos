@@ -303,6 +303,47 @@ async function backupModels(aiKey) {
   return [...configured, ...found].slice(0, MAX_BACKUPS);
 }
 
+// Todos los modelos Gemini útiles que tiene la llave, del más nuevo al más viejo, sin límite.
+// Para el dato curioso, que puede probar más modelos (cada uno tiene su cupo) antes de rendirse.
+async function allModels(aiKey, { gemma }) {
+  const { primaryModel, fallbackModel, extraModels = [] } = CONFIG.AI_PROVIDER;
+  await backupModels(aiKey);
+  const names = await modelNamesPromise;
+  const found = names
+    ? [...names]
+        .filter((m) => isUsefulModel(m) && (gemma || !m.startsWith("gemma")))
+        .sort((a, b) => Number(a.startsWith("gemma")) - Number(b.startsWith("gemma")) || modelVersion(b) - modelVersion(a))
+    : extraModels;
+  // Primero el ligero; el principal al final, para guardar su cupo para identificar discos.
+  return [...new Set([fallbackModel, ...found.filter((m) => m !== primaryModel), primaryModel])];
+}
+
+// Prueba los modelos uno tras otro hasta que uno responda. Ni la falta de cupo ni la saturación
+// paran la búsqueda: se pasa al siguiente modelo. Devuelve { ok: true, candidate, model } o
+// { ok: false, detail, quota, stop }.
+async function firstAnswer(models, parts, aiKey, body) {
+  const failures = [];
+  let allQuota = true;
+  for (const model of models) {
+    const result = await callNative(model, parts, aiKey, { body });
+    if (!result.ok) {
+      if (result.stop) return { ok: false, detail: result.detail, stop: true };
+      if (!result.quota && !result.busy && !result.notFound) allQuota = false;
+      if (!result.notFound) failures.push(`${model}: ${result.detail}`);
+      continue;
+    }
+    try {
+      const candidate = JSON.parse(result.body)?.candidates?.[0];
+      if (candidate) return { ok: true, candidate, model };
+    } catch {
+      // cae al fallo de abajo
+    }
+    allQuota = false;
+    failures.push(`${model}: respuesta vacía`);
+  }
+  return { ok: false, detail: failures.join(" · ") || "ningún modelo disponible", quota: allQuota && failures.length > 0 };
+}
+
 function imagePart(image) {
   const match = /^data:([^;]+);base64,(.*)$/.exec(image);
   if (match) return { inline_data: { mime_type: match[1], data: match[2] } };
@@ -394,31 +435,13 @@ function parseLabelAnswer(body, count) {
 
 // Pregunta con la búsqueda de Google activada: Gemini busca en internet y devuelve qué páginas
 // respaldan cada trozo de su respuesta (groundingMetadata). Gemma no sabe buscar, así que se salta.
-// Primero el modelo ligero: el principal se reserva para identificar discos (cada uno tiene su cupo).
-// Devuelve { ok: true, candidate, model } o { ok: false, detail, quota, stop }.
 export async function askWithGoogleSearch(prompt, aiKey) {
-  const { primaryModel, fallbackModel } = CONFIG.AI_PROVIDER;
-  const backups = (await backupModels(aiKey)).filter((m) => !m.startsWith("gemma"));
-  const models = [...new Set([fallbackModel, ...backups, primaryModel])];
   const body = { tools: [{ google_search: {} }], generationConfig: { temperature: 1 } };
-  const failures = [];
-  let allQuota = true;
-  for (const model of models) {
-    const result = await callNative(model, [{ text: prompt }], aiKey, { body });
-    if (!result.ok) {
-      if (result.stop) return { ok: false, detail: result.detail, stop: true };
-      if (!result.quota && !result.busy) allQuota = false;
-      if (!result.notFound) failures.push(`${model}: ${result.detail}`);
-      continue;
-    }
-    try {
-      const candidate = JSON.parse(result.body)?.candidates?.[0];
-      if (candidate) return { ok: true, candidate, model };
-    } catch {
-      // cae al fallo de abajo
-    }
-    allQuota = false;
-    failures.push(`${model}: respuesta vacía`);
-  }
-  return { ok: false, detail: failures.join(" · ") || "ningún modelo disponible", quota: allQuota && failures.length > 0 };
+  return firstAnswer(await allModels(aiKey, { gemma: false }), [{ text: prompt }], aiKey, body);
+}
+
+// Pregunta normal, sin buscar en internet (gasta otro cupo distinto al de la búsqueda de Google).
+// Gemma sí vale aquí, como último recurso. Devuelve lo mismo que askWithGoogleSearch.
+export async function askPlain(prompt, aiKey) {
+  return firstAnswer(await allModels(aiKey, { gemma: true }), [{ text: prompt }], aiKey, { generationConfig: { temperature: 0.8 } });
 }
