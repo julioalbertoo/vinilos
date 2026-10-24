@@ -392,6 +392,16 @@ export async function masterMainRelease(masterId, discogsToken) {
   return vinyls.reduce((best, v) => (have(v) > have(best) ? v : best)).id;
 }
 
+// Ediciones oficiales en vinilo de un álbum, de la que más gente tiene a la que menos (solo ids).
+export async function popularVinylVersions(masterId, discogsToken) {
+  const versions = await discogsGet(`/masters/${masterId}/versions`, { format: "Vinyl", per_page: "100" }, discogsToken);
+  const have = (v) => v.stats?.community?.in_collection || 0;
+  return (versions.versions || [])
+    .filter((v) => !/unofficial/i.test(v.format || ""))
+    .sort((a, b) => have(b) - have(a))
+    .map((v) => v.id);
+}
+
 // Busca un artista por su nombre; devuelve su id o null. Primero el que se llama igual.
 export async function findArtistId(name, discogsToken) {
   const r = await discogsGet("/database/search", { type: "artist", q: name, per_page: "10" }, discogsToken);

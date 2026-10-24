@@ -14,7 +14,7 @@ import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify, geminiModels, probeModel } from "./ai.js";
 import { quotaReport, nextPacificMidnight } from "./quota.js";
-import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, masterMainRelease, findAlbumRelease, bothYears, countryWithFlag, vinylColor, releaseWeight, releaseDiscs } from "./discogs.js";
+import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, masterMainRelease, popularVinylVersions, findAlbumRelease, bothYears, countryWithFlag, vinylColor, releaseWeight, releaseDiscs } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -1210,29 +1210,42 @@ function addCoverPicker(release) {
   const box = foldable(`🖼️ Cambiar portada (${photos.length} fotos)`, grid);
   box.append(el("p", "detail-meta", "Toca una foto para usarla como portada en «Mis discos»."));
 
-  // Si no gusta ninguna: fotos de la edición en vinilo que más gente tiene.
+  // Si no gusta ninguna: fotos de otras ediciones en vinilo, de la más popular a la menos.
+  // Cada toque trae la siguiente.
   if (release.masterId) {
     const more = el("button", "secondary cover-picker-more", "📀 Ver fotos de la edición más popular");
     more.type = "button";
     const status = el("p", "detail-meta");
+    let queue = null; // ids de ediciones que faltan por enseñar
+    let shown = 0;
     more.addEventListener("click", async () => {
       more.disabled = true;
-      status.textContent = "⏳ Buscando la edición más popular…";
+      status.textContent = "⏳ Buscando otra edición…";
       try {
-        const id = await masterMainRelease(release.masterId, getDiscogsToken());
-        if (!id || String(id) === String(release.id)) {
-          status.textContent = "Esta ya es la edición más popular del álbum.";
+        if (!queue) {
+          queue = (await popularVinylVersions(release.masterId, getDiscogsToken())).filter((id) => String(id) !== String(release.id));
+        }
+        let added = 0;
+        let popular = null;
+        // Se salta las ediciones que no aportan fotos nuevas.
+        while (queue.length && !added) {
+          popular = await cachedRelease(queue.shift(), getDiscogsToken());
+          added = releasePhotos(popular).filter(addOption).length;
+        }
+        if (!added) {
+          status.textContent = shown ? "No hay más ediciones con fotos distintas." : "No hay otras ediciones con fotos distintas.";
+          more.hidden = true;
           return;
         }
-        const popular = await cachedRelease(id, getDiscogsToken());
-        const added = releasePhotos(popular).filter(addOption).length;
+        shown += 1;
         mark();
         box.querySelector("summary").textContent = `🖼️ Cambiar portada (${grid.children.length} fotos)`;
-        const where = [popular.country, popular.year].filter(Boolean).join(" · ");
-        status.textContent = added
-          ? `✓ ${added} foto${added > 1 ? "s" : ""} más de la edición más popular${where ? ` (${where})` : ""}.`
-          : "La edición más popular no tiene fotos distintas.";
-        more.hidden = true;
+        const where = [popular.country, popular.year, popular.labels?.[0]?.name].filter(Boolean).join(" · ");
+        const which = shown === 1 ? "la edición más popular" : `la ${shown}.ª edición más popular`;
+        status.textContent = `✓ ${added} foto${added > 1 ? "s" : ""} más de ${which}${where ? ` (${where})` : ""}.`;
+        more.textContent = "📀 No me gustan: ver la siguiente edición";
+        more.hidden = !queue.length;
+        more.disabled = false;
       } catch (err) {
         status.textContent = `No se pudieron cargar: ${err.message}`;
         more.disabled = false;
