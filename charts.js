@@ -779,10 +779,9 @@ export function timelineCard(rows, yearMode, onOpen) {
 
 let mapModule = null;
 let mapLoading = null;
-let mapView = null; // "world" | "europe"; null = se elige solo
+let mapView = "world"; // "world" | "europe"; empieza en Mundo
 
 const EUROPE_BOX = [360, 50, 124, 96];
-const EUROPE = new Set("ES PT FR GB IE DE NL BE LU CH AT IT SE NO DK FI IS GR PL CZ SK HU RO BG RS HR SI UA RU TR".split(" "));
 
 // counts: Map código → número de discos. names: Map código → nombre con bandera. extras: [[nombre, número]] sin país en el mapa (p. ej. «Europa»).
 export function mapCard(counts, names, extras, bars, rerender) {
@@ -802,9 +801,7 @@ export function mapCard(counts, names, extras, bars, rerender) {
   }
   const { VIEWBOX, OTHER, COUNTRIES } = mapModule;
   const located = [...counts.entries()].filter(([code]) => COUNTRIES[code]);
-  const europeShare = located.reduce((n, [code, c]) => n + (EUROPE.has(code) ? c : 0), 0);
-  const totalLocated = located.reduce((n, [, c]) => n + c, 0);
-  const view = mapView || (totalLocated && europeShare / totalLocated > 0.5 ? "europe" : "world");
+  const view = mapView;
 
   const switcher = segmented([["world", "🌍 Mundo"], ["europe", "🇪🇺 Europa"]], view, (value) => {
     mapView = value;
