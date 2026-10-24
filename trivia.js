@@ -247,7 +247,7 @@ function wikiLink(article, cita) {
   return `${page}#:~:text=${fragment}`;
 }
 
-async function wikipediaTrivia(release, aiKey, seen) {
+async function wikipediaTrivia(release, aiKey, seen, onStep) {
   let calls = 0;
   for (const plan of wikiPlans(release)) {
     if (calls >= WIKI_ATTEMPTS) break;
@@ -260,7 +260,9 @@ async function wikipediaTrivia(release, aiKey, seen) {
     if (!article) continue;
     const excerpt = randomWindow(article.text);
     calls += 1;
-    const answer = await askPlain(wikiPrompt(release, plan.topic, excerpt, seen), aiKey);
+    const answer = await askPlain(wikiPrompt(release, plan.topic, excerpt, seen), aiKey, (model) =>
+      onStep(`Leyendo Wikipedia con ${model}…`)
+    );
     if (!answer.ok) return { ok: false, quota: answer.quota, stop: answer.stop, detail: answer.detail };
     const fact = verifiedFact(parseJson(answerText(answer.candidate)), excerpt);
     if (!fact) continue;
@@ -276,19 +278,22 @@ async function wikipediaTrivia(release, aiKey, seen) {
 
 // ---------- Dato curioso ----------
 
-// Devuelve { ok: true, text, sources, searchHtml } o { ok: false, message }.
-export async function loadTrivia(release, aiKey) {
+// Devuelve { ok: true, text, sources, searchHtml, note } o { ok: false, message }. note: por qué el
+// dato sale de Wikipedia y no de la búsqueda de Google. onStep(texto): en qué paso va.
+export async function loadTrivia(release, aiKey, onStep = () => {}) {
   if (!aiKey) return { ok: false, message: "Hace falta la llave de Google Gemini para buscar datos curiosos." };
   const seen = readSeen()[discKey(release)] || [];
   let lastProblem = "No se encontró un dato curioso con fuentes que lo respalden.";
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
-    const answer = await askWithGoogleSearch(buildPrompt(release, chooseTopic(release), seen), aiKey);
+    const answer = await askWithGoogleSearch(buildPrompt(release, chooseTopic(release), seen), aiKey, (model) =>
+      onStep(`Buscando en Google con ${model}…`)
+    );
     if (!answer.ok) {
       if (answer.stop) return { ok: false, message: answer.detail };
       // Sin cupo de búsqueda en ningún modelo (o error): se pasa al plan B.
       lastProblem = answer.quota
-        ? "La búsqueda de Google está sin cupo gratuito en todos los modelos de Gemini."
-        : `No se pudo buscar el dato: ${answer.detail}.`;
+        ? "La búsqueda de Google de Gemini no tiene cupo ahora (es un cupo aparte del normal; mira Ajustes)."
+        : `La búsqueda de Google de Gemini falló (${answer.detail.split(" · ")[0].slice(0, 140)}).`;
       break;
     }
     const text = answerText(answer.candidate);
@@ -301,10 +306,11 @@ export async function loadTrivia(release, aiKey) {
     rememberFact(release, text.slice(0, 220));
     return { ok: true, text, sources: grounded.sources, searchHtml: grounded.searchHtml };
   }
-  const wiki = await wikipediaTrivia(release, aiKey, seen);
+  onStep("Buscando en Wikipedia…");
+  const wiki = await wikipediaTrivia(release, aiKey, seen, onStep);
   if (wiki.ok) {
     rememberFact(release, wiki.text.slice(0, 220));
-    return wiki;
+    return { ...wiki, note: `Sacado de Wikipedia: ${lastProblem.charAt(0).toLowerCase()}${lastProblem.slice(1)}` };
   }
   if (wiki.stop) return { ok: false, message: wiki.detail };
   if (wiki.quota) return { ok: false, message: "Gemini está sin cupo gratuito o saturado ahora mismo, en todos sus modelos. Inténtalo en un rato." };

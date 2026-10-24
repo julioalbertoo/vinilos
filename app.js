@@ -281,23 +281,26 @@ const clock = (iso) => {
   return sameDay ? `las ${time}` : `el ${date.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" })} a las ${time}`;
 };
 
-function quotaState(row) {
-  const limit = row.limit ? ` · límite: ${row.limit} ${row.perDay ? "al día" : "por minuto"}` : "";
-  switch (row.state) {
+function quotaState(entry) {
+  if (entry.state === "quota" && entry.limit === 0) return ["⛔", "no incluido en tu plan gratuito (límite: 0)"];
+  const limit = entry.limit ? ` · límite: ${entry.limit} ${entry.perDay ? "al día" : "por minuto"}` : "";
+  switch (entry.state) {
     case "ok":
-      return ["✅", `Disponible · respondió a ${clock(row.at)}`];
+      return ["✅", `disponible · respondió a ${clock(entry.at)}`];
     case "quota":
-      return row.perDay
-        ? ["⛔", `Sin cupo diario hasta ${clock(row.until)}${limit}`]
-        : ["⏳", `Sin cupo por minuto hasta ${clock(row.until)}${limit}`];
+      return entry.perDay
+        ? ["⛔", `sin cupo diario hasta ${clock(entry.until)}${limit}`]
+        : ["⏳", `sin cupo por minuto hasta ${clock(entry.until)}${limit}`];
     case "back":
-      return ["🔄", `Debería tener cupo otra vez (se agotó a ${clock(row.at)})${limit}`];
+      return ["🔄", `debería tener cupo otra vez (se agotó a ${clock(entry.at)})${limit}`];
     case "busy":
-      return ["⚠️", `Saturado o sin respuesta a ${clock(row.at)}`];
+      return ["⚠️", `saturado o sin respuesta a ${clock(entry.at)}`];
     case "gone":
       return ["🚫", "Google ya no ofrece este modelo"];
+    case "error":
+      return ["❌", `error a ${clock(entry.at)}: ${entry.detail || "sin detalle"}`];
     default:
-      return ["·", "Sin noticias todavía: pulsa «Comprobar ahora»"];
+      return ["·", "sin noticias todavía"];
   }
 }
 
@@ -318,14 +321,20 @@ async function renderQuota() {
     }
   }
   const rows = quotaReport(quotaModels).map((row) => {
-    const [icon, text] = quotaState(row);
-    const li = el("li", `quota-row quota-row--${row.state}`);
+    const [icon, text] = quotaState(row.plain);
+    const li = el("li", `quota-row quota-row--${row.plain.state}`);
     const used = row.used
       ? `Hoy, desde este móvil: ${row.used} ${row.used === 1 ? "consulta" : "consultas"}${row.search ? ` (${row.search} con búsqueda de Google)` : ""}`
       : "Hoy, desde este móvil: ninguna consulta";
-    const left = row.perDay && row.limit && row.state !== "quota" ? ` · quedan como mucho ${Math.max(0, row.limit - row.used)}` : "";
+    const left = row.plain.perDay && row.plain.limit && row.plain.state !== "quota" ? ` · quedan como mucho ${Math.max(0, row.plain.limit - row.used)}` : "";
     const info = el("span", "quota-text");
-    info.append(el("span", "quota-model", row.model), el("span", "quota-state", text), el("span", "quota-used", used + left));
+    info.append(el("span", "quota-model", row.model), el("span", "quota-state", `Normal: ${text}`));
+    // Gemma no sabe buscar en Google.
+    if (!row.model.startsWith("gemma")) {
+      const [webIcon, webText] = quotaState(row.web);
+      info.append(el("span", "quota-state", `${webIcon} Con búsqueda de Google: ${webText}`));
+    }
+    info.append(el("span", "quota-used", used + left));
     li.append(el("span", "quota-icon", icon), info);
     return li;
   });
@@ -343,7 +352,13 @@ async function checkQuotaNow() {
   button.textContent = "Comprobando…";
   try {
     if (!quotaModels) quotaModels = await geminiModels(getAiKey());
-    await Promise.all(quotaModels.map((model) => probeModel(model, getAiKey()).catch(() => null)));
+    // Cada modelo, sin y con búsqueda de Google (son cupos distintos).
+    await Promise.all(
+      quotaModels.flatMap((model) => [
+        probeModel(model, getAiKey()).catch(() => null),
+        model.startsWith("gemma") ? null : probeModel(model, getAiKey(), { search: true }).catch(() => null),
+      ])
+    );
   } catch {
     // Lo que se haya podido comprobar ya está apuntado.
   }
@@ -837,8 +852,11 @@ async function loadTriviaBox(release, request) {
     box.hidden = true;
     return;
   }
-  box.replaceChildren(title, el("p", "detail-trivia-note", "Buscando en internet un dato curioso con fuentes…"));
-  const result = await loadTrivia(release, getAiKey());
+  const step = el("p", "detail-trivia-note", "Buscando en internet un dato curioso con fuentes…");
+  box.replaceChildren(title, step);
+  const result = await loadTrivia(release, getAiKey(), (text) => {
+    if (request === detailRequest) step.textContent = text;
+  });
   if (request !== detailRequest) return;
   const again = el("button", "detail-trivia-again", "🔄 Otro dato");
   again.type = "button";
@@ -865,6 +883,7 @@ async function loadTriviaBox(release, request) {
     frame.srcdoc = `<base target="_blank"><style>body{margin:0;background:transparent}</style>${result.searchHtml}`;
     nodes.push(frame);
   }
+  if (result.note) nodes.push(el("p", "detail-trivia-why", result.note));
   nodes.push(again);
   box.replaceChildren(...nodes);
 }

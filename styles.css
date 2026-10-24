@@ -910,6 +910,12 @@ input[type="text"]:focus {
   overflow-wrap: anywhere;
 }
 
+.view .detail-trivia-why {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
 .view .detail-trivia-sources a {
   color: inherit;
   font-weight: 700;

@@ -1,5 +1,5 @@
 import { CONFIG } from "./config.js";
-import { recordCall } from "./quota.js";
+import { recordCall, shouldSkip } from "./quota.js";
 
 const RESPONSE_FIELDS = [
   "artist",
@@ -23,6 +23,8 @@ const SYSTEM_PROMPT =
   "confidence es un número entre 0 y 1 que indica cuánto confías en tu lectura global.";
 
 const MODEL_TIMEOUT_MS = 30000;
+// El dato curioso no espera tanto a un modelo lento: pasa antes al siguiente.
+const TRIVIA_TIMEOUT_MS = 15000;
 
 // Gemma no admite instrucciones de sistema: a ese modelo se le dan dentro del mensaje.
 function buildMessages(model, imageDataUrl) {
@@ -332,11 +334,15 @@ async function allModels(aiKey, { gemma }) {
 // Prueba los modelos uno tras otro hasta que uno responda. Ni la falta de cupo ni la saturación
 // paran la búsqueda: se pasa al siguiente modelo. Devuelve { ok: true, candidate, model } o
 // { ok: false, detail, quota, stop }.
-async function firstAnswer(models, parts, aiKey, body) {
+async function firstAnswer(models, parts, aiKey, body, onModel) {
+  const search = Boolean(body.tools);
   const failures = [];
   let allQuota = true;
   for (const model of models) {
-    const result = await callNative(model, parts, aiKey, { body });
+    // Los que se sabe que no van a responder (sin cupo, saturados hace nada…) se saltan sin esperar.
+    if (shouldSkip(model, search)) continue;
+    if (onModel) onModel(model);
+    const result = await callNative(model, parts, aiKey, { body, timeoutMs: TRIVIA_TIMEOUT_MS });
     if (!result.ok) {
       if (result.stop) return { ok: false, detail: result.detail, stop: true };
       if (!result.quota && !result.busy && !result.notFound) allQuota = false;
@@ -352,7 +358,7 @@ async function firstAnswer(models, parts, aiKey, body) {
     allQuota = false;
     failures.push(`${model}: respuesta vacía`);
   }
-  return { ok: false, detail: failures.join(" · ") || "ningún modelo disponible", quota: allQuota && failures.length > 0 };
+  return { ok: false, detail: failures.join(" · ") || "todos sin cupo o sin respuesta", quota: allQuota };
 }
 
 function imagePart(image) {
@@ -365,7 +371,7 @@ function imagePart(image) {
 // options.body: campos extra de la petición (p. ej. herramientas); sustituyen a los de por defecto.
 async function callNative(model, parts, aiKey, options = {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs || MODEL_TIMEOUT_MS);
   let response;
   try {
     response = await fetch(`${NATIVE_BASE}/${model}:generateContent`, {
@@ -380,7 +386,7 @@ async function callNative(model, parts, aiKey, options = {}) {
       signal: controller.signal,
     });
   } catch (err) {
-    recordCall(model, { status: 0 });
+    recordCall(model, { status: 0, search: Boolean(options.body && options.body.tools) });
     const detail =
       err && err.name === "AbortError" ? "tiempo agotado" : `error de red (${err && err.message ? err.message : err})`;
     return { ok: false, detail, busy: true };
@@ -448,15 +454,15 @@ function parseLabelAnswer(body, count) {
 
 // Pregunta con la búsqueda de Google activada: Gemini busca en internet y devuelve qué páginas
 // respaldan cada trozo de su respuesta (groundingMetadata). Gemma no sabe buscar, así que se salta.
-export async function askWithGoogleSearch(prompt, aiKey) {
+export async function askWithGoogleSearch(prompt, aiKey, onModel) {
   const body = { tools: [{ google_search: {} }], generationConfig: { temperature: 1 } };
-  return firstAnswer(await allModels(aiKey, { gemma: false }), [{ text: prompt }], aiKey, body);
+  return firstAnswer(await allModels(aiKey, { gemma: false }), [{ text: prompt }], aiKey, body, onModel);
 }
 
 // Pregunta normal, sin buscar en internet (gasta otro cupo distinto al de la búsqueda de Google).
 // Gemma sí vale aquí, como último recurso. Devuelve lo mismo que askWithGoogleSearch.
-export async function askPlain(prompt, aiKey) {
-  return firstAnswer(await allModels(aiKey, { gemma: true }), [{ text: prompt }], aiKey, { generationConfig: { temperature: 0.8 } });
+export async function askPlain(prompt, aiKey, onModel) {
+  return firstAnswer(await allModels(aiKey, { gemma: true }), [{ text: prompt }], aiKey, { generationConfig: { temperature: 0.8 } }, onModel);
 }
 
 // Modelos que se enseñan en el cupo de Ajustes: todos los que usa la app con esta llave.
@@ -465,7 +471,11 @@ export async function geminiModels(aiKey) {
 }
 
 // Pregunta mínima a un modelo para saber si ahora mismo tiene cupo (gasta una consulta si responde).
-export async function probeModel(model, aiKey) {
-  const result = await callNative(model, [{ text: "Responde solo: ok" }], aiKey, { body: { generationConfig: { maxOutputTokens: 5 } } });
-  return result;
+// search: la pregunta va con búsqueda de Google, para ver ese cupo (gasta una búsqueda si responde).
+export async function probeModel(model, aiKey, { search = false } = {}) {
+  const body = search
+    ? { tools: [{ google_search: {} }], generationConfig: { maxOutputTokens: 30 } }
+    : { generationConfig: { maxOutputTokens: 5 } };
+  const text = search ? "¿En qué año salió el disco Abbey Road? Responde solo el año." : "Responde solo: ok";
+  return callNative(model, [{ text }], aiKey, { body, timeoutMs: 20000 });
 }

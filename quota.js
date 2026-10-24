@@ -63,13 +63,42 @@ export function parseQuotaError(bodyText) {
   const retrySeconds = retry ? Number.parseFloat(String(retry.retryDelay)) : null;
   return {
     quotaId: violation.quotaId || "",
-    limit: violation.quotaValue ? Number(violation.quotaValue) : null,
+    limit: violation.quotaValue !== undefined && violation.quotaValue !== "" ? Number(violation.quotaValue) : null,
     perDay: /PerDay/i.test(violation.quotaId || ""),
     retrySeconds: Number.isFinite(retrySeconds) ? retrySeconds : null,
   };
 }
 
-// Apunta una consulta a un modelo. status: código HTTP (0 = sin respuesta). search: con búsqueda de Google.
+function errorText(bodyText) {
+  try {
+    const parsed = JSON.parse(bodyText);
+    const error = Array.isArray(parsed) ? parsed[0]?.error : parsed?.error;
+    return String((error && error.message) || bodyText || "").slice(0, 160);
+  } catch {
+    return String(bodyText || "").slice(0, 160);
+  }
+}
+
+// Estado de un modelo tras una respuesta: ok, quota (sin cupo hasta until), busy (saturado o sin
+// respuesta), gone (retirado) o error (otro fallo, con su mensaje).
+function stateFrom(status, body, now) {
+  const at = now.toISOString();
+  if (status === 200) return { state: "ok", at };
+  if (status === 429) {
+    const info = parseQuotaError(body);
+    const until = info.perDay
+      ? nextPacificMidnight(now).toISOString()
+      : new Date(now.getTime() + (info.retrySeconds || 60) * 1000).toISOString();
+    // Límite 0: el plan gratuito no incluye ese modelo (o su búsqueda): no vuelve hasta mañana ni nunca.
+    return { state: "quota", at, until, limit: info.limit, perDay: info.perDay || info.limit === 0 };
+  }
+  if (status === 404) return { state: "gone", at };
+  if (status === 0 || status >= 500) return { state: "busy", at };
+  return { state: "error", at, detail: errorText(body) };
+}
+
+// Apunta una consulta a un modelo. status: código HTTP (0 = sin respuesta). search: con búsqueda de Google,
+// que tiene su propio cupo: se apunta aparte (web) de las consultas normales (plain).
 export function recordCall(model, { status, body = "", search = false }) {
   if (!model) return;
   const data = read();
@@ -79,40 +108,48 @@ export function recordCall(model, { status, body = "", search = false }) {
     m.used += 1;
     if (search) m.search += 1;
   }
-  const now = new Date();
-  if (status === 200) {
-    m.state = "ok";
-    m.at = now.toISOString();
-    m.until = null;
-  } else if (status === 429) {
-    const info = parseQuotaError(body);
-    m.state = "quota";
-    m.at = now.toISOString();
-    m.quotaId = info.quotaId;
-    if (info.limit) m.limit = info.limit;
-    m.perDay = info.perDay;
-    m.until = info.perDay
-      ? nextPacificMidnight(now).toISOString()
-      : new Date(now.getTime() + (info.retrySeconds || 60) * 1000).toISOString();
-  } else if (status === 404) {
-    m.state = "gone";
-    m.at = now.toISOString();
-  } else if (status >= 500 || status === 0) {
-    m.state = "busy";
-    m.at = now.toISOString();
-  }
+  const next = stateFrom(status, body, new Date());
+  const key = search ? "web" : "plain";
+  // El límite conocido se conserva aunque luego vuelva a responder.
+  const limit = next.limit ?? (m[key] && m[key].limit) ?? null;
+  const perDay = next.state === "quota" ? next.perDay : Boolean(m[key] && m[key].perDay);
+  m[key] = { ...next, limit, perDay };
+  // Si responde con búsqueda, también respondería sin ella.
+  if (search && status === 200) m.plain = { ...(m.plain || {}), state: "ok", at: next.at, until: null };
   write(data);
 }
 
-// Estado de cada modelo para Ajustes: { model, used, search, state, at, until, limit, perDay }.
-// Un «sin cupo» cuya hora de vuelta ya pasó se da por disponible otra vez.
+const BUSY_SKIP_MS = 2 * 60 * 1000;
+const ERROR_SKIP_MS = 6 * 3600 * 1000;
+
+function current(entry) {
+  if (!entry || !entry.state) return { state: "unknown" };
+  if (entry.state === "quota" && entry.until && new Date(entry.until).getTime() <= Date.now()) return { ...entry, state: "back" };
+  return entry;
+}
+
+// ¿Merece la pena saltarse este modelo? Sí si se sabe que no tiene cupo, si estaba saturado hace
+// menos de 2 minutos, si Google lo retiró o (con búsqueda) si dio un error hace menos de 6 horas.
+export function shouldSkip(model, search) {
+  const data = read();
+  const m = data.models[model];
+  if (!m) return false;
+  const entry = current(search ? m.web : m.plain);
+  const age = entry.at ? Date.now() - new Date(entry.at).getTime() : Infinity;
+  if (entry.state === "quota" || entry.state === "gone") return true;
+  if (entry.state === "busy") return age < BUSY_SKIP_MS;
+  if (entry.state === "error") return search && age < ERROR_SKIP_MS;
+  return false;
+}
+
+// Estado de cada modelo para Ajustes: { model, used, search, plain, web }; plain y web son
+// { state, at, until, limit, perDay, detail }. Un «sin cupo» cuya hora ya pasó sale como «back».
 export function quotaReport(models) {
   const data = read();
-  const now = Date.now();
   return models.map((model) => {
     const m = data.models[model] || { used: 0, search: 0 };
-    let state = m.state || "unknown";
-    if (state === "quota" && m.until && new Date(m.until).getTime() <= now) state = "back";
-    return { model, used: m.used || 0, search: m.search || 0, state, at: m.at || null, until: m.until || null, limit: m.limit || null, perDay: Boolean(m.perDay) };
+    // Versión anterior: el estado iba suelto en el modelo.
+    const plain = m.plain || (m.state ? { state: m.state, at: m.at, until: m.until, limit: m.limit, perDay: m.perDay } : null);
+    return { model, used: m.used || 0, search: m.search || 0, plain: current(plain), web: current(m.web) };
   });
 }
