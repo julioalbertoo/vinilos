@@ -6,6 +6,7 @@ import { getArtist, getArtistAlbums, findArtistId } from "./discogs.js";
 import { cachedRelease } from "./details.js";
 import { findMbArtist, mbDiscography } from "./musicbrainz.js";
 import { el, card, tile, note, pill, plural, segmented, coverStrip } from "./charts.js";
+import { isWanted, toggleWanted } from "./wantlist.js";
 
 const CACHE_KEY = CONFIG.STORAGE_KEYS.artistCache;
 const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
@@ -273,6 +274,25 @@ export async function renderArtistPage(container, target, ctx) {
   }
 }
 
+// Estrella para apuntar (o quitar) un álbum en «Lo que busco».
+function wantStar(album) {
+  const star = el("button", "want-star");
+  star.type = "button";
+  const paint = () => {
+    const on = isWanted(album.artist, album.title);
+    star.textContent = on ? "★" : "☆";
+    star.classList.toggle("is-on", on);
+    star.setAttribute("aria-pressed", String(on));
+    star.setAttribute("aria-label", on ? `Quitar «${album.title}» de lo que busco` : `Añadir «${album.title}» a lo que busco`);
+  };
+  star.addEventListener("click", () => {
+    toggleWanted(album);
+    paint();
+  });
+  paint();
+  return star;
+}
+
 function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
   const nodes = [];
 
@@ -405,9 +425,10 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
     const list = el("div", "artist-albums");
     albums.forEach((album, index) => {
       const mine = ownedAlbum(album);
+      const line = el("div", "artist-album-line");
+      if (index >= ALBUMS_SHOWN) line.hidden = true;
       const row = el("button", `artist-album${mine ? " is-owned" : ""}`);
       row.type = "button";
-      if (index >= ALBUMS_SHOWN) row.hidden = true;
       const src = (mine && (mine.thumb || mine.cover)) || album.thumb;
       const img = el(src ? "img" : "span", "artist-album-cover");
       if (src) {
@@ -425,7 +446,10 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
       row.append(img, text, el("span", "artist-row-go", "›"));
       row.disabled = !mine && !album.id && !album.masterId && !album.mbid;
       row.addEventListener("click", () => (mine ? ctx.onOpenItem(mine) : ctx.onOpenAlbum(album, name)));
-      list.append(row);
+      line.append(row);
+      // Los que no tienes se pueden apuntar en «Lo que busco».
+      if (!mine && !row.disabled) line.append(wantStar({ ...album, artist: name }));
+      list.append(line);
     });
     if (loadingMore) chips.append(el("span", "artist-kind-wait", "⏳ Buscando singles, EP, piratas…"));
     const box = card({ icon: "📀", title: "Discografía", sub, accent: "peach" }, kinds.length > 1 || loadingMore ? chips : null, list);
@@ -441,8 +465,8 @@ function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {
     box.append(
       note(
         entry.source === "musicbrainz"
-          ? "Discografía y tipos (LP, directo, recopilatorio…) según MusicBrainz; precios y fichas, de Discogs. Los que no tienes se abren sin guardarse en tu colección."
-          : "Discos en los que es el artista principal; el tipo (LP, single…) es el que da Discogs. Los que no tienes se abren sin guardarse en tu colección."
+          ? "Discografía y tipos (LP, directo, recopilatorio…) según MusicBrainz; precios y fichas, de Discogs. Los que no tienes se abren sin guardarse en tu colección; con ☆ los apuntas en «Lo que busco»."
+          : "Discos en los que es el artista principal; el tipo (LP, single…) es el que da Discogs. Los que no tienes se abren sin guardarse en tu colección; con ☆ los apuntas en «Lo que busco»."
       )
     );
     nodes.push(box);

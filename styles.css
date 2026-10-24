@@ -2991,6 +2991,64 @@ button.artist-row:active {
   background: var(--line);
 }
 
+/* Fila de la discografía con la estrella de «Lo que busco» al lado. */
+.artist-album-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.artist-album-line > button.artist-album {
+  flex: 1;
+  min-width: 0;
+}
+
+button.want-star {
+  flex: 0 0 auto;
+  width: 40px;
+  min-height: 40px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+button.want-star.is-on {
+  color: #e0a100;
+}
+
+button.want-star:active {
+  background: var(--line);
+}
+
+/* Acceso discreto a «Lo que busco», al final de «Mis discos». */
+button.wantlist-link {
+  display: block;
+  width: auto;
+  min-height: 0;
+  margin: 18px auto 0;
+  padding: 6px 12px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+button.wantlist-link:active {
+  background: var(--line);
+}
+
+.view .wantlist-sub,
+.view .wantlist-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 button.artist-album:disabled {
   opacity: 1;
 }

@@ -24,6 +24,7 @@ import { renderStats, setStatsActive } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { loadTrivia } from "./trivia.js";
+import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease } from "./wantlist.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
@@ -34,15 +35,15 @@ const SEARCH_STEP_LABELS = {
   master: "todas las ediciones del álbum",
 };
 
-const VIEWS = ["guide", "settings", "capture", "results", "detail", "collection", "artist"];
+const VIEWS = ["guide", "settings", "capture", "results", "detail", "collection", "artist", "wantlist"];
 const GUIDE_SCREENS = ["intro", "ai", "discogs"];
 // Pestaña que se marca en la barra inferior para cada pantalla.
-const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "collection", settings: "settings" };
+const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "collection", settings: "settings", wantlist: "collection" };
 
 // ---------- Botón «atrás» del navegador ----------
 // La app es una sola página: para que «atrás» (o deslizar desde el borde en el iPhone) haga lo mismo que
 // «← Volver», cada pantalla de detalle (candidatos, ficha, artista) deja una marca en el historial.
-const SUB_VIEWS = ["results", "detail", "artist"];
+const SUB_VIEWS = ["results", "detail", "artist", "wantlist"];
 let navDepth = 0;
 let skipPop = false;
 
@@ -63,6 +64,7 @@ function goBack() {
   if (view === "artist") artistBack();
   else if (view === "detail") detailBack();
   else if (view === "results") resultsBack();
+  else if (view === "wantlist") wantlistBack();
 }
 
 window.addEventListener("popstate", (event) => {
@@ -86,6 +88,7 @@ function showView(name) {
   }
   if (name !== "capture") stopScanner();
   if (name === "collection") renderCollection();
+  if (name === "wantlist") renderWantlist();
   else setStatsActive(false);
   for (const view of VIEWS) {
     document.getElementById(`view-${view}`).classList.toggle("active", view === name);
@@ -793,6 +796,7 @@ const BACK_LABELS = {
   results: "← Volver a los candidatos",
   collection: "← Volver a mis discos",
   artist: "← Volver al artista",
+  wantlist: "← Volver a lo que busco",
 };
 
 // returnView: pantalla a la que lleva "Volver". Desde «Mis discos» el disco ya está
@@ -810,6 +814,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
   const savedNote = document.getElementById("detail-saved");
   savedNote.textContent = "";
   document.getElementById("detail-delete").hidden = true;
+  document.getElementById("detail-want").hidden = true;
 
   // Mientras llega la ficha completa se enseña lo que ya sabemos del candidato.
   renderDetail({
@@ -866,7 +871,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
   }
 
   const alreadyOwned = getHistory().some((item) => String(item.release_id) === String(candidate.id));
-  if (returnView === "artist" && !alreadyOwned) {
+  if ((returnView === "artist" || returnView === "wantlist") && !alreadyOwned) {
     if (request === detailRequest) savedNote.textContent = "Edición principal del álbum · no está en tu colección";
   } else if (fromHistory) {
     // Ya guardado: no se toca.
@@ -891,6 +896,8 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
         weight: release ? releaseWeight(release) : candidate.weight || undefined,
       });
       if (request === detailRequest) savedNote.textContent = alreadyOwned ? "💿 Ya estaba en tu colección" : "✓ Guardado en tu historial";
+      // Si estaba en «Lo que busco», ya no hace falta buscarlo.
+      removeWantedRelease({ artist: release ? release.artist : candidate.artist, title: release ? release.title : candidate.title, id: candidate.id, masterId: release && release.masterId });
     } catch {
       if (request === detailRequest) savedNote.textContent = "❌ No se pudo guardar en el historial (¿memoria del navegador llena?).";
     }
@@ -900,7 +907,94 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
   if (request === detailRequest) {
     const owned = getHistory().some((item) => String(item.release_id) === String(candidate.id));
     document.getElementById("detail-delete").hidden = !owned;
+    if (!owned) showWantButton(release || candidate);
   }
+}
+
+// «☆ Lo busco» en la ficha de un disco que no tienes.
+function showWantButton(release) {
+  const button = document.getElementById("detail-want");
+  const entry = {
+    artist: cleanArtistName(release.artist),
+    title: release.title,
+    year: release.originalYear || release.year,
+    thumb: release.thumb || release.image || "",
+    id: release.id,
+    masterId: release.masterId,
+  };
+  if (!entry.artist || !entry.title) return;
+  const paint = () => {
+    button.textContent = isWanted(entry.artist, entry.title) ? "★ En lo que busco · quitar" : "☆ Añadir a lo que busco";
+  };
+  button.onclick = () => {
+    toggleWanted(entry);
+    paint();
+  };
+  paint();
+  button.hidden = false;
+}
+
+// ---------- Lo que busco (wantlist) ----------
+
+let wantlistScroll = 0;
+
+function openWantlist() {
+  wantlistScroll = window.scrollY;
+  pushNav();
+  showView("wantlist");
+  window.scrollTo(0, 0);
+}
+
+function wantlistBack() {
+  showView("collection");
+  restoreScroll(wantlistScroll);
+}
+
+function renderWantlist() {
+  const items = getWantlist();
+  const box = document.getElementById("wantlist-content");
+  const nodes = [el("h2", null, "⭐ Lo que busco")];
+  if (!items.length) {
+    nodes.push(el("p", "wantlist-empty", "Aún no buscas ningún disco. En la discografía de un artista, toca ☆ junto a un álbum que no tengas para apuntarlo aquí."));
+    box.replaceChildren(...nodes);
+    return;
+  }
+  nodes.push(el("p", "wantlist-sub", `${items.length} ${items.length === 1 ? "disco" : "discos"} · al guardarlo en tus discos sale solo de aquí`));
+  const list = el("div", "artist-albums");
+  for (const item of items) {
+    const line = el("div", "artist-album-line");
+    const row = el("button", "artist-album");
+    row.type = "button";
+    const img = el(item.thumb ? "img" : "span", "artist-album-cover");
+    if (item.thumb) {
+      img.src = item.thumb;
+      img.alt = "";
+      img.loading = "lazy";
+      img.addEventListener("error", () => img.replaceWith(el("span", "artist-album-cover", "💿")), { once: true });
+    } else {
+      img.textContent = "💿";
+    }
+    const text = el("span", "artist-album-text");
+    text.append(el("span", "artist-album-title", item.title), el("span", "artist-album-year", [item.artist, item.year].filter(Boolean).join(" · ")));
+    row.append(img, text, el("span", "artist-row-go", "›"));
+    row.addEventListener("click", () => openAlbum({ ...item }, item.artist, "wantlist"));
+    const remove = el("button", "want-star is-on", "★");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `Quitar «${item.title}» de lo que busco`);
+    remove.addEventListener("click", () => {
+      removeWanted(item.artist, item.title);
+      renderWantlist();
+    });
+    line.append(row, remove);
+    list.append(line);
+  }
+  nodes.push(list);
+  box.replaceChildren(...nodes);
+}
+
+function updateWantlistLink() {
+  const count = getWantlist().length;
+  document.getElementById("wantlist-open").textContent = count ? `⭐ Lo que busco (${count})` : "⭐ Lo que busco";
 }
 
 // Borra de «Mis discos» el disco de la ficha abierta, tras dos confirmaciones, y vuelve atrás.
@@ -1008,7 +1102,7 @@ function albumCandidate(album, artistName) {
 }
 
 // Un álbum de la discografía: si solo se sabe su master, se busca antes su edición principal.
-async function openAlbum(album, name) {
+async function openAlbum(album, name, returnView = "artist") {
   // Con master se busca siempre su edición principal en vinilo (la que da Discogs puede ser un CD o digital).
   if (!album.resolved && (album.masterId || (!album.id && album.mbid))) {
     const fallback = album.id;
@@ -1031,7 +1125,7 @@ async function openAlbum(album, name) {
       }
     }
   }
-  if (album.id) openDetail(albumCandidate(album, name), { returnView: "artist" });
+  if (album.id) openDetail(albumCandidate(album, name), { returnView });
 }
 
 function drawArtistTop() {
@@ -1195,6 +1289,7 @@ function sortItems(items) {
 function renderCollection() {
   const items = sortItems(getHistory());
   const empty = items.length === 0;
+  updateWantlistLink();
   const grid = collectionMode === "grid";
   const stats = collectionMode === "stats";
   document.getElementById("collection-empty").hidden = !empty;
@@ -1325,6 +1420,8 @@ function initDetail() {
   document.getElementById("detail-back").addEventListener("click", navBack);
   document.getElementById("detail-delete").addEventListener("click", deleteDetailDisc);
   document.getElementById("artist-back").addEventListener("click", navBack);
+  document.getElementById("wantlist-back").addEventListener("click", navBack);
+  document.getElementById("wantlist-open").addEventListener("click", openWantlist);
 }
 
 // Modo explorador: tema oscuro y lo que se identifica no se guarda en «Mis discos».
