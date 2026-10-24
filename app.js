@@ -1205,10 +1205,8 @@ function addCoverPicker(release) {
   mark();
   const box = foldable(`🖼️ Cambiar portada (${photos.length} fotos)`, grid);
   box.append(el("p", "detail-meta", "Toca una foto para usarla como portada en «Mis discos»."));
-  const content = document.getElementById("detail-content");
-  const price = document.getElementById("detail-price");
-  if (price) content.insertBefore(box, price.nextSibling);
-  else content.append(box);
+  // Al final de la ficha: se usa poco y no debe separar el precio del resto.
+  document.getElementById("detail-content").append(box);
 }
 
 // Si el disco guardado aún no tiene galleta, se vuelve a buscar al abrir su ficha.
