@@ -779,9 +779,10 @@ export function timelineCard(rows, yearMode, onOpen) {
 
 let mapModule = null;
 let mapLoading = null;
-let mapView = "world"; // "world" | "europe"; empieza en Mundo
+let mapView = "world"; // "world" | "america" | "europe"; empieza en Mundo
 
 const EUROPE_BOX = [360, 50, 124, 96];
+const AMERICA_BOX = [100, 22, 250, 356]; // de Alaska/Canadá a la Patagonia
 
 // counts: Map código → número de discos. names: Map código → nombre con bandera. extras: [[nombre, número]] sin país en el mapa (p. ej. «Europa»).
 export function mapCard(counts, names, extras, bars, rerender) {
@@ -803,12 +804,12 @@ export function mapCard(counts, names, extras, bars, rerender) {
   const located = [...counts.entries()].filter(([code]) => COUNTRIES[code]);
   const view = mapView;
 
-  const switcher = segmented([["world", "🌍 Mundo"], ["europe", "🇪🇺 Europa"]], view, (value) => {
+  const switcher = segmented([["world", "🌍 Mundo"], ["america", "🌎 América"], ["europe", "🇪🇺 Europa"]], view, (value) => {
     mapView = value;
     rerender();
   });
 
-  const box = view === "europe" ? EUROPE_BOX : VIEWBOX.split(" ").map(Number);
+  const box = view === "europe" ? EUROPE_BOX : view === "america" ? AMERICA_BOX : VIEWBOX.split(" ").map(Number);
   const scale = box[2] / 800; // para que los círculos y el texto se vean igual de grandes con zoom
   const svg = svgEl("svg", { viewBox: box.join(" "), class: "stats-map", role: "img" });
   svg.setAttribute("aria-label", `Países: ${located.map(([c, n]) => `${c} ${n}`).join(", ")}`);
