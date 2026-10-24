@@ -1376,9 +1376,11 @@ input[type="text"]:focus {
 
 /* Doble, triple LP…: los otros vinilos van detrás del primero, en abanico (gallery.js les da el
    desplazamiento con «translate», que no choca con el giro). */
-.gallery-disc-extra {
+.gallery-disc-extra,
+.gallery-slide.is-selected .gallery-disc-extra {
   z-index: -1;
   filter: brightness(0.85);
+  animation: none; /* solo gira el de delante */
 }
 
 .gallery-disc-extra::after {
