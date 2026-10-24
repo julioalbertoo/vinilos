@@ -761,6 +761,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
   document.getElementById("detail-back").textContent = BACK_LABELS[returnView];
   const savedNote = document.getElementById("detail-saved");
   savedNote.textContent = "";
+  document.getElementById("detail-delete").hidden = true;
 
   // Mientras llega la ficha completa se enseña lo que ya sabemos del candidato.
   renderDetail({
@@ -845,6 +846,26 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
       if (request === detailRequest) savedNote.textContent = "❌ No se pudo guardar en el historial (¿memoria del navegador llena?).";
     }
   }
+
+  // «Borrar de mis discos» solo aparece si el disco está en tu colección.
+  if (request === detailRequest) {
+    const owned = getHistory().some((item) => String(item.release_id) === String(candidate.id));
+    document.getElementById("detail-delete").hidden = !owned;
+  }
+}
+
+// Borra de «Mis discos» el disco de la ficha abierta, tras dos confirmaciones, y vuelve atrás.
+function deleteDetailDisc() {
+  if (!lastDetail) return;
+  const { candidate } = lastDetail;
+  const item = getHistory().find((i) => String(i.release_id) === String(candidate.id));
+  if (!item) return;
+  if (!window.confirm(`¿Borrar «${item.title}» de tus discos?`)) return;
+  const where = cloudSignedIn ? " También se borrará de la nube." : "";
+  if (!window.confirm(`¿Seguro? «${item.title}» desaparecerá de tu colección.${where} No se puede deshacer.`)) return;
+  removeFromHistory(item.release_id);
+  renderCollection();
+  navBack();
 }
 
 // Todas las fotos de la edición en Discogs, empezando por la portada principal.
@@ -1073,16 +1094,7 @@ function renderHistoryItem(item) {
   if (years) open.append(el("span", "history-meta", years));
   open.addEventListener("click", () => openDetail(historyItemToCandidate(item), { returnView: "collection" }));
 
-  const remove = el("button", "history-remove", "✕");
-  remove.type = "button";
-  remove.setAttribute("aria-label", `Borrar ${item.title} del historial`);
-  remove.addEventListener("click", () => {
-    if (!window.confirm(`¿Borrar «${item.title}» de tus discos? No se puede deshacer.`)) return;
-    removeFromHistory(item.release_id);
-    renderCollection();
-  });
-
-  wrapper.append(open, remove);
+  wrapper.append(open);
   return wrapper;
 }
 
@@ -1262,6 +1274,7 @@ function detailBack() {
 
 function initDetail() {
   document.getElementById("detail-back").addEventListener("click", navBack);
+  document.getElementById("detail-delete").addEventListener("click", deleteDetailDisc);
   document.getElementById("artist-back").addEventListener("click", navBack);
 }
 
