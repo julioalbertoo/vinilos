@@ -21,7 +21,7 @@ const SYSTEM_PROMPT =
   "Usa null en cualquier campo que no puedas leer con certeza en la imagen. No inventes datos. " +
   "confidence es un número entre 0 y 1 que indica cuánto confías en tu lectura global.";
 
-const MODEL_TIMEOUT_MS = 45000;
+const MODEL_TIMEOUT_MS = 30000;
 
 // Gemma no admite instrucciones de sistema: a ese modelo se le dan dentro del mensaje.
 function buildMessages(model, imageDataUrl) {
