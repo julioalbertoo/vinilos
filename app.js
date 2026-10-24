@@ -341,7 +341,50 @@ async function renderQuota() {
   const reset = nextPacificMidnight().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   const list = el("ul", "quota-rows");
   list.append(...rows);
-  box.replaceChildren(list, el("p", "quota-note", `Los cupos diarios se renuevan a las ${reset} (medianoche en California).`));
+  const report = quotaReport(quotaModels);
+  const summary = el("div", "quota-summary");
+  summary.append(
+    quotaSummaryCard("Cupo normal", "Identificar fotos, buscar galletas y el dato curioso desde Wikipedia",
+      report.map((r) => r.plain), report.reduce((n, r) => n + r.used - r.search, 0)),
+    quotaSummaryCard("Cupo de búsqueda de Google", "El dato curioso de la ficha (con fuentes de Google)",
+      report.filter((r) => !r.model.startsWith("gemma")).map((r) => r.web), report.reduce((n, r) => n + r.search, 0))
+  );
+  box.replaceChildren(
+    summary,
+    el("p", "quota-note", `Los cupos diarios se renuevan a las ${reset} (medianoche en California). Debajo, el detalle de cada modelo.`),
+    list
+  );
+}
+
+// Resumen de un cupo: cuántos modelos lo tienen disponible, agotado, etc.
+function quotaSummaryCard(title, usedFor, entries, usedToday) {
+  const count = (test) => entries.filter(test).length;
+  const ok = count((e) => e.state === "ok" || e.state === "back");
+  const none = count((e) => e.state === "quota" && e.limit === 0);
+  const out = count((e) => e.state === "quota" && e.limit !== 0);
+  const failing = count((e) => e.state === "busy" || e.state === "error");
+  const unknown = count((e) => e.state === "unknown");
+  let head;
+  if (ok) head = ["✅", `Disponible en ${ok} ${ok === 1 ? "modelo" : "modelos"}`, "ok"];
+  else if (out) head = ["⛔", none ? "Agotado o no incluido en tu plan gratuito" : "Agotado por ahora", "quota"];
+  else if (none) head = ["⛔", "No incluido en tu plan gratuito", "quota"];
+  else if (failing) head = ["⚠️", "Sin respuesta ahora", "busy"];
+  else head = ["·", "Sin comprobar: pulsa «Comprobar ahora»", "unknown"];
+  const parts = [
+    ok && `${ok} con cupo`,
+    out && `${out} ${out === 1 ? "agotado" : "agotados"}`,
+    none && `${none} no ${none === 1 ? "incluido" : "incluidos"} en el plan gratuito`,
+    failing && `${failing} con fallos`,
+    unknown && `${unknown} sin comprobar`,
+  ].filter(Boolean);
+  const card = el("div", `quota-card quota-card--${head[2]}`);
+  card.append(
+    el("p", "quota-card-title", title),
+    el("p", "quota-card-for", `Para: ${usedFor}`),
+    el("p", "quota-card-head", `${head[0]} ${head[1]}`),
+    el("p", "quota-card-detail", `${parts.join(" · ") || "sin modelos"} · hoy, desde este móvil: ${usedToday} ${usedToday === 1 ? "consulta" : "consultas"}`)
+  );
+  return card;
 }
 
 // Pregunta a cada modelo si responde ahora. Gasta una consulta en los que tienen cupo.

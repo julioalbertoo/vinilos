@@ -3342,3 +3342,69 @@ button.artist-kind:active {
   color: var(--muted);
   font-size: 0.82rem;
 }
+
+/* Resumen de los dos cupos de Gemini (normal y búsqueda de Google). */
+.quota-summary {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.quota-card {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.quota-card--ok {
+  background: var(--mint);
+  color: var(--mint-text);
+}
+
+.quota-card--quota {
+  background: var(--pink);
+  color: var(--rose-text);
+}
+
+.quota-card--busy {
+  background: var(--butter);
+  color: var(--butter-text);
+}
+
+.view .quota-card p {
+  margin: 0;
+}
+
+.view .quota-card-title {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.view .quota-card-for {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.view .quota-card-head {
+  margin-top: 6px;
+  font-weight: 800;
+}
+
+.view .quota-card--ok .quota-card-head,
+.view .quota-card--ok .quota-card-detail {
+  color: var(--mint-text);
+}
+
+.view .quota-card--quota .quota-card-head,
+.view .quota-card--quota .quota-card-detail {
+  color: var(--rose-text);
+}
+
+.view .quota-card--busy .quota-card-head,
+.view .quota-card--busy .quota-card-detail {
+  color: var(--butter-text);
+}
+
+.view .quota-card-detail {
+  font-size: 0.82rem;
+}
