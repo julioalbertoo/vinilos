@@ -139,6 +139,12 @@ function discColors(text, count) {
   return Array.from({ length: count }, (_, i) => parts[i % parts.length]);
 }
 
+// Colores distintos de los vinilos de un disco (uno por vinilo si cada uno es de un color). Para «Datos».
+export function vinylColorsOf(item) {
+  const all = discColors(item.color, 12);
+  return all.filter((c, i) => c && all.indexOf(c) === i);
+}
+
 // Número de vinilos que trae el disco (1 si no se sabe). Se pintan como mucho 4 para no tapar la funda.
 function discCount(item) {
   return Math.max(1, Number(item.discs) || 1);

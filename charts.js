@@ -1,6 +1,6 @@
 // Piezas visuales de la pestaña «Datos»: el vinilo de géneros, el arcoíris de portadas, la duración,
 // la línea del tiempo y el mapa. stats.js calcula los datos y decide el orden.
-import { vinylBackground } from "./gallery.js";
+import { vinylBackground, vinylColorsOf } from "./gallery.js";
 
 // ---------- Utilidades compartidas ----------
 
@@ -519,18 +519,20 @@ export function rainbowCard(entries, colored, onOpen, pending) {
   }
 
   // Vinilos de color, con su color de verdad.
-  nodes.push(el("p", "stats-sub", colored.length ? `💿 Tus vinilos de color (${colored.length})` : "💿 Tus vinilos de color"));
-  if (!colored.length) {
+  // Un doble o triple LP con un color por vinilo sale una vez por cada vinilo.
+  const vinyls = colored.flatMap((item) => vinylColorsOf(item).map((color) => ({ item, color })));
+  nodes.push(el("p", "stats-sub", vinyls.length ? `💿 Tus vinilos de color (${vinyls.length})` : "💿 Tus vinilos de color"));
+  if (!vinyls.length) {
     nodes.push(note("Aún no tienes ninguno: todos son negros."));
   } else {
     const row = el("div", "stats-discs");
-    for (const item of colored) {
+    for (const { item, color } of vinyls) {
       const disc = el("button", "stats-disc");
       disc.type = "button";
       const face = el("span", "stats-disc-face");
-      face.style.background = vinylBackground(item.color) || "#1b1b1f";
+      face.style.background = vinylBackground(color) || "#1b1b1f";
       face.append(el("span", "stats-disc-hole"));
-      disc.append(face, el("span", "stats-disc-title", item.title), el("span", "stats-disc-color", item.color));
+      disc.append(face, el("span", "stats-disc-title", item.title), el("span", "stats-disc-color", color));
       disc.addEventListener("click", () => onOpen(item));
       row.append(disc);
     }
