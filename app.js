@@ -784,6 +784,7 @@ function renderPrices(id, prices, at) {
   } else {
     own.append(el("p", "detail-price-note", "Ahora mismo nadie la vende."));
   }
+  own.append(outLink("🇪🇸 Desde España ↗", spainShopUrl(["release", id])));
   nodes.push(own);
   // Cualquier edición en vinilo del álbum: se rellena aparte (renderAllVinyl).
   if (box.dataset.master) {
@@ -802,8 +803,8 @@ function renderPrices(id, prices, at) {
     nodes.push(row);
   }
   const when = pricesAge(at);
-  if (when) nodes.push(el("p", "detail-price-note", when));
-  nodes.push(spainLink(id));
+  // Una sola nota al pie para las dos tarjetas.
+  nodes.push(el("p", "detail-price-note", [when, "🇪🇸 Solo copias con disco y portada en G o mejor."].filter(Boolean).join(" · ")));
   box.replaceChildren(...nodes);
   renderAllVinyl();
 }
@@ -834,6 +835,8 @@ function renderAllVinyl() {
       nodes.push(el("p", "detail-price-note", `La más barata entre sus ${total} ediciones en vinilo más comunes${of}.`));
     }
   }
+  const masterId = document.getElementById("detail-price")?.dataset.master;
+  if (masterId) nodes.push(outLink("🇪🇸 Desde España ↗", spainShopUrl(["master", masterId])));
   row.replaceChildren(...nodes);
 }
 

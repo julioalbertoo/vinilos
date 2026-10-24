@@ -3296,6 +3296,14 @@ button.artist-kind:active {
   margin: 0;
 }
 
+/* Enlace a lo que se vende desde España, dentro de cada tarjeta de precio. */
+.view .detail-price-row .detail-price-spain {
+  margin-top: 8px;
+  background: var(--mint);
+  color: var(--mint-text);
+  font-size: 0.9rem;
+}
+
 .view .detail-price-label {
   color: var(--mint-text);
   font-size: 0.82rem;
