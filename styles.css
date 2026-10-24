@@ -873,6 +873,70 @@ input[type="text"]:focus {
   margin-top: 16px;
 }
 
+/* «¿Sabías que…?»: dato curioso con sus fuentes. */
+.detail-trivia {
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--butter);
+  color: var(--butter-text);
+}
+
+.detail-trivia:empty {
+  display: none;
+}
+
+.view .detail-trivia p {
+  margin: 2px 0;
+}
+
+.view .detail-trivia-title {
+  font-weight: 800;
+}
+
+.view .detail-trivia-text {
+  margin-top: 6px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.view .detail-trivia-note {
+  font-size: 0.88rem;
+}
+
+.view .detail-trivia-sources {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.view .detail-trivia-sources a {
+  color: inherit;
+  font-weight: 700;
+}
+
+.detail-trivia-search {
+  display: block;
+  width: 100%;
+  height: 56px;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 10px;
+}
+
+.view .detail-trivia-again {
+  display: inline-block;
+  width: auto;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .cover-picker {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));

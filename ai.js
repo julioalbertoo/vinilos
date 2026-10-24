@@ -310,7 +310,8 @@ function imagePart(image) {
 }
 
 // Una petición al modelo. busy: saturado o caído un momento (merece reintentar).
-async function callNative(model, parts, aiKey) {
+// options.body: campos extra de la petición (p. ej. herramientas); sustituyen a los de por defecto.
+async function callNative(model, parts, aiKey, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
   let response;
@@ -322,6 +323,7 @@ async function callNative(model, parts, aiKey) {
         contents: [{ role: "user", parts }],
         // Gemma no admite el modo JSON: a ese se le pide el JSON solo en el texto.
         generationConfig: model.startsWith("gemma") ? { temperature: 0 } : { temperature: 0, responseMimeType: "application/json" },
+        ...options.body,
       }),
       signal: controller.signal,
     });
@@ -388,4 +390,35 @@ function parseLabelAnswer(body, count) {
   const [ymin, xmin, ymax, xmax] = box;
   if (xmax - xmin < 50 || ymax - ymin < 50) return { ok: true, index: null };
   return { ok: true, index, box: { ymin, xmin, ymax, xmax } };
+}
+
+// Pregunta con la búsqueda de Google activada: Gemini busca en internet y devuelve qué páginas
+// respaldan cada trozo de su respuesta (groundingMetadata). Gemma no sabe buscar, así que se salta.
+// Primero el modelo ligero: el principal se reserva para identificar discos (cada uno tiene su cupo).
+// Devuelve { ok: true, candidate, model } o { ok: false, detail, quota, stop }.
+export async function askWithGoogleSearch(prompt, aiKey) {
+  const { primaryModel, fallbackModel } = CONFIG.AI_PROVIDER;
+  const backups = (await backupModels(aiKey)).filter((m) => !m.startsWith("gemma"));
+  const models = [...new Set([fallbackModel, ...backups, primaryModel])];
+  const body = { tools: [{ google_search: {} }], generationConfig: { temperature: 1 } };
+  const failures = [];
+  let allQuota = true;
+  for (const model of models) {
+    const result = await callNative(model, [{ text: prompt }], aiKey, { body });
+    if (!result.ok) {
+      if (result.stop) return { ok: false, detail: result.detail, stop: true };
+      if (!result.quota && !result.busy) allQuota = false;
+      if (!result.notFound) failures.push(`${model}: ${result.detail}`);
+      continue;
+    }
+    try {
+      const candidate = JSON.parse(result.body)?.candidates?.[0];
+      if (candidate) return { ok: true, candidate, model };
+    } catch {
+      // cae al fallo de abajo
+    }
+    allQuota = false;
+    failures.push(`${model}: respuesta vacía`);
+  }
+  return { ok: false, detail: failures.join(" · ") || "ningún modelo disponible", quota: allQuota && failures.length > 0 };
 }

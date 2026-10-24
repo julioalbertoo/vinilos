@@ -23,6 +23,7 @@ import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest } from "./
 import { renderStats, setStatsActive } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
+import { loadTrivia } from "./trivia.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
@@ -459,6 +460,12 @@ function renderDetail(release) {
     price.append(el("p", "detail-price-title", "💶 Precio de esta edición"), el("p", "detail-price-note", "Buscando precio en Discogs…"), spainLink(release.id, release.masterId));
     nodes.push(price);
   }
+  // Dato curioso: solo con la ficha completa; se rellena al llegar (loadTriviaBox).
+  if (release.id) {
+    const trivia = el("div", "detail-trivia");
+    trivia.id = "detail-trivia";
+    nodes.push(trivia);
+  }
   if (release.tracklist.length) {
     const list = el("ul", "detail-tracks");
     for (const track of release.tracklist) {
@@ -734,6 +741,47 @@ async function loadPrices(release, request) {
   if (release.masterId && request === detailRequest) loadCheapest(release, prices, request);
 }
 
+// «¿Sabías que…?»: un dato curioso nuevo cada vez que se abre la ficha, con enlaces a sus fuentes.
+async function loadTriviaBox(release, request) {
+  const box = document.getElementById("detail-trivia");
+  if (!box) return;
+  const title = el("p", "detail-trivia-title", "💡 ¿Sabías que…?");
+  if (!getAiKey()) {
+    box.hidden = true;
+    return;
+  }
+  box.replaceChildren(title, el("p", "detail-trivia-note", "Buscando en internet un dato curioso con fuentes…"));
+  const result = await loadTrivia(release, getAiKey());
+  if (request !== detailRequest) return;
+  const again = el("button", "detail-trivia-again", "🔄 Otro dato");
+  again.type = "button";
+  again.addEventListener("click", () => loadTriviaBox(release, request));
+  if (!result.ok) {
+    box.replaceChildren(title, el("p", "detail-trivia-note", result.message), again);
+    return;
+  }
+  const sources = el("p", "detail-trivia-sources", "Fuentes: ");
+  result.sources.forEach((source, i) => {
+    const link = el("a", null, source.title);
+    link.href = source.url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    if (i) sources.append(" · ");
+    sources.append(link);
+  });
+  const nodes = [title, el("p", "detail-trivia-text", result.text), sources];
+  // Google pide enseñar sus sugerencias de búsqueda junto a lo encontrado con su buscador.
+  if (result.searchHtml) {
+    const frame = el("iframe", "detail-trivia-search");
+    frame.title = "Búsquedas de Google relacionadas";
+    frame.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
+    frame.srcdoc = `<base target="_blank"><style>body{margin:0;background:transparent}</style>${result.searchHtml}`;
+    nodes.push(frame);
+  }
+  nodes.push(again);
+  box.replaceChildren(...nodes);
+}
+
 let detailRequest = 0;
 let detailReturnView = "results";
 
@@ -790,6 +838,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
       const saved = fromHistory && getHistory().find((i) => String(i.release_id) === String(release.id));
       renderDetail(saved && saved.cover ? { ...release, image: saved.cover } : release);
       loadPrices(release, request);
+      loadTriviaBox(release, request);
       if (fromHistory) {
         addCoverPicker(release);
         searchLabelAgain(release, request);
