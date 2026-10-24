@@ -1379,8 +1379,30 @@ input[type="text"]:focus {
 .gallery-disc-extra,
 .gallery-slide.is-selected .gallery-disc-extra {
   z-index: -1;
-  filter: brightness(0.85);
   animation: none; /* solo gira el de delante */
+}
+
+/* Para que no parezca una sombra: canto claro y surcos algo más grises que el de delante. */
+.gallery-disc-wrap .gallery-disc-extra {
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.28),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.1),
+    0 10px 24px -10px rgba(0, 0, 0, 0.6);
+}
+
+.gallery-disc-extra:not(.is-colored) {
+  background:
+    radial-gradient(circle, transparent 0 34%, #1a1a1f 34.5% 36%, transparent 36.5%),
+    repeating-radial-gradient(circle, #2c2c33 0 1px, #3a3a43 1px 2.5px);
+}
+
+.gallery-disc-extra.is-colored {
+  filter: brightness(0.9);
+}
+
+/* El de delante deja caer sombra sobre los de detrás, para separarlos. */
+.gallery-disc-wrap.is-multi > .gallery-disc:not(.gallery-disc-extra) {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.18), 0 0 18px 2px rgba(0, 0, 0, 0.55);
 }
 
 .gallery-disc-extra::after {

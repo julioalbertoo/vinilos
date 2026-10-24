@@ -158,7 +158,7 @@ function fillDisc(disc, item) {
   for (let i = shown - 1; i >= 1; i--) {
     const extra = el("span", "gallery-disc gallery-disc-extra");
     // En abanico: uno a la derecha, otro a la izquierda y el cuarto un poco más arriba.
-    const [x, y] = [null, [11, -3], [-11, -3], [0, -9]][i];
+    const [x, y] = [null, [16, -4], [-16, -4], [0, -12]][i];
     extra.style.translate = `${x}% ${y}%`;
     const bg = vinylBackground(colors[i]);
     extra.style.background = bg;
