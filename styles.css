@@ -3484,3 +3484,8 @@ button.artist-kind:active {
 .view .quota-card-detail {
   font-size: 0.82rem;
 }
+
+/* «Ver fotos de la edición más popular», debajo de las fotos de «Cambiar portada». */
+.cover-picker-more {
+  margin-top: 4px;
+}

@@ -1170,17 +1170,19 @@ function releasePhotos(release) {
   return photos.filter((p, i, all) => all.findIndex((q) => q.uri === p.uri) === i);
 }
 
-// «Cambiar portada»: si la foto principal de Discogs es mala, se elige otra de la edición.
+// «Cambiar portada»: si la foto principal de Discogs es mala, se elige otra de la edición
+// o, con el botón de abajo, de la edición más popular del álbum.
 function addCoverPicker(release) {
   const item = getHistory().find((i) => String(i.release_id) === String(release.id));
   const photos = releasePhotos(release);
-  if (!item || photos.length < 2) return;
+  if (!item || (photos.length < 2 && !release.masterId)) return;
   const grid = el("div", "cover-picker");
   const mark = () => {
     const current = item.cover || release.image;
     for (const b of grid.children) b.classList.toggle("is-current", b.dataset.uri === current);
   };
-  for (const photo of photos) {
+  const addOption = (photo) => {
+    if ([...grid.children].some((b) => b.dataset.uri === photo.uri)) return false;
     const b = el("button", "cover-picker-option");
     b.type = "button";
     b.dataset.uri = photo.uri;
@@ -1201,10 +1203,43 @@ function addCoverPicker(release) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
     grid.append(b);
-  }
+    return true;
+  };
+  photos.forEach(addOption);
   mark();
   const box = foldable(`🖼️ Cambiar portada (${photos.length} fotos)`, grid);
   box.append(el("p", "detail-meta", "Toca una foto para usarla como portada en «Mis discos»."));
+
+  // Si no gusta ninguna: fotos de la edición en vinilo que más gente tiene.
+  if (release.masterId) {
+    const more = el("button", "secondary cover-picker-more", "📀 Ver fotos de la edición más popular");
+    more.type = "button";
+    const status = el("p", "detail-meta");
+    more.addEventListener("click", async () => {
+      more.disabled = true;
+      status.textContent = "⏳ Buscando la edición más popular…";
+      try {
+        const id = await masterMainRelease(release.masterId, getDiscogsToken());
+        if (!id || String(id) === String(release.id)) {
+          status.textContent = "Esta ya es la edición más popular del álbum.";
+          return;
+        }
+        const popular = await cachedRelease(id, getDiscogsToken());
+        const added = releasePhotos(popular).filter(addOption).length;
+        mark();
+        box.querySelector("summary").textContent = `🖼️ Cambiar portada (${grid.children.length} fotos)`;
+        const where = [popular.country, popular.year].filter(Boolean).join(" · ");
+        status.textContent = added
+          ? `✓ ${added} foto${added > 1 ? "s" : ""} más de la edición más popular${where ? ` (${where})` : ""}.`
+          : "La edición más popular no tiene fotos distintas.";
+        more.hidden = true;
+      } catch (err) {
+        status.textContent = `No se pudieron cargar: ${err.message}`;
+        more.disabled = false;
+      }
+    });
+    box.append(more, status);
+  }
   // Al final de la ficha: se usa poco y no debe separar el precio del resto.
   document.getElementById("detail-content").append(box);
 }
