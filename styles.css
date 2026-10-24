@@ -1396,6 +1396,16 @@ input[type="text"]:focus {
     repeating-radial-gradient(circle, #2c2c33 0 1px, #3a3a43 1px 2.5px);
 }
 
+/* Los vinilos de detrás solo se ven en el disco del centro; en los de los lados asomarían por el borde. */
+.gallery-disc-wrap .gallery-disc-extra {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.gallery-slide.is-selected .gallery-disc-extra {
+  opacity: 1;
+}
+
 .gallery-disc-extra.is-colored {
   filter: brightness(0.9);
 }
