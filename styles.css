@@ -1374,6 +1374,40 @@ input[type="text"]:focus {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
 }
 
+/* Doble, triple LP…: los otros vinilos van detrás del primero, en abanico (gallery.js les da el
+   desplazamiento con «translate», que no choca con el giro). */
+.gallery-disc-extra {
+  z-index: -1;
+  filter: brightness(0.85);
+}
+
+.gallery-disc-extra::after {
+  content: "";
+  position: absolute;
+  inset: 32%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #1b1b1f 0 7%, var(--peach) 8%);
+}
+
+.gallery-discs {
+  position: absolute;
+  top: 2%;
+  left: 2%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.gallery-discs:empty {
+  display: none;
+}
+
 .gallery-weight {
   position: absolute;
   top: 2%;

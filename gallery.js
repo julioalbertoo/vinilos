@@ -128,12 +128,52 @@ export function vinylBackground(text) {
   return `${ring}, ${shine}, ${grooves}, ${base}`;
 }
 
+// Color de cada vinilo de un doble/triple LP. Si el texto nombra un color por disco separado por comas
+// ("Red W/ Black Splatter, Yellow W/ Black Splatter, Green…"), cada uno lleva el suyo; si no, todos el mismo.
+function discColors(text, count) {
+  const parts = String(text || "")
+    .split(/[,;]/)
+    .map((p) => p.trim())
+    .filter((p) => colorsIn(p.toLowerCase()).length || /\b(clear|transparent|transparente|crystal)\b/i.test(p));
+  if (parts.length < 2) return Array(count).fill(text || "");
+  return Array.from({ length: count }, (_, i) => parts[i % parts.length]);
+}
+
+// Número de vinilos que trae el disco (1 si no se sabe). Se pintan como mucho 4 para no tapar la funda.
+function discCount(item) {
+  return Math.max(1, Number(item.discs) || 1);
+}
+
 function fillDisc(disc, item) {
-  const background = vinylBackground(item.color || "");
+  const count = discCount(item);
+  const colors = discColors(item.color, count);
+  const background = vinylBackground(colors[0]);
   disc.style.background = background;
   disc.classList.toggle("is-colored", Boolean(background));
-  // Vinilo pesado (180 g o más): canto más grueso y una etiqueta con el gramaje.
   const wrap = disc.parentElement;
+
+  // Doble, triple LP…: los otros vinilos asoman detrás del primero, cada uno con su color.
+  wrap.querySelectorAll(".gallery-disc-extra").forEach((n) => n.remove());
+  const shown = Math.min(count, 4);
+  for (let i = shown - 1; i >= 1; i--) {
+    const extra = el("span", "gallery-disc gallery-disc-extra");
+    // En abanico: uno a la derecha, otro a la izquierda y el cuarto un poco más arriba.
+    const [x, y] = [null, [11, -3], [-11, -3], [0, -9]][i];
+    extra.style.translate = `${x}% ${y}%`;
+    const bg = vinylBackground(colors[i]);
+    extra.style.background = bg;
+    extra.classList.toggle("is-colored", Boolean(bg));
+    wrap.prepend(extra);
+  }
+  wrap.classList.toggle("is-multi", count > 1);
+  let many = wrap.querySelector(".gallery-discs");
+  if (count > 1 && !many) {
+    many = el("span", "gallery-discs");
+    wrap.append(many);
+  }
+  if (many) many.textContent = count > 1 ? `${count} LP` : "";
+
+  // Vinilo pesado (180 g o más): canto más grueso y una etiqueta con el gramaje.
   const heavy = isHeavy(item.weight || "");
   wrap.classList.toggle("is-heavy", heavy);
   let badge = wrap.querySelector(".gallery-weight");
@@ -155,7 +195,7 @@ export function updateSlide(item) {
   const slide = document.querySelector(`.gallery-slide[data-id="${item.release_id}"]`);
   if (!slide) return;
   fillLabel(slide.querySelector(".gallery-label"), item);
-  fillDisc(slide.querySelector(".gallery-disc"), item);
+  fillDisc(slide.querySelector(".gallery-disc:not(.gallery-disc-extra)"), item);
   fillSleeve(slide.querySelector(".gallery-sleeve"), item);
 }
 
@@ -217,7 +257,7 @@ export function renderGallery(items, onOpen) {
     const item = items[index];
     selectedId = item.release_id;
     title.textContent = item.title;
-    meta.textContent = [item.artist, bothYears(item), isHeavy(item.weight || "") && item.weight].filter(Boolean).join(" · ");
+    meta.textContent = [item.artist, bothYears(item), discCount(item) > 1 && `${discCount(item)} LP`, isHeavy(item.weight || "") && item.weight].filter(Boolean).join(" · ");
     count.textContent = `${index + 1} de ${items.length}`;
   }
 

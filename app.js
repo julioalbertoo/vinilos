@@ -14,7 +14,7 @@ import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify, geminiModels, probeModel } from "./ai.js";
 import { quotaReport, nextPacificMidnight } from "./quota.js";
-import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, masterMainRelease, findAlbumRelease, bothYears, countryWithFlag, vinylColor, releaseWeight } from "./discogs.js";
+import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, masterMainRelease, findAlbumRelease, bothYears, countryWithFlag, vinylColor, releaseWeight, releaseDiscs } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -1040,6 +1040,8 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
         color: release ? vinylColor(release.formats.map((f) => f.text)) : candidate.color || undefined,
         // Gramaje ("180 g"; "" si Discogs no lo dice).
         weight: release ? releaseWeight(release) : candidate.weight || undefined,
+        // Cuántos vinilos trae (2 = doble LP); sin ficha se sabrá más tarde.
+        discs: release ? releaseDiscs(release) : undefined,
       });
       if (request === detailRequest) savedNote.textContent = alreadyOwned ? "💿 Ya estaba en tu colección" : "✓ Guardado en tu historial";
       // Si estaba en «Lo que busco», ya no hace falta buscarlo.

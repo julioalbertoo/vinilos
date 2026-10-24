@@ -75,6 +75,13 @@ export function releaseWeight(release) {
   return vinylWeight(release.formats.flatMap((f) => [f.text, ...f.descriptions]));
 }
 
+// Número de vinilos de una ficha completa (2 en un doble LP, 3 en un triple…). 1 si no lo dice.
+export function releaseDiscs(release) {
+  const vinyl = (release.formats || []).filter((f) => /vinyl|lp/i.test(f.name || ""));
+  const total = vinyl.reduce((sum, f) => sum + (parseInt(f.qty, 10) || 1), 0);
+  return Math.max(1, total);
+}
+
 // Vinilo pesado: 180 g o más.
 export function isHeavy(weight) {
   return parseInt(weight, 10) >= 180;
