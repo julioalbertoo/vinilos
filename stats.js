@@ -3,7 +3,7 @@
 // Se guarda un resumen pequeño en el móvil; con cuenta, se leen de golpe las fichas guardadas en la nube
 // y lo que falte se pide a Discogs poco a poco, en segundo plano, mientras la pestaña está abierta.
 import { CONFIG } from "./config.js";
-import { cachedRelease, cachedPrices, fillDurations } from "./details.js";
+import { cachedRelease, cachedPrices, fillDurations, DURATIONS_CHECK } from "./details.js";
 import { loadDetailSummaries, cloudUser } from "./cloud.js";
 import { releaseWeight, isHeavy, countryFlag, countryCodes } from "./discogs.js";
 import {
@@ -69,7 +69,7 @@ function summarize(source) {
     tracks: tracks.length,
     timedTracks: timed.length,
     seconds: timed.reduce((a, b) => a + b, 0),
-    durationsChecked: Boolean(source.durationsChecked),
+    durationsChecked: Number(source.durationsChecked) === DURATIONS_CHECK,
   };
 }
 

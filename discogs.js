@@ -1,4 +1,5 @@
 import { CONFIG } from "./config.js";
+import { trackKey } from "./musicbrainz.js";
 
 const MIN_GAP_MS = 1100; // Discogs permite unas 60 peticiones por minuto con token
 let lastRequestAt = 0;
@@ -454,7 +455,7 @@ export async function popularVinylVersions(masterId, discogsToken) {
 // Si a una edición le faltan duraciones de canciones, se copian de otras ediciones del mismo álbum
 // (la principal y las más comunes), emparejando por título. Cambia release.tracklist; true si añadió alguna.
 export async function borrowDurations(release, discogsToken) {
-  const norm = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const norm = trackKey;
   const missing = () => release.tracklist.filter((t) => !t.duration);
   if (!release.masterId || !missing().length) return false;
   const master = await discogsGet(`/masters/${release.masterId}`, null, discogsToken);

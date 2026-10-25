@@ -161,3 +161,36 @@ export async function mbAlbumAnnotation(masterId) {
   if (!text) return null;
   return { title: group.title || "", url: `https://musicbrainz.org/release-group/${group.id}`, text };
 }
+
+// Título para emparejar canciones entre fuentes: sin acentos, sin «(Live)», «[Remastered]»… ni signos.
+export const trackKey = (title) =>
+  String(title || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s*[([][^)\]]*[)\]]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+
+// Duraciones de las canciones de un álbum en MusicBrainz: [{ title, seconds }] de la edición que mejor
+// encaja (la que tiene más canciones con duración), o null si no lo encuentra.
+export async function mbTrackLengths(artist, title, wantedCount = 0) {
+  const clean = (t) => String(t || "").replace(/"/g, "");
+  const found = await mbGet("/release", {
+    query: `release:"${clean(title)}" AND artist:"${clean(norm(artist))}"`,
+    limit: "5",
+  });
+  const releases = ((found && found.releases) || []).filter((r) => (r.score || 0) >= 80);
+  // Primero las que tienen el mismo número de canciones.
+  releases.sort((a, b) => (b["track-count"] === wantedCount) - (a["track-count"] === wantedCount));
+  let best = null;
+  for (const r of releases.slice(0, 2)) {
+    const full = await mbGet(`/release/${r.id}`, { inc: "recordings" });
+    const tracks = ((full && full.media) || [])
+      .flatMap((m) => m.tracks || [])
+      .map((t) => ({ title: t.title, seconds: Math.round((t.length || (t.recording && t.recording.length) || 0) / 1000) }));
+    const timed = tracks.filter((t) => t.seconds > 0).length;
+    if (!best || timed > best.timed) best = { tracks, timed };
+    if (timed === tracks.length && tracks.length) break;
+  }
+  return best && best.timed ? best.tracks : null;
+}

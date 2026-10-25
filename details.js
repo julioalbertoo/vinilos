@@ -4,6 +4,7 @@
 // Sin cuenta en la nube, o si Supabase no responde, se pregunta a Discogs como siempre.
 import { getRelease, getPrices, cheapestVinyl, borrowDurations } from "./discogs.js";
 import { CONFIG } from "./config.js";
+import { mbTrackLengths, trackKey } from "./musicbrainz.js";
 import { loadDetail, saveDetail } from "./cloud.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -63,12 +64,39 @@ export function rememberRelease(release) {
   writeRow(release.id, { data: release, data_at: (row && row.data_at) || new Date().toISOString() });
 }
 
+// Sube cuando se añade otra fuente de duraciones: los discos ya mirados se vuelven a mirar (2: MusicBrainz).
+export const DURATIONS_CHECK = 2;
+
+const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
+// Rellena las duraciones que faltan con las de MusicBrainz: por título y, si el disco tiene
+// las mismas canciones en el mismo número, por orden.
+async function mbDurations(release) {
+  let tracks = null;
+  try {
+    tracks = await mbTrackLengths(release.artist, release.title, release.tracklist.length);
+  } catch {
+    return; // MusicBrainz es un extra: si falla, se queda la duración aproximada
+  }
+  if (!tracks) return;
+  const known = new Map();
+  for (const t of tracks) if (t.seconds && !known.has(trackKey(t.title))) known.set(trackKey(t.title), t.seconds);
+  const sameOrder = tracks.length === release.tracklist.length;
+  release.tracklist.forEach((t, i) => {
+    if (t.duration) return;
+    const seconds = known.get(trackKey(t.title)) || (sameOrder && tracks[i].seconds);
+    if (seconds) t.duration = clock(seconds);
+  });
+}
+
 // Si Discogs no da la duración de algunas canciones, se copian de otra edición del mismo álbum
 // (se intenta una sola vez por disco y se guarda). Devuelve la ficha, con o sin cambios.
 export async function fillDurations(release, discogsToken) {
-  if (release.durationsChecked || !release.tracklist || release.tracklist.every((t) => t.duration)) return release;
+  if (release.durationsChecked === DURATIONS_CHECK || !release.tracklist || release.tracklist.every((t) => t.duration)) return release;
   await borrowDurations(release, discogsToken); // si falla, quien llama lo apunta y se reintenta otro día
-  release.durationsChecked = true;
+  // Si a ninguna edición de Discogs le constan, se miran en MusicBrainz.
+  if (release.tracklist.some((t) => !t.duration)) await mbDurations(release);
+  release.durationsChecked = DURATIONS_CHECK;
   rememberRelease(release);
   return release;
 }
