@@ -101,7 +101,10 @@ export function vinylBackground(text) {
   if (rainbow && colors.length < 2) colors = ["#c8202e", "#f07c1f", "#f2c530", "#2e9e5b", "#2c64b5", "#7a4bb5"];
   if (!colors.length && !clear) return "";
   if (!colors.length) colors = ["#c9d6dd"]; // transparente sin color: cristal grisáceo
-  if (colors.length === 1 && colors[0] === "#1b1b1f") return ""; // negro normal
+  if (colors.length === 1 && colors[0] === "#1b1b1f") {
+    if (!see) return ""; // negro normal
+    colors = ["#4a4452"]; // negro translúcido: ahumado, se ve que deja pasar la luz
+  }
   const alpha = clear && colors[0] === "#c9d6dd" ? 0.6 : see ? 0.72 : 1;
   const c = colors.map((hex) => hexToRgba(hex, alpha));
 
