@@ -360,21 +360,33 @@ const sortByYear = (list) => [...list].sort((a, b) => (Number(a.year) || 9999) -
 // la principal de su master si se encuentra; si no, la primera edición en vinilo. null si no hay.
 export async function findAlbumRelease(artist, title, discogsToken) {
   // Los títulos muy largos («X; or, Y: …») no los encuentra Discogs: se prueba también con la parte corta.
-  const titles = [...new Set([title, shortAlbumTitle(title)].filter(Boolean))];
-  for (const t of titles) {
-    const masters = await discogsGet("/database/search", { type: "master", artist, release_title: t, per_page: "10" }, discogsToken);
-    const master = bestMaster(masters.results || [], t);
+  const short = shortAlbumTitle(title);
+  const titles = [...new Set([title, short].filter(Boolean))];
+  const search = (params) => discogsGet("/database/search", params, discogsToken).then((r) => r.results || []);
+  const firstResults = [];
+
+  // 1) El álbum (master) con el mismo título; 2) búsqueda libre, por si el artista se escribe distinto («&» o «And»).
+  const masterSearches = [
+    ...titles.map((t) => ({ type: "master", artist, release_title: t, per_page: "10" })),
+    { type: "master", q: `${artist} ${short}`, per_page: "10" },
+  ];
+  for (const params of masterSearches) {
+    const results = await search(params);
+    if (!firstResults.length) firstResults.push(...results);
+    const master = bestMaster(results, title, true);
     if (master) {
       const id = await masterMainRelease(master.id, discogsToken);
       if (id) return id;
     }
-    const releases = await discogsGet("/database/search", { type: "release", artist, release_title: t, format: "Vinyl", per_page: "5" }, discogsToken);
-    const id = ((releases.results || [])[0] || {}).id;
-    if (id) return id;
   }
-  // Último intento: búsqueda libre (por si el nombre del artista se escribe distinto, «&» o «And»).
-  const loose = await discogsGet("/database/search", { type: "master", q: `${artist} ${titles[titles.length - 1]}`, per_page: "10" }, discogsToken);
-  const master = bestMaster(loose.results || [], titles[titles.length - 1]);
+  // 3) Una edición en vinilo con el mismo título (la que más gente tiene).
+  for (const t of titles) {
+    const releases = await search({ type: "release", artist, release_title: t, format: "Vinyl", per_page: "10" });
+    const release = bestMaster(releases, title, true);
+    if (release) return release.id;
+  }
+  // 4) Como antes: el master más común de la primera búsqueda, aunque el título no coincida del todo.
+  const master = bestMaster(firstResults, title, false);
   return master ? await masterMainRelease(master.id, discogsToken) : null;
 }
 
@@ -383,16 +395,18 @@ function shortAlbumTitle(title) {
   return String(title || "").split(/\s*[;:(\[]\s*|\s+\/\s+|,\s+or,?\s+/i)[0].trim();
 }
 
-// De los masters encontrados, el del álbum de verdad: mismo título y el que más gente tiene.
-// Así no sale una edición rara (un VHS, un pirata, un single) que Discogs guarda como master aparte.
-function bestMaster(results, title) {
+// De los resultados, el del álbum de verdad: mismo título (al menos su parte corta) y el que más gente tiene.
+// Así no sale una edición rara (un VHS, un pirata, un single, un disco de otro con título parecido).
+// strict: si ninguno tiene el mismo título, no devuelve nada.
+function bestMaster(results, title, strict) {
   const norm = (t) => String(t || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   const wanted = norm(title);
+  const wantedShort = norm(shortAlbumTitle(title));
   const official = results.filter((r) => !lowerWords(r.format).includes("unofficial release"));
-  const same = official.filter((r) => norm(splitSearchTitle(r.title).title) === wanted);
-  // Con el título corto, vale el master cuyo título empieza igual.
-  if (!same.length) same.push(...official.filter((r) => norm(splitSearchTitle(r.title).title).startsWith(wanted)));
-  const pool = same.length ? same : official.length ? official : results;
+  const titleOf = (r) => splitSearchTitle(r.title).title;
+  const same = official.filter((r) => norm(titleOf(r)) === wanted);
+  const similar = official.filter((r) => norm(shortAlbumTitle(titleOf(r))) === wantedShort);
+  const pool = same.length ? same : similar.length ? similar : strict ? [] : official.length ? official : results;
   const have = (r) => r.community?.have || 0;
   return pool.reduce((best, r) => (!best || have(r) > have(best) ? r : best), null);
 }
