@@ -458,10 +458,19 @@ export async function borrowDurations(release, discogsToken) {
   const missing = () => release.tracklist.filter((t) => !t.duration);
   if (!release.masterId || !missing().length) return false;
   const master = await discogsGet(`/masters/${release.masterId}`, null, discogsToken);
-  const popular = await popularVinylVersions(release.masterId, discogsToken);
-  const ids = [master.main_release, ...popular].filter((id, i, all) => id && id !== release.id && all.indexOf(id) === i).slice(0, 3);
+  // Primero la principal; las más comunes solo se piden si a esa también le faltan.
+  const ids = [master.main_release];
+  let more = false;
   let added = false;
-  for (const id of ids) {
+  for (let i = 0; i < ids.length && i < 3; i++) {
+    const id = ids[i];
+    if (!id || id === release.id) {
+      if (!more) {
+        more = true;
+        ids.push(...(await popularVinylVersions(release.masterId, discogsToken)).filter((x) => x !== release.id && !ids.includes(x)));
+      }
+      continue;
+    }
     const other = await discogsGet(`/releases/${id}`, null, discogsToken);
     const known = new Map();
     for (const t of other.tracklist || []) if (t.duration && !known.has(norm(t.title))) known.set(norm(t.title), t.duration);
@@ -473,6 +482,10 @@ export async function borrowDurations(release, discogsToken) {
       }
     }
     if (!missing().length) break;
+    if (!more) {
+      more = true;
+      ids.push(...(await popularVinylVersions(release.masterId, discogsToken)).filter((x) => x !== release.id && !ids.includes(x)));
+    }
   }
   return added;
 }
