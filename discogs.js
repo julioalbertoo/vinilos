@@ -179,7 +179,7 @@ export async function getRelease(id, discogsToken) {
     title: r.title || "",
     year: r.year || "",
     country: r.country || "",
-    labels: (r.labels || []).map((l) => ({ name: l.name, catno: l.catno })),
+    labels: (r.labels || []).map((l) => ({ name: l.name, catno: l.catno, ...(l.id ? { id: l.id } : {}) })),
     formats: (r.formats || []).map((f) => ({
       name: f.name,
       qty: f.qty,
@@ -414,6 +414,24 @@ export async function popularVinylVersions(masterId, discogsToken) {
     .filter((v) => !/unofficial/i.test(v.format || ""))
     .sort((a, b) => have(b) - have(a))
     .map((v) => v.id);
+}
+
+// Notas de la edición principal (normalmente la primera) de un álbum. null si es la misma que exceptId o no tiene.
+export async function masterMainNotes(masterId, discogsToken, exceptId) {
+  const master = await discogsGet(`/masters/${masterId}`, null, discogsToken);
+  if (!master.main_release || master.main_release === exceptId) return null;
+  const r = await discogsGet(`/releases/${master.main_release}`, null, discogsToken);
+  const notes = cleanNotes(r.notes);
+  if (!notes) return null;
+  const where = [r.country, r.year].filter(Boolean).join(", ");
+  return { text: notes, url: r.uri || releaseUrl(r.id), where };
+}
+
+// Historia de un sello. null si no tiene.
+export async function getLabelProfile(id, discogsToken) {
+  const l = await discogsGet(`/labels/${id}`, null, discogsToken);
+  const profile = cleanNotes(l.profile).replace(/\[[amlr]\d+\]/gi, "").trim();
+  return profile ? { name: l.name || "", text: profile, url: l.uri || `https://www.discogs.com/label/${id}` } : null;
 }
 
 // Busca un artista por su nombre; devuelve su id o null. Primero el que se llama igual.

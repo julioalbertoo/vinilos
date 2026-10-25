@@ -5,6 +5,8 @@ import {
   markAiVerified,
   getDiscogsToken,
   setDiscogsToken,
+  getGeniusToken,
+  setGeniusToken,
   clearDiscogsToken,
   markDiscogsVerified,
   hasTokens,
@@ -242,10 +244,13 @@ function initSettings() {
 
   aiInput.value = getAiKey();
   discogsInput.value = getDiscogsToken();
+  const geniusInput = document.getElementById("genius-token-input");
+  geniusInput.value = getGeniusToken();
 
   document.getElementById("settings-save").addEventListener("click", () => {
     aiInput.value = setAiKey(aiInput.value);
     discogsInput.value = setDiscogsToken(discogsInput.value);
+    geniusInput.value = setGeniusToken(geniusInput.value);
     status.textContent = "Guardado.";
   });
 
@@ -254,6 +259,7 @@ function initSettings() {
     clearDiscogsToken();
     aiInput.value = "";
     discogsInput.value = "";
+    geniusInput.value = setGeniusToken("");
     status.textContent = "Llaves borradas.";
   });
 
@@ -917,7 +923,7 @@ async function loadTriviaBox(release, request) {
     (text) => {
       if (request === detailRequest) step.textContent = text;
     },
-    getDiscogsToken()
+    { discogsToken: getDiscogsToken(), geniusToken: getGeniusToken() }
   );
   if (request !== detailRequest) return;
   const again = el("button", "detail-trivia-again", "🔄 Otro dato");

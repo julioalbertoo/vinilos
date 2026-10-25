@@ -93,6 +93,18 @@ export function markDiscogsVerified(ok) {
   notify();
 }
 
+// Llave opcional de Genius: no va a la nube (la copia en la nube solo guarda las dos principales).
+export function getGeniusToken() {
+  return localStorage.getItem(KEYS.geniusToken) || "";
+}
+
+export function setGeniusToken(value) {
+  const cleaned = clean(value);
+  if (cleaned) localStorage.setItem(KEYS.geniusToken, cleaned);
+  else localStorage.removeItem(KEYS.geniusToken);
+  return cleaned;
+}
+
 export function hasTokens() {
   return Boolean(getAiKey() && getDiscogsToken());
 }
