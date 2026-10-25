@@ -22,7 +22,7 @@ import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory, updateHistoryItem } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
-import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest } from "./details.js";
+import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest, fillDurations, DURATIONS_CHECK } from "./details.js";
 import { renderStats, setStatsActive } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
@@ -656,15 +656,7 @@ function renderDetail(release) {
     nodes.push(trivia);
   }
   if (release.tracklist.length) {
-    const list = el("ul", "detail-tracks");
-    for (const track of release.tracklist) {
-      const li = el("li");
-      li.append(el("span", "pos", track.position), el("span", "detail-track-title", track.title));
-      if (track.duration) li.append(el("span", "detail-track-time", track.duration));
-      list.append(li);
-    }
-    const total = totalDuration(release.tracklist);
-    nodes.push(foldable(`🎵 Canciones (${[release.tracklist.length, total].filter(Boolean).join(" · ")})`, list));
+    nodes.push(tracksBox(release));
   }
   if (release.notes) {
     nodes.push(foldable("📝 Notas de la edición", el("p", "detail-notes", release.notes)));
@@ -699,6 +691,37 @@ function detailArtistLinks(release) {
 }
 
 // Apartado plegable de la ficha: empieza cerrado y se abre al tocar el título.
+// Lista de canciones plegable, con la duración de cada una y la total si se saben.
+function tracksBox(release) {
+  const list = el("ul", "detail-tracks");
+  for (const track of release.tracklist) {
+    const li = el("li");
+    li.append(el("span", "pos", track.position), el("span", "detail-track-title", track.title));
+    if (track.duration) li.append(el("span", "detail-track-time", track.duration));
+    list.append(li);
+  }
+  const total = totalDuration(release.tracklist);
+  const box = foldable(`🎵 Canciones (${[release.tracklist.length, total].filter(Boolean).join(" · ")})`, list);
+  box.id = "detail-tracks-box";
+  return box;
+}
+
+// Si faltan duraciones, se buscan en otras ediciones o en MusicBrainz y se repinta la lista.
+async function loadDurations(release, request) {
+  if (!release.tracklist || release.tracklist.every((t) => t.duration) || release.durationsChecked === DURATIONS_CHECK) return;
+  const before = release.tracklist.filter((t) => t.duration).length;
+  try {
+    await fillDurations(release, getDiscogsToken());
+  } catch {
+    return;
+  }
+  const old = document.getElementById("detail-tracks-box");
+  if (request !== detailRequest || !old || release.tracklist.filter((t) => t.duration).length === before) return;
+  const box = tracksBox(release);
+  box.open = old.open;
+  old.replaceWith(box);
+}
+
 function foldable(title, content) {
   const box = el("details", "detail-fold");
   box.append(el("summary", null, title), content);
@@ -1059,7 +1082,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
       // En un disco guardado se enseña la portada que haya elegido el usuario.
       const saved = fromHistory && getHistory().find((i) => String(i.release_id) === String(release.id));
       renderDetail(saved && saved.cover ? { ...release, image: saved.cover } : release);
-      loadPrices(release, request);
+      loadPrices(release, request).then(() => loadDurations(release, request));
       loadTriviaBox(release, request);
       if (fromHistory) {
         addCoverPicker(release);

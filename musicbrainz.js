@@ -175,8 +175,10 @@ export const trackKey = (title) =>
 // encaja (la que tiene más canciones con duración), o null si no lo encuentra.
 export async function mbTrackLengths(artist, title, wantedCount = 0) {
   const clean = (t) => String(t || "").replace(/"/g, "");
+  // Discogs ordena algunos nombres al revés: «Beatles, The» → «The Beatles».
+  artist = norm(artist).replace(/^(.+),\s*(the|los|las|el|la|les|le|die)$/i, "$2 $1");
   const found = await mbGet("/release", {
-    query: `release:"${clean(title)}" AND artist:"${clean(norm(artist))}"`,
+    query: `release:"${clean(title)}" AND artist:"${clean(artist)}"`,
     limit: "5",
   });
   const releases = ((found && found.releases) || []).filter((r) => (r.score || 0) >= 80);
