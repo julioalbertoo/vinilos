@@ -121,6 +121,9 @@ async function tryModel(model, aiKey, imageDataUrl) {
         temperature: 0.1,
         // Margen amplio: los modelos Flash "piensan" antes de responder y eso también consume tokens.
         max_tokens: 4096,
+        // Sin esto, Flash piensa a fondo y con una foto puede pasar de 30 s. Leer una portada no lo necesita.
+        // Gemma no admite este campo.
+        ...(model.startsWith("gemma") ? {} : { reasoning_effort: "low" }),
       },
       MODEL_TIMEOUT_MS
     );
