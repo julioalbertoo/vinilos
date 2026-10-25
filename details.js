@@ -65,7 +65,7 @@ export function rememberRelease(release) {
 }
 
 // Sube cuando se añade otra fuente de duraciones: los discos ya mirados se vuelven a mirar (3: MusicBrainz, sin dar por mirados los que fallaron).
-export const DURATIONS_CHECK = 3;
+export const DURATIONS_CHECK = 4;
 
 const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
@@ -94,9 +94,16 @@ async function mbDurations(release) {
 // (se intenta una sola vez por disco y se guarda). Devuelve la ficha, con o sin cambios.
 export async function fillDurations(release, discogsToken) {
   if (release.durationsChecked === DURATIONS_CHECK || !release.tracklist || release.tracklist.every((t) => t.duration)) return release;
-  await borrowDurations(release, discogsToken); // si falla, quien llama lo apunta y se reintenta otro día
-  // Si a ninguna edición de Discogs le constan, se miran en MusicBrainz.
-  if (release.tracklist.some((t) => !t.duration)) await mbDurations(release);
+  // Primero MusicBrainz (tiene su propia cola: no espera a las consultas de precios a Discogs);
+  // lo que falte, de otras ediciones de Discogs. Si algo falla, se apunta y se reintenta otro día.
+  try {
+    await mbDurations(release);
+    if (release.tracklist.some((t) => !t.duration)) await borrowDurations(release, discogsToken);
+  } catch (err) {
+    release.durationsNote = `Error: ${err.message}`;
+    rememberRelease(release);
+    throw err;
+  }
   release.durationsChecked = DURATIONS_CHECK;
   rememberRelease(release);
   return release;
