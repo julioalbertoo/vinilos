@@ -429,6 +429,32 @@ function el(tag, className, text) {
   return node;
 }
 
+// Pills de color del vinilo y gramaje («🎨 Orange Translucent», «⚖️ 180 g»), sin repetir las que ya hay.
+function addVinylPills(pills, color, weight) {
+  if (color && !pills.querySelector(".card-color")) pills.append(el("span", "card-color", `🎨 ${color}`));
+  if (weight && !pills.querySelector(".card-weight")) pills.append(el("span", "card-weight", `⚖️ ${weight}`));
+}
+
+// La lista de ediciones de Discogs no trae el color ni el gramaje: se mira la ficha de cada
+// edición que se enseña, de una en una (la ficha queda guardada para la próxima vez).
+let versionPillsRun = 0;
+async function fillVersionPills(cards, isCurrent) {
+  const run = ++versionPillsRun;
+  for (const { candidate, card } of cards) {
+    if (run !== versionPillsRun || !isCurrent()) return;
+    if (candidate.pillsChecked) continue;
+    try {
+      const release = await cachedRelease(candidate.id, getDiscogsToken());
+      candidate.pillsChecked = true;
+      candidate.color = candidate.color || vinylColor(release.formats.map((f) => f.text));
+      candidate.weight = candidate.weight || releaseWeight(release);
+      addVinylPills(card.querySelector(".card-pills"), candidate.color, candidate.weight);
+    } catch {
+      return; // Discogs no responde o se pasó del límite: se queda como estaba.
+    }
+  }
+}
+
 // versions: tarjeta de la lista de ediciones de un álbum (sin «mejor coincidencia»; solo se mira, no se guarda).
 // currentId: la edición de la ficha desde la que se abrió la lista.
 function renderCard(candidate, index, owned, { versions = false, currentId = null } = {}) {
@@ -454,8 +480,9 @@ function renderCard(candidate, index, owned, { versions = false, currentId = nul
   body.append(el("p", null, [candidate.year || "Año ?", countryWithFlag(candidate.country) || "País ?"].join(" · ")));
   body.append(el("p", null, [candidate.label || "Sello ?", candidate.catno || "Nº cat. ?"].join(" · ")));
   body.append(el("p", null, candidate.formats.join(", ")));
-  if (candidate.color) body.append(el("p", "card-color", `🎨 ${candidate.color}`));
-  if (candidate.weight) body.append(el("p", "card-weight", `⚖️ ${candidate.weight}`));
+  const pills = el("div", "card-pills");
+  addVinylPills(pills, candidate.color, candidate.weight);
+  body.append(pills);
   if (versions && candidate.have) body.append(el("p", null, `👥 ${candidate.have.toLocaleString("es-ES")} en colecciones de Discogs`));
   if (candidate.matches && candidate.matches.length) {
     body.append(el("p", "card-matches", candidate.matches.map((m) => `✓ ${m}`).join("  ")));
@@ -1154,10 +1181,15 @@ function drawVersions(entry) {
   }
   const owned = new Set(getHistory().map((item) => String(item.release_id)));
   let shown = 0;
+  let allCards = [];
   const showMore = () => {
     const next = items.slice(shown, shown + (shown ? RESULTS_STEP : 20));
-    list.append(...next.map((c, i) => renderCard(c, shown + i, owned, { versions: true, currentId: release.id })));
+    const cards = next.map((c, i) => ({ candidate: c, card: renderCard(c, shown + i, owned, { versions: true, currentId: release.id }) }));
+    list.append(...cards.map((c) => c.card));
     shown += next.length;
+    // Sigue mientras se vea esta lista; «Ver más» continúa con todas las que aún falten.
+    allCards = allCards.concat(cards);
+    fillVersionPills(allCards, () => activeView() === "versions" && versionsStack[versionsStack.length - 1] === entry && list.isConnected);
     const left = items.length - shown;
     more.hidden = left <= 0;
     more.textContent = left > RESULTS_STEP ? `Ver ${RESULTS_STEP} más (quedan ${left})` : left === 1 ? "Ver la que queda" : `Ver las ${left} que quedan`;

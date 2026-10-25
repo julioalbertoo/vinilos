@@ -57,7 +57,8 @@ const COLOR_WORDS =
 
 // Devuelve el texto del color del vinilo (p. ej. "Orange Translucent"), o "" si es negro o no se sabe.
 export function vinylColor(texts) {
-  const hit = texts.find((t) => t && COLOR_WORDS.test(t));
+  // «White Label» es una edición promocional sin portada, no un vinilo blanco.
+  const hit = texts.find((t) => t && COLOR_WORDS.test(t.replace(/white label/gi, "")));
   return hit ? hit.trim() : "";
 }
 
