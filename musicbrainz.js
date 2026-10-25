@@ -147,3 +147,17 @@ export async function mbDiscography(mbid, onProgress = () => {}) {
 }
 
 const sortByYear = (list) => [...list].sort((a, b) => (Number(a.year) || 9999) - (Number(b.year) || 9999));
+
+// Nota libre («annotation») del álbum en MusicBrainz, localizado por su master de Discogs.
+// Devuelve { title, url, text } o null si no hay álbum enlazado o no tiene nota.
+export async function mbAlbumAnnotation(masterId) {
+  if (!masterId) return null;
+  const url = await mbGet("/url", { resource: `https://www.discogs.com/master/${masterId}`, inc: "release-group-rels" });
+  const groupOf = (r) => r["release_group"] || r["release-group"];
+  const rel = url && (url.relations || []).find((r) => groupOf(r) && groupOf(r).id);
+  if (!rel) return null;
+  const group = await mbGet(`/release-group/${groupOf(rel).id}`, { inc: "annotation" });
+  const text = String((group && group.annotation) || "").replace(/\[[^\]|]*\|([^\]]*)\]/g, "$1").replace(/\[([^\]]*)\]/g, "$1").trim();
+  if (!text) return null;
+  return { title: group.title || "", url: `https://musicbrainz.org/release-group/${group.id}`, text };
+}

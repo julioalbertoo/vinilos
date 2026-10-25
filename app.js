@@ -911,9 +911,14 @@ async function loadTriviaBox(release, request) {
   }
   const step = el("p", "detail-trivia-note", "Buscando en internet un dato curioso con fuentes…");
   box.replaceChildren(title, step);
-  const result = await loadTrivia(release, getAiKey(), (text) => {
-    if (request === detailRequest) step.textContent = text;
-  });
+  const result = await loadTrivia(
+    release,
+    getAiKey(),
+    (text) => {
+      if (request === detailRequest) step.textContent = text;
+    },
+    getDiscogsToken()
+  );
   if (request !== detailRequest) return;
   const again = el("button", "detail-trivia-again", "🔄 Otro dato");
   again.type = "button";

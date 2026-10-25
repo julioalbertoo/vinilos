@@ -5,10 +5,13 @@
 // 2. Gemini con la búsqueda de Google: Google dice qué páginas respaldan cada frase
 //    (groundingMetadata); el dato solo vale si sus frases están respaldadas.
 // 3. Si la búsqueda no tiene cupo: textos que la app lee ella misma (el artículo exacto de Wikipedia
-//    del álbum, localizado con Wikidata; artículos de sus canciones; las notas de la edición en Discogs).
-//    Gemini elige un dato y copia la frase que lo prueba; solo vale si esa frase está en el texto.
+//    del álbum, localizado con Wikidata; artículos de sus canciones; las notas de la edición en Discogs;
+//    la nota del álbum en MusicBrainz; y, si nada de eso sale, el artículo de Wikipedia del artista y su
+//    biografía en Discogs). Gemini elige un dato y copia la frase que lo prueba; solo vale si esa frase está en el texto.
 // Para no repetir, se le pasan a la IA los datos ya contados de ese álbum.
 import { askWithGoogleSearch, askPlain } from "./ai.js";
+import { getArtist } from "./discogs.js";
+import { mbAlbumAnnotation } from "./musicbrainz.js";
 
 const SEEN_KEY = "vinilos_trivia_seen";
 const SEEN_PER_DISC = 10;
@@ -73,13 +76,15 @@ function editionLine(release) {
   return [label && label.name, label && label.catno, release.country, release.year].filter(Boolean).join(", ");
 }
 
+// Datos por consulta. La búsqueda de Google pide más: su cupo es pequeño y los que sobran se guardan.
 const FACTS_PER_CALL = 3;
+const FACTS_PER_SEARCH = 6;
 
 function buildPrompt(release, topic, seen) {
   const format = (release.formats || []).map((f) => [f.name, ...(f.descriptions || []), f.text].filter(Boolean).join(", ")).join(" + ");
   const tracks = (release.tracklist || []).map((t) => t.title).filter(Boolean).slice(0, 30).join("; ");
   const lines = [
-    `Busca en internet ${FACTS_PER_CALL} datos curiosos, sorprendentes y poco conocidos, distintos entre sí, sobre ${topic} o, si no hay bastantes, sobre el disco en general.`,
+    `Busca en internet ${FACTS_PER_SEARCH} datos curiosos, sorprendentes y poco conocidos, distintos entre sí, sobre ${topic} o, si no hay bastantes, sobre el disco en general.`,
     "",
     "El disco:",
     `- Artista: ${release.artist || "?"}`,
@@ -153,6 +158,7 @@ const ATTEMPTS = 2;
 const POOL_KEY = "vinilos_trivia_pool";
 // Los enlaces de Google caducan con el tiempo: la reserva dura pocos días.
 const POOL_MAX_AGE = 3 * 24 * 3600 * 1000;
+const POOL_MAX = 12;
 
 function readPool() {
   try {
@@ -180,7 +186,7 @@ function savePool(release, facts) {
   const pool = readPool();
   const key = discKey(release);
   const at = new Date().toISOString();
-  pool[key] = [...(pool[key] || []), ...facts.map((f) => ({ ...f, at }))].slice(-8);
+  pool[key] = [...(pool[key] || []), ...facts.map((f) => ({ ...f, at }))].slice(-POOL_MAX);
   writePool(pool);
 }
 
@@ -198,7 +204,7 @@ function takeFromPool(release, seen) {
 
 // ---------- Plan B: textos que lee la propia app ----------
 
-const DOC_ATTEMPTS = 3;
+const DOC_ATTEMPTS = 4;
 const DOC_WINDOW = 9000;
 
 // Minúsculas, sin acentos, comillas ni signos raros y con los espacios juntos, para comparar textos.
@@ -252,6 +258,17 @@ async function wikidataArticles(release) {
   return [];
 }
 
+// Artículos de Wikipedia del artista: Wikidata guarda su número de artista de Discogs (P1953).
+async function wikidataArtistArticles(artistId) {
+  if (!artistId) return [];
+  const found = await wikiJson("www.wikidata.org", { action: "query", list: "search", srsearch: `haswbstatement:P1953=${artistId}`, srlimit: "1" });
+  const hit = found.query && found.query.search && found.query.search[0];
+  if (!hit) return [];
+  const entity = await wikiJson("www.wikidata.org", { action: "wbgetentities", ids: hit.title, props: "sitelinks", sitefilter: "eswiki|enwiki" });
+  const links = (entity.entities && entity.entities[hit.title] && entity.entities[hit.title].sitelinks) || {};
+  return ["es", "en"].filter((lang) => links[`${lang}wiki`]).map((lang) => ({ lang, title: links[`${lang}wiki`].title }));
+}
+
 // Primer artículo de una búsqueda que hable de verdad de ese disco o canción (nombra al artista y el título).
 async function searchArticle(lang, search, mustHave) {
   const found = await wikiJson(`${lang}.wikipedia.org`, { action: "query", list: "search", srsearch: search, srlimit: "3" });
@@ -266,7 +283,7 @@ async function searchArticle(lang, search, mustHave) {
 
 // Fuentes posibles, en orden y sin pedirlas todavía (cada una es una función que trae su texto).
 // Cada fuente: { name, url, text, topic }.
-function documentPlans(release) {
+function documentPlans(release, discogsToken) {
   const artist = cleanArtist(release.artist);
   const title = coreTitle(release.title);
   const album = "este álbum, su grabación, su portada o esta edición en vinilo";
@@ -303,17 +320,55 @@ function documentPlans(release) {
     });
   }
 
+  // Nota del álbum en MusicBrainz (pocos la tienen, pero suele ser buena).
+  if (release.masterId) {
+    plans.push(async () => {
+      const note = await mbAlbumAnnotation(release.masterId);
+      return note && note.text.length >= 150 && { name: `MusicBrainz: ${note.title || title}`, url: note.url, text: note.text, topic: album };
+    });
+  }
+
   // Un poco de azar en el orden, pero el artículo del álbum casi siempre primero (es el más completo).
   const [first, ...rest] = plans;
-  return Math.random() < 0.7 ? [first, ...rest.sort(() => Math.random() - 0.5)] : plans.sort(() => Math.random() - 0.5);
+  const ordered = Math.random() < 0.7 ? [first, ...rest.sort(() => Math.random() - 0.5)] : plans.sort(() => Math.random() - 0.5);
+
+  // Último recurso: el artista. Sirve para discos nuevos o poco conocidos, sin artículo propio.
+  // Se lee de preferencia el trozo que nombra el disco.
+  const mainArtist = (release.artists || [])[0];
+  const artistTopic = `${artist} (mejor si tiene que ver con «${title}» o con su época)`;
+  const artistPlans = [];
+  let artistLinks = null;
+  const artistArticles = () => (artistLinks = artistLinks || wikidataArtistArticles(mainArtist && mainArtist.id).catch(() => []));
+  if (artist && !/^various$/i.test(artist)) {
+    for (const lang of Math.random() < 0.5 ? ["es", "en"] : ["en", "es"]) {
+      artistPlans.push(async () => {
+        const link = (await artistArticles()).find((a) => a.lang === lang);
+        const page = link
+          ? await wikiText(lang, { titles: link.title })
+          : await searchArticle(lang, `${artist} ${lang === "es" ? "músico banda" : "band musician"}`, [coreArtist(artist)]);
+        return page && { name: `Wikipedia (${lang}): ${page.title}`, url: wikiUrl(lang, page.title), text: page.text, topic: artistTopic, focus: title };
+      });
+    }
+  }
+  if (mainArtist && mainArtist.id) {
+    artistPlans.push(async () => {
+      const info = await getArtist(mainArtist.id, discogsToken);
+      return info.profile.length >= 200 && { name: `Discogs: ${cleanArtist(info.name)}`, url: info.url, text: info.profile, topic: artistTopic, focus: title };
+    });
+  }
+  return [...ordered, ...artistPlans.sort(() => Math.random() - 0.5)];
 }
 
 // Trozo al azar del texto (empezando en un párrafo), para que cada vez salga un dato distinto.
-function randomWindow(text) {
+// Con focus (el título del disco), casi siempre empieza en un párrafo que lo nombra.
+function randomWindow(text, focus) {
   if (text.length <= DOC_WINDOW) return text;
   const starts = [0];
   for (let i = text.indexOf("\n"); i !== -1 && i < text.length - 2000; i = text.indexOf("\n", i + 1)) starts.push(i + 1);
-  const start = starts[Math.floor(Math.random() * starts.length)];
+  const key = focus && plain(focus).length >= 3 ? plain(focus) : "";
+  const near = key ? starts.filter((s) => plain(text.slice(s, text.indexOf("\n", s) === -1 ? undefined : text.indexOf("\n", s))).includes(key)) : [];
+  const pool = near.length && Math.random() < 0.8 ? near : starts;
+  const start = pool[Math.floor(Math.random() * pool.length)];
   return text.slice(start, start + DOC_WINDOW);
 }
 
@@ -393,10 +448,10 @@ function quoteLink(url, quote) {
 }
 
 // Devuelve { ok: true, facts } o { ok: false, quota, stop, detail, tried }.
-async function documentTrivia(release, aiKey, seen, onStep) {
+async function documentTrivia(release, aiKey, discogsToken, seen, onStep) {
   let calls = 0;
   const tried = [];
-  for (const plan of documentPlans(release)) {
+  for (const plan of documentPlans(release, discogsToken)) {
     if (calls >= DOC_ATTEMPTS) break;
     let doc = null;
     try {
@@ -405,7 +460,7 @@ async function documentTrivia(release, aiKey, seen, onStep) {
       doc = null;
     }
     if (!doc) continue;
-    const excerpt = randomWindow(doc.text);
+    const excerpt = randomWindow(doc.text, doc.focus);
     calls += 1;
     tried.push(doc.name);
     const answer = await askPlain(docPrompt(release, doc, excerpt, seen), aiKey, (model) => onStep(`Leyendo ${doc.name} con ${model}…`));
@@ -429,7 +484,7 @@ function show(release, facts, extra = {}) {
 
 // Devuelve { ok: true, text, sources, searchHtml, note } o { ok: false, message }. note: por qué el
 // dato no sale de la búsqueda de Google. onStep(texto): en qué paso va.
-export async function loadTrivia(release, aiKey, onStep = () => {}) {
+export async function loadTrivia(release, aiKey, onStep = () => {}, discogsToken = "") {
   if (!aiKey) return { ok: false, message: "Hace falta la llave de Google Gemini para buscar datos curiosos." };
   const seen = readSeen()[discKey(release)] || [];
 
@@ -462,12 +517,12 @@ export async function loadTrivia(release, aiKey, onStep = () => {}) {
   }
 
   // 3. Textos que lee la propia app: Wikipedia y las notas de Discogs.
-  onStep("Buscando en Wikipedia y en Discogs…");
-  const docs = await documentTrivia(release, aiKey, seen, onStep);
+  onStep("Buscando en Wikipedia, Discogs y MusicBrainz…");
+  const docs = await documentTrivia(release, aiKey, discogsToken, seen, onStep);
   if (docs.ok) return show(release, docs.facts, { note: `Sin búsqueda de Google: ${why}.` });
   if (docs.stop) return { ok: false, message: docs.detail };
   if (docs.quota) return { ok: false, message: `${capital(why)}, y Gemini está sin cupo o saturado en todos sus modelos. Inténtalo en un rato.` };
-  const read = docs.tried.length ? `He leído ${docs.tried.join(", ")}, pero no salió un dato comprobable.` : "No encontré un artículo de Wikipedia de este disco ni notas en Discogs.";
+  const read = docs.tried.length ? `He leído ${docs.tried.join(", ")}, pero no salió un dato comprobable.` : "No encontré textos sobre este disco ni sobre el artista en Wikipedia, Discogs o MusicBrainz.";
   return { ok: false, message: `${capital(why)}. ${read} Prueba con «Otro dato».` };
 }
 
