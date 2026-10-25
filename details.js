@@ -89,11 +89,12 @@ function readCheapest() {
   }
 }
 
-// Devuelve { best, checked, total, versions, at } o null si se cortó (stop).
+// Devuelve { best, checked, total, versions, community, at } o null si se cortó (stop).
 export async function cachedCheapest(masterId, discogsToken, options = {}) {
   const all = readCheapest();
   const saved = all[masterId];
-  if (saved && isFresh(saved.at, PRICES_MAX_AGE)) return saved;
+  // Los guardados antes de contar quién lo tiene/busca (sin community) se vuelven a pedir.
+  if (saved && saved.community && isFresh(saved.at, PRICES_MAX_AGE)) return saved;
   const result = await cheapestVinyl(masterId, discogsToken, options);
   if (!result) return null;
   const entry = { ...result, at: new Date().toISOString() };

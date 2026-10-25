@@ -813,7 +813,14 @@ function spainLink(id, masterId = document.getElementById("detail-price")?.datas
   return box;
 }
 
-function renderPrices(id, prices, at) {
+// «👥 1.234 la tienen · 💛 56 la buscan» (datos de la comunidad de Discogs).
+function peopleNote(c, prefix = "") {
+  if (!c) return null;
+  const n = (x) => (x || 0).toLocaleString("es-ES");
+  return el("p", "detail-price-note", `${prefix}👥 ${n(c.have)} la tienen · 💛 ${n(c.want)} la buscan`);
+}
+
+function renderPrices(id, prices, at, community) {
   const box = document.getElementById("detail-price");
   if (!box) return;
   const nodes = [el("p", "detail-price-title", "💶 Precio en Discogs")];
@@ -828,6 +835,8 @@ function renderPrices(id, prices, at) {
   } else {
     own.append(el("p", "detail-price-note", "Ahora mismo nadie la vende."));
   }
+  const people = peopleNote(community);
+  if (people) own.append(people);
   own.append(outLink("🇪🇸 Desde España ↗", spainShopUrl(["release", id])));
   nodes.push(own);
   // Cualquier edición en vinilo del álbum: se rellena aparte (renderAllVinyl).
@@ -859,9 +868,16 @@ let allVinyl = null;
 function renderAllVinyl() {
   const row = document.getElementById("detail-price-all");
   if (!row || !allVinyl || allVinyl.request !== detailRequest) return;
-  const { status, best, checked, total, versions, error } = allVinyl;
+  const { status, best, checked, total, versions, error, community } = allVinyl;
   const nodes = [el("p", "detail-price-label", "Cualquier edición en vinilo")];
   if (best) nodes.push(el("p", "detail-price-main", `desde ${formatMoney(best)}`));
+  // Suma de todas sus ediciones en vinilo (si tiene más de las leídas, se dice).
+  if (community) {
+    const partial = versions > community.counted ? ` (en sus ${community.counted} primeras ediciones)` : "";
+    const people = peopleNote(community, "Sumando todas: ");
+    people.textContent += partial;
+    nodes.push(people);
+  }
   if (status === "loading") {
     nodes.push(el("p", "detail-price-note", total ? `⏳ Mirando precios: ${checked} de ${total} ediciones…` : "⏳ Buscando las ediciones del álbum…"));
   } else if (status === "error") {
@@ -922,7 +938,7 @@ async function loadPrices(release, request) {
   try {
     const result = await cachedPrices(id, getDiscogsToken());
     prices = result.prices;
-    if (request === detailRequest) renderPrices(id, result.prices, result.at);
+    if (request === detailRequest) renderPrices(id, result.prices, result.at, release.community);
   } catch (err) {
     const box = document.getElementById("detail-price");
     if (request === detailRequest && box) {

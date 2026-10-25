@@ -578,6 +578,13 @@ export async function cheapestVinyl(masterId, discogsToken, { known = {}, onProg
     if (page >= ((r.pagination && r.pagination.pages) || 1) || stop()) break;
   }
   const have = (v) => (v.stats && v.stats.community && v.stats.community.in_collection) || 0;
+  const want = (v) => (v.stats && v.stats.community && v.stats.community.in_wantlist) || 0;
+  // Cuánta gente tiene y busca el álbum, sumando todas las ediciones en vinilo leídas (como mucho 200).
+  const community = {
+    have: versions.reduce((sum, v) => sum + have(v), 0),
+    want: versions.reduce((sum, v) => sum + want(v), 0),
+    counted: versions.length,
+  };
   const picks = versions.sort((a, b) => have(b) - have(a)).slice(0, CHEAPEST_CHECKS);
   let best = null;
   let checked = 0;
@@ -607,9 +614,9 @@ export async function cheapestVinyl(masterId, discogsToken, { known = {}, onProg
       }
     }
     checked += 1;
-    onProgress({ best, checked, total: picks.length, versions: total });
+    onProgress({ best, checked, total: picks.length, versions: total, community });
   }
-  return { best, checked, total: picks.length, versions: total };
+  return { best, checked, total: picks.length, versions: total, community };
 }
 
 // Solo interesan los vinilos: se descartan CD, casetes, etc.
