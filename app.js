@@ -16,7 +16,7 @@ import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify, geminiModels, probeModel } from "./ai.js";
 import { quotaReport, nextPacificMidnight } from "./quota.js";
-import { testDiscogsConnection, vinylVersions, findCandidates, searchByText, getMasterYear, masterMainRelease, popularVinylVersions, findAlbumRelease, bothYears, countryWithFlag, vinylColor, releaseWeight, releaseDiscs } from "./discogs.js";
+import { testDiscogsConnection, vinylVersions, findCandidates, searchByText, getMasterYear, masterMainRelease, popularVinylVersions, findAlbumRelease, bothYears, countryWithFlag, vinylColor, COLOR_REV, releaseWeight, releaseDiscs } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -1104,6 +1104,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
         cover: (release && release.image) || "",
         // Color del vinilo ("" si es negro); sin ficha se usa el del candidato si lo traía.
         color: release ? vinylColor(release.formats.map((f) => f.text)) : candidate.color || undefined,
+        colorRev: release ? COLOR_REV : undefined,
         // Gramaje ("180 g"; "" si Discogs no lo dice).
         weight: release ? releaseWeight(release) : candidate.weight || undefined,
         // Cuántos vinilos trae (2 = doble LP); sin ficha se sabrá más tarde.

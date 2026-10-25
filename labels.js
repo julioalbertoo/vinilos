@@ -1,4 +1,4 @@
-import { getMasterYear, mainVinylRelease, vinylColor, releaseWeight, releaseDiscs } from "./discogs.js";
+import { getMasterYear, mainVinylRelease, vinylColor, COLOR_REV, releaseWeight, releaseDiscs } from "./discogs.js";
 import { cachedRelease, rememberRelease } from "./details.js";
 import { locateLabel } from "./ai.js";
 import { getHistory, updateHistoryItem } from "./history.js";
@@ -104,7 +104,9 @@ const needsLabel = (item) => !isResolved(item) && !failedThisVisit.has(item.rele
 // Los discos guardados antes de la v1.6.6 solo tienen la miniatura (150 px), que se ve pixelada.
 const needsCover = (item) => !item.cover && !failedThisVisit.has(item.release_id);
 // Los discos guardados antes de la v1.11.0 no saben de qué color es el vinilo.
-const needsColor = (item) => item.color === undefined && !failedThisVisit.has(item.release_id);
+// Y los guardados como negros con una lista de colores anterior se vuelven a mirar (p. ej. «Rainbow»).
+const colorOutdated = (item) => item.color === undefined || (item.color === "" && (item.colorRev || 0) < COLOR_REV);
+const needsColor = (item) => colorOutdated(item) && !failedThisVisit.has(item.release_id);
 // Los discos guardados antes de la v1.12.0 no saben su gramaje.
 const needsWeight = (item) => item.weight === undefined && !failedThisVisit.has(item.release_id);
 // Los discos guardados antes de la v1.49.0 no saben cuántos vinilos traen.
@@ -161,7 +163,10 @@ export async function fillMissingLabels(aiKey, discogsToken, onUpdate, onStatus)
         const release = await cachedRelease(item.release_id, discogsToken);
         const patch = {};
         if (!item.cover && release.image) patch.cover = release.image;
-        if (item.color === undefined) patch.color = vinylColor(release.formats.map((f) => f.text));
+        if (colorOutdated(item)) {
+          patch.color = vinylColor(release.formats.map((f) => f.text));
+          patch.colorRev = COLOR_REV;
+        }
         if (item.weight === undefined) patch.weight = releaseWeight(release);
         if (item.discs === undefined) patch.discs = releaseDiscs(release);
         if (item.originalYear === undefined) {

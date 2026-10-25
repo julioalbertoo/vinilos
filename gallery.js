@@ -93,6 +93,9 @@ export function vinylBackground(text) {
   const clear = /\b(clear|transparent|transparente|crystal)\b/.test(t);
   const see = clear || /\b(translucent|transl[uú]cido|transparent)\b/.test(t);
   let colors = colorsIn(t);
+  // Arcoíris o multicolor sin nombrar colores: vetas de todos los colores.
+  const rainbow = /\b(rainbow|arco ?iris|multi-?colou?r(ed)?|tie-?dye)\b/.test(t);
+  if (rainbow && colors.length < 2) colors = ["#c8202e", "#f07c1f", "#f2c530", "#2e9e5b", "#2c64b5", "#7a4bb5"];
   if (!colors.length && !clear) return "";
   if (!colors.length) colors = ["#c9d6dd"]; // transparente sin color: cristal grisáceo
   if (colors.length === 1 && colors[0] === "#1b1b1f") return ""; // negro normal

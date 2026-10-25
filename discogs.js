@@ -53,7 +53,11 @@ function releaseUrl(id) {
 
 // Palabras que indican un vinilo de color. "black" va aparte: un disco solo negro no se destaca.
 const COLOR_WORDS =
-  /\b(red|blue|green|yellow|orange|pink|purple|violet|white|clear|transparent|translucent|gold|golden|silver|gr[ae]y|brown|cream|beige|turquoise|teal|magenta|aqua|mint|coral|marbled?|splatter|swirl|smoke|smoky|colou?red|picture disc|rainbow|multi-?colou?r(?:ed)?|tie-?dye|galaxy|neon|glow|opaque|milky|crystal|bone|olive|lilac|lavender|indigo|navy|cyan|lime|amber|bronze|copper|ruby|emerald|sapphire|jade|tangerine|peach|salmon|maroon|burgundy|cobalt|sky|sea ?glass|haze|nebula|confetti|blend|cloudy|rojo|azul|verde|amarillo|naranja|rosa|morado|blanco|transparente|dorado|plateado|gris)\b/i;
+  /\b(red|blue|green|yellow|orange|pink|purple|violet|white|clear|transparent|translucent|gold|golden|silver|gr[ae]y|brown|cream|beige|turquoise|teal|magenta|aqua|mint|coral|marbled?|splatter|swirl|smoke|smoky|colou?red|picture disc|rainbow|arco ?iris|multi-?colou?r(?:ed)?|tie-?dye|galaxy|neon|glow|opaque|milky|crystal|bone|olive|lilac|lavender|indigo|navy|cyan|lime|amber|bronze|copper|ruby|emerald|sapphire|jade|tangerine|peach|salmon|maroon|burgundy|cobalt|sky|sea ?glass|haze|nebula|confetti|blend|cloudy|rojo|azul|verde|amarillo|naranja|rosa|morado|blanco|transparente|dorado|plateado|gris)\b/i;
+
+// Sube cada vez que la lista de palabras de color crece: los discos guardados como negros con una
+// lista anterior se vuelven a mirar por si ahora se reconoce su color.
+export const COLOR_REV = 2;
 
 // Devuelve el texto del color del vinilo (p. ej. "Orange Translucent"), o "" si es negro o no se sabe.
 export function vinylColor(texts) {
