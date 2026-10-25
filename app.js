@@ -25,6 +25,7 @@ import { renderStats, setStatsActive } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { loadTrivia } from "./trivia.js";
+import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
 import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease } from "./wantlist.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
@@ -36,15 +37,15 @@ const SEARCH_STEP_LABELS = {
   master: "todas las ediciones del álbum",
 };
 
-const VIEWS = ["guide", "settings", "capture", "results", "detail", "collection", "artist", "wantlist"];
+const VIEWS = ["guide", "settings", "capture", "results", "detail", "collection", "artist", "wantlist", "explored"];
 const GUIDE_SCREENS = ["intro", "ai", "discogs"];
 // Pestaña que se marca en la barra inferior para cada pantalla.
-const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "collection", settings: "settings", wantlist: "collection" };
+const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "collection", settings: "settings", wantlist: "collection", explored: "capture" };
 
 // ---------- Botón «atrás» del navegador ----------
 // La app es una sola página: para que «atrás» (o deslizar desde el borde en el iPhone) haga lo mismo que
 // «← Volver», cada pantalla de detalle (candidatos, ficha, artista) deja una marca en el historial.
-const SUB_VIEWS = ["results", "detail", "artist", "wantlist"];
+const SUB_VIEWS = ["results", "detail", "artist", "wantlist", "explored"];
 let navDepth = 0;
 let skipPop = false;
 
@@ -66,6 +67,7 @@ function goBack() {
   else if (view === "detail") detailBack();
   else if (view === "results") resultsBack();
   else if (view === "wantlist") wantlistBack();
+  else if (view === "explored") exploredBack();
 }
 
 window.addEventListener("popstate", (event) => {
@@ -90,6 +92,8 @@ function showView(name) {
   if (name !== "capture") stopScanner();
   if (name === "collection") renderCollection();
   if (name === "wantlist") renderWantlist();
+  if (name === "explored") renderExplored();
+  if (name === "capture") updateExploredLink();
   if (name === "settings") renderQuota();
   else setStatsActive(false);
   for (const view of VIEWS) {
@@ -946,6 +950,7 @@ const BACK_LABELS = {
   collection: "← Volver a mis discos",
   artist: "← Volver al artista",
   wantlist: "← Volver a lo que busco",
+  explored: "← Volver a explorados",
 };
 
 // returnView: pantalla a la que lleva "Volver". Desde «Mis discos» el disco ya está
@@ -1020,11 +1025,20 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
   }
 
   const alreadyOwned = getHistory().some((item) => String(item.release_id) === String(candidate.id));
-  if ((returnView === "artist" || returnView === "wantlist") && !alreadyOwned) {
+  if (returnView === "explored") {
+    if (request === detailRequest) savedNote.textContent = alreadyOwned ? "🧭 Explorado · 💿 Ya lo tienes en tu colección" : "🧭 Explorado · no está en tu colección";
+  } else if ((returnView === "artist" || returnView === "wantlist") && !alreadyOwned) {
     if (request === detailRequest) savedNote.textContent = "Edición principal del álbum · no está en tu colección";
   } else if (fromHistory) {
     // Ya guardado: no se toca.
   } else if (exploreMode) {
+    addExplored({
+      release_id: candidate.id,
+      artist: release ? release.artist : candidate.artist || "",
+      title: release ? release.title : candidate.title,
+      year: String((release ? release.year : candidate.year) || ""),
+      thumb: (release && release.thumb) || candidate.thumb || "",
+    });
     savedNote.textContent = alreadyOwned
       ? "🧭 Modo explorador · 💿 Ya lo tienes en tu colección"
       : "🧭 Modo explorador: no se ha guardado en tu colección";
@@ -1146,6 +1160,81 @@ function renderWantlist() {
 function updateWantlistLink() {
   const count = getWantlist().length;
   document.getElementById("wantlist-open").textContent = count ? `⭐ Lo que busco (${count})` : "⭐ Lo que busco";
+}
+
+// ---------- Discos explorados (modo explorador) ----------
+
+let exploredScroll = 0;
+
+function openExplored() {
+  exploredScroll = window.scrollY;
+  pushNav();
+  showView("explored");
+  window.scrollTo(0, 0);
+}
+
+function exploredBack() {
+  showView("capture");
+  restoreScroll(exploredScroll);
+}
+
+function exploredDate(iso) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function renderExplored() {
+  const items = getExplored();
+  const box = document.getElementById("explored-content");
+  const nodes = [el("h2", null, "🧭 Discos explorados")];
+  document.getElementById("explored-clear").hidden = !items.length;
+  if (!items.length) {
+    nodes.push(el("p", "wantlist-empty", "Aún no has explorado ningún disco. Con el modo explorador activado, lo que identifiques se apunta aquí sin guardarse en tu colección."));
+    box.replaceChildren(...nodes);
+    return;
+  }
+  nodes.push(el("p", "wantlist-sub", `${items.length} ${items.length === 1 ? "disco" : "discos"} · solo en este móvil`));
+  const owned = new Set(getHistory().map((item) => String(item.release_id)));
+  const list = el("div", "artist-albums");
+  for (const item of items) {
+    const line = el("div", "artist-album-line");
+    const row = el("button", "artist-album");
+    row.type = "button";
+    const img = el(item.thumb ? "img" : "span", "artist-album-cover");
+    if (item.thumb) {
+      img.src = item.thumb;
+      img.alt = "";
+      img.loading = "lazy";
+      img.addEventListener("error", () => img.replaceWith(el("span", "artist-album-cover", "💿")), { once: true });
+    } else {
+      img.textContent = "💿";
+    }
+    const text = el("span", "artist-album-text");
+    const meta = [item.artist, item.year, exploredDate(item.date)].filter(Boolean).join(" · ");
+    const title = owned.has(String(item.release_id)) ? `💿 ${item.title}` : item.title;
+    text.append(el("span", "artist-album-title", title), el("span", "artist-album-year", meta));
+    row.append(img, text, el("span", "artist-row-go", "›"));
+    row.addEventListener("click", () => openDetail(historyItemToCandidate(item), { returnView: "explored" }));
+    const remove = el("button", "want-star", "✕");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `Quitar «${item.title}» de explorados`);
+    remove.addEventListener("click", () => {
+      removeExplored(item.release_id);
+      renderExplored();
+    });
+    line.append(row, remove);
+    list.append(line);
+  }
+  nodes.push(list);
+  box.replaceChildren(...nodes);
+}
+
+// El acceso se ve con el modo explorador activado o si ya hay algo explorado.
+function updateExploredLink() {
+  const count = getExplored().length;
+  const link = document.getElementById("explored-open");
+  link.textContent = count ? `🧭 Discos explorados (${count})` : "🧭 Discos explorados";
+  link.hidden = !exploreMode && !count;
 }
 
 // Borra de «Mis discos» el disco de la ficha abierta, tras dos confirmaciones, y vuelve atrás.
@@ -1619,6 +1708,13 @@ function initDetail() {
   document.getElementById("artist-back").addEventListener("click", navBack);
   document.getElementById("wantlist-back").addEventListener("click", navBack);
   document.getElementById("wantlist-open").addEventListener("click", openWantlist);
+  document.getElementById("explored-back").addEventListener("click", navBack);
+  document.getElementById("explored-open").addEventListener("click", openExplored);
+  document.getElementById("explored-clear").addEventListener("click", () => {
+    if (!window.confirm("¿Borrar todo el historial de discos explorados? Tu colección no se toca.")) return;
+    clearExplored();
+    renderExplored();
+  });
 }
 
 // Modo explorador: tema oscuro y lo que se identifica no se guarda en «Mis discos».
@@ -1634,6 +1730,7 @@ function setExploreMode(on) {
   document.querySelector('meta[name="theme-color"]').content = on ? "#17141f" : "#fbf6f1";
   document.getElementById("explore-toggle").checked = on;
   document.getElementById("identify-title").textContent = on ? "¿Qué disco exploras?" : "¿Qué disco tienes?";
+  updateExploredLink();
   try {
     if (on) localStorage.setItem(EXPLORE_KEY, "1");
     else localStorage.removeItem(EXPLORE_KEY);
