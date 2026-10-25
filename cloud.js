@@ -304,6 +304,7 @@ function tokensRow(state) {
     user_id: user.id,
     ai_key: state.aiKey,
     discogs_token: state.discogsToken,
+    genius_token: state.geniusToken || "",
     ai_verified: state.aiVerified,
     discogs_verified: state.discogsVerified,
   };
@@ -330,6 +331,7 @@ async function syncTokens() {
       merged.discogsToken = data.discogs_token;
       merged.discogsVerified = data.discogs_verified;
     }
+    if (!local.geniusToken && data.genius_token) merged.geniusToken = data.genius_token;
   }
   const changedHere = JSON.stringify(merged) !== JSON.stringify(local);
   if (changedHere) {
@@ -341,6 +343,7 @@ async function syncTokens() {
     data &&
     data.ai_key === row.ai_key &&
     data.discogs_token === row.discogs_token &&
+    (data.genius_token || "") === row.genius_token &&
     data.ai_verified === row.ai_verified &&
     data.discogs_verified === row.discogs_verified;
   if (!sameThere && (row.ai_key || row.discogs_token || data)) {

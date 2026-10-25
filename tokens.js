@@ -17,20 +17,23 @@ function notify() {
   }
 }
 
-// Foto de las dos llaves y de si ya se comprobaron.
+// Foto de las llaves y de si ya se comprobaron.
 export function getTokenState() {
   return {
     aiKey: getAiKey(),
     discogsToken: getDiscogsToken(),
+    geniusToken: getGeniusToken(),
     aiVerified: localStorage.getItem(KEYS.aiVerified) === "1",
     discogsVerified: localStorage.getItem(KEYS.discogsVerified) === "1",
   };
 }
 
 // Escribe las llaves traídas de la nube sin avisar (no hay que volver a subirlas).
-export function applyTokenState({ aiKey, discogsToken, aiVerified, discogsVerified }) {
+export function applyTokenState({ aiKey, discogsToken, geniusToken, aiVerified, discogsVerified }) {
   localStorage.setItem(KEYS.aiKey, aiKey || "");
   localStorage.setItem(KEYS.discogsToken, discogsToken || "");
+  if (geniusToken) localStorage.setItem(KEYS.geniusToken, geniusToken);
+  else localStorage.removeItem(KEYS.geniusToken);
   if (aiKey && aiVerified) localStorage.setItem(KEYS.aiVerified, "1");
   else localStorage.removeItem(KEYS.aiVerified);
   if (discogsToken && discogsVerified) localStorage.setItem(KEYS.discogsVerified, "1");
@@ -93,15 +96,17 @@ export function markDiscogsVerified(ok) {
   notify();
 }
 
-// Llave opcional de Genius: no va a la nube (la copia en la nube solo guarda las dos principales).
+// Llave opcional de Genius (historias de canciones para el dato curioso). También va a la nube.
 export function getGeniusToken() {
   return localStorage.getItem(KEYS.geniusToken) || "";
 }
 
 export function setGeniusToken(value) {
   const cleaned = clean(value);
+  if (cleaned === getGeniusToken()) return cleaned;
   if (cleaned) localStorage.setItem(KEYS.geniusToken, cleaned);
   else localStorage.removeItem(KEYS.geniusToken);
+  notify();
   return cleaned;
 }
 

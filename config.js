@@ -29,7 +29,7 @@ export const CONFIG = {
     aiVerified: "vinilos_ai_verified",
     discogsToken: "vinilos_discogs_token",
     discogsVerified: "vinilos_discogs_verified",
-    // Llave opcional de Genius (historias de canciones para el dato curioso). Solo en este navegador.
+    // Llave opcional de Genius (historias de canciones para el dato curioso).
     geniusToken: "vinilos_genius_token",
     history: "vinilos_history",
     collectionSort: "vinilos_collection_sort",
