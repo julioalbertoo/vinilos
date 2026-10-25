@@ -2,6 +2,9 @@
 
 import { isHeavy, bothYears } from "./discogs.js";
 
+// Discogs añade «(2)», «(3)»… a los artistas que se llaman igual: no se enseña.
+const artistName = (name) => String(name || "").replace(/\s*\(\d+\)/g, "").replace(/\*/g, "").trim();
+
 let selectedId = null; // Se recuerda para volver al mismo disco después de abrir su ficha.
 
 function el(tag, className, text) {
@@ -43,7 +46,7 @@ function fillLabel(label, item) {
     return;
   }
   label.style.background = LABEL_COLORS[Number(item.release_id) % LABEL_COLORS.length] || LABEL_COLORS[0];
-  label.append(el("span", "gallery-label-title", item.title || ""), el("span", "gallery-label-artist", item.artist || ""));
+  label.append(el("span", "gallery-label-title", item.title || ""), el("span", "gallery-label-artist", artistName(item.artist)));
 }
 
 // ---------- Color del vinilo ----------
@@ -212,7 +215,7 @@ function renderSlide(item) {
   const slide = el("button", "gallery-slide");
   slide.type = "button";
   slide.dataset.id = item.release_id;
-  slide.setAttribute("aria-label", [item.title, item.artist].filter(Boolean).join(", "));
+  slide.setAttribute("aria-label", [item.title, artistName(item.artist)].filter(Boolean).join(", "));
 
   // Dos capas: la de fuera desliza el disco fuera de la funda y la de dentro gira.
   const discWrap = el("span", "gallery-disc-wrap");
@@ -266,7 +269,7 @@ export function renderGallery(items, onOpen) {
     const item = items[index];
     selectedId = item.release_id;
     title.textContent = item.title;
-    meta.textContent = [item.artist, bothYears(item), discCount(item) > 1 && `${discCount(item)} LP`, isHeavy(item.weight || "") && item.weight].filter(Boolean).join(" · ");
+    meta.textContent = [artistName(item.artist), bothYears(item), discCount(item) > 1 && `${discCount(item)} LP`, isHeavy(item.weight || "") && item.weight].filter(Boolean).join(" · ");
     count.textContent = `${index + 1} de ${items.length}`;
   }
 

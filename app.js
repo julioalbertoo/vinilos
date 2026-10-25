@@ -621,7 +621,7 @@ function renderDetail(release) {
     img.alt = "Portada";
     nodes.push(img);
   }
-  nodes.push(el("h2", null, release.artist ? `${release.artist} – ${release.title}` : release.title));
+  nodes.push(el("h2", null, release.artist ? `${cleanArtistName(release.artist)} – ${release.title}` : release.title));
   const artistLinks = detailArtistLinks(release);
   if (artistLinks) nodes.push(artistLinks);
   nodes.push(el("p", "detail-meta detail-year", detailYearLine(release)));
@@ -1292,7 +1292,7 @@ function renderWantlist() {
       img.textContent = "💿";
     }
     const text = el("span", "artist-album-text");
-    text.append(el("span", "artist-album-title", item.title), el("span", "artist-album-year", [item.artist, item.year].filter(Boolean).join(" · ")));
+    text.append(el("span", "artist-album-title", item.title), el("span", "artist-album-year", [cleanArtistName(item.artist), item.year].filter(Boolean).join(" · ")));
     row.append(img, text, el("span", "artist-row-go", "›"));
     row.addEventListener("click", () => openAlbum({ ...item }, item.artist, "wantlist"));
     const remove = el("button", "want-star is-on", "★");
@@ -1362,7 +1362,7 @@ function renderExplored() {
       img.textContent = "💿";
     }
     const text = el("span", "artist-album-text");
-    const meta = [item.artist, item.year, exploredDate(item.date)].filter(Boolean).join(" · ");
+    const meta = [cleanArtistName(item.artist), item.year, exploredDate(item.date)].filter(Boolean).join(" · ");
     const title = owned.has(String(item.release_id)) ? `💿 ${item.title}` : item.title;
     text.append(el("span", "artist-album-title", title), el("span", "artist-album-year", meta));
     row.append(img, text, el("span", "artist-row-go", "›"));
@@ -1670,7 +1670,7 @@ function renderHistoryItem(item) {
     open.append(el("span", "history-cover", "💿"));
   }
   open.append(el("span", "history-title", item.title));
-  if (item.artist) open.append(el("span", "history-meta", item.artist));
+  if (item.artist) open.append(el("span", "history-meta", cleanArtistName(item.artist)));
   const years = bothYears(item);
   if (years) open.append(el("span", "history-meta", years));
   open.addEventListener("click", () => openDetail(historyItemToCandidate(item), { returnView: "collection" }));
