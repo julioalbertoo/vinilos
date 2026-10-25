@@ -3,6 +3,7 @@ import { trackKey } from "./musicbrainz.js";
 
 const MIN_GAP_MS = 1100; // Discogs permite unas 60 peticiones por minuto con token
 let lastRequestAt = 0;
+let queue = Promise.resolve();
 
 function interpretStatus(status) {
   if (status === 401 || status === 403) {
@@ -15,9 +16,15 @@ function interpretStatus(status) {
 }
 
 async function discogsGet(path, params, discogsToken) {
-  const wait = lastRequestAt + MIN_GAP_MS - Date.now();
-  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-  lastRequestAt = Date.now();
+  // Turno en la cola: si hay varias consultas a la vez, salen de una en una con su pausa.
+  const turn = queue.then(() => {
+    const wait = lastRequestAt + MIN_GAP_MS - Date.now();
+    return wait > 0 ? new Promise((resolve) => setTimeout(resolve, wait)) : null;
+  });
+  queue = turn.then(() => {
+    lastRequestAt = Date.now();
+  });
+  await queue;
 
   const query = params ? `?${new URLSearchParams(params)}` : "";
   let response;

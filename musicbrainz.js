@@ -5,11 +5,18 @@
 const BASE = "https://musicbrainz.org/ws/2";
 const MIN_GAP_MS = 1100;
 let lastRequestAt = 0;
+let queue = Promise.resolve();
 
 async function mbGet(path, params = {}) {
-  const wait = lastRequestAt + MIN_GAP_MS - Date.now();
-  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-  lastRequestAt = Date.now();
+  // Turno en la cola: si hay varias consultas a la vez, salen de una en una con su pausa.
+  const turn = queue.then(() => {
+    const wait = lastRequestAt + MIN_GAP_MS - Date.now();
+    return wait > 0 ? new Promise((resolve) => setTimeout(resolve, wait)) : null;
+  });
+  queue = turn.then(() => {
+    lastRequestAt = Date.now();
+  });
+  await queue;
   const query = new URLSearchParams({ ...params, fmt: "json" });
   let response;
   try {

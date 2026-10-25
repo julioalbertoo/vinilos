@@ -64,21 +64,20 @@ export function rememberRelease(release) {
   writeRow(release.id, { data: release, data_at: (row && row.data_at) || new Date().toISOString() });
 }
 
-// Sube cuando se añade otra fuente de duraciones: los discos ya mirados se vuelven a mirar (2: MusicBrainz).
-export const DURATIONS_CHECK = 2;
+// Sube cuando se añade otra fuente de duraciones: los discos ya mirados se vuelven a mirar (3: MusicBrainz, sin dar por mirados los que fallaron).
+export const DURATIONS_CHECK = 3;
 
 const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 // Rellena las duraciones que faltan con las de MusicBrainz: por título y, si el disco tiene
 // las mismas canciones en el mismo número, por orden.
 async function mbDurations(release) {
-  let tracks = null;
-  try {
-    tracks = await mbTrackLengths(release.artist, release.title, release.tracklist.length);
-  } catch {
-    return; // MusicBrainz es un extra: si falla, se queda la duración aproximada
+  // Si MusicBrainz falla (p. ej. por ir muy deprisa), el error sube y se reintenta otro día.
+  const tracks = await mbTrackLengths(release.artist, release.title, release.tracklist.length);
+  if (!tracks) {
+    release.durationsNote = "MusicBrainz: álbum no encontrado";
+    return;
   }
-  if (!tracks) return;
   const known = new Map();
   for (const t of tracks) if (t.seconds && !known.has(trackKey(t.title))) known.set(trackKey(t.title), t.seconds);
   const sameOrder = tracks.length === release.tracklist.length;
@@ -87,6 +86,8 @@ async function mbDurations(release) {
     const seconds = known.get(trackKey(t.title)) || (sameOrder && tracks[i].seconds);
     if (seconds) t.duration = clock(seconds);
   });
+  const filled = release.tracklist.filter((t) => t.duration).length;
+  release.durationsNote = `MusicBrainz: ${tracks.length} canciones, ${filled} de ${release.tracklist.length} con duración`;
 }
 
 // Si Discogs no da la duración de algunas canciones, se copian de otra edición del mismo álbum
