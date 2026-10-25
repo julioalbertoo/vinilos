@@ -23,7 +23,7 @@ import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory, updateHistoryItem } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
 import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest, fillDurations, DURATIONS_CHECK } from "./details.js";
-import { renderStats, setStatsActive } from "./stats.js";
+import { renderStats, setStatsActive, estimate, priceSource } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { loadTrivia } from "./trivia.js";
@@ -878,6 +878,9 @@ function renderPrices(id, prices, at, community) {
     }
     nodes.push(row);
   }
+  // Lo que vale este disco en «Mis discos › Datos › Valor», y de dónde sale.
+  const worth = estimate(prices);
+  if (worth) nodes.push(el("p", "detail-price-sub", `💶 En «Valor» cuenta como ${formatMoney(worth)}: ${priceSource(worth)}.`));
   const when = pricesAge(at);
   // Una sola nota al pie para las dos tarjetas.
   nodes.push(el("p", "detail-price-note", [when, "🇪🇸 Solo copias con disco y portada en G o mejor."].filter(Boolean).join(" · ")));

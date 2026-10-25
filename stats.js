@@ -226,13 +226,24 @@ const yearOf = (value) => {
 
 // Precio estimado de un disco: el sugerido para VG+ (estado típico de un disco usado);
 // si no hay, lo más barato a la venta; si no, otro sugerido.
-function estimate(prices) {
+// source dice de dónde sale: "vg+" (sugerido VG+), "lowest" (más barato a la venta) u "other" (sugerido de otro estado).
+export function estimate(prices) {
   if (!prices) return null;
   const suggested = Array.isArray(prices.suggested) ? prices.suggested : [];
   const vgPlus = suggested.find((s) => s.grade === "VG+");
-  const pick = vgPlus || prices.lowest || suggested[0];
-  return pick && pick.value ? { value: Number(pick.value), currency: pick.currency || "EUR" } : null;
+  const lowest = prices.lowest && prices.lowest.value ? prices.lowest : null;
+  const [pick, source, grade] = vgPlus ? [vgPlus, "vg+", "VG+"] : lowest ? [lowest, "lowest", ""] : [suggested[0], "other", suggested[0] && suggested[0].grade];
+  return pick && pick.value ? { value: Number(pick.value), currency: pick.currency || "EUR", source, grade } : null;
 }
+
+// Texto corto de dónde sale el precio de un disco.
+export function priceSource(price) {
+  if (!price) return "";
+  if (price.source === "lowest") return "el más barato a la venta";
+  return `sugerido para ${price.grade || "su estado"}`;
+}
+
+const SOURCE_NAMES = { "vg+": "Sugerido para VG+", lowest: "Más barato a la venta", other: "Sugerido para otro estado", none: "Sin precio" };
 
 function countBy(list) {
   const map = new Map();
@@ -296,7 +307,7 @@ const decadeName = (decade) => `los ${decade < 2000 ? String(decade).slice(2) : 
 let yearMode = "original";
 let selectedYear = null;
 let peopleMode = "artists";
-const picks = { country: null, artists: null, labels: null, rarity: null, hot: false };
+const picks = { country: null, artists: null, labels: null, rarity: null, hot: false, source: null };
 
 // Entradas de la barra de accesos, en el orden de la página.
 const NAV = [
@@ -327,7 +338,7 @@ function summaryTiles(items, artists, countries, lengths, onArtists) {
   return box;
 }
 
-function valueCard(data, items, onOpen) {
+function valueCard(data, items, onOpen, rerender) {
   const head = { icon: "💶", title: "Valor estimado", sub: "Según los precios de Discogs", accent: "butter", nav: "value" };
   if (!data.totals.size) {
     return card(head, pill("⏳ Aún no hay precios: se piden a Discogs poco a poco.", "butter"));
@@ -343,13 +354,51 @@ function valueCard(data, items, onOpen) {
     el("p", "stats-big-note", `unos ${money(avg, mainCurrency)} por disco de media`),
     top.length ? el("p", "stats-sub", "🏆 Los más valiosos") : null,
     top.length ? podium(top.map((r) => ({ item: r.item, value: money(r.price.value, r.price.currency) })), onOpen) : null,
+    el("p", "stats-sub", "🔎 De dónde sale el precio"),
+    sourceList(data, rerender, onOpen),
+    picks.source ? null : hint("Toca una fila para ver sus discos."),
     note(
-      `Con precio: ${data.priced.length} de ${items.length}. ` +
-        "Es el precio sugerido por Discogs para un disco en estado VG+ (o el más barato a la venta)."
+      "Se usa el precio que Discogs sugiere para un disco en estado VG+ (muy bueno, usado). Si no lo hay, el más " +
+        "barato a la venta ahora; si nadie lo vende, el sugerido para otro estado. Solo cuenta el estado del disco, no el de la funda."
     )
   );
   box.classList.add("stats-card--hero");
   return box;
+}
+
+// Cuántos discos tienen cada tipo de precio; tocar una fila enseña sus discos con su precio.
+function sourceList(data, rerender, onOpen) {
+  const byKey = new Map();
+  for (const r of data.rows) {
+    const name = SOURCE_NAMES[r.price ? r.price.source : "none"];
+    byKey.set(name, [...(byKey.get(name) || []), r]);
+  }
+  const entries = Object.values(SOURCE_NAMES).map((name) => [name, (byKey.get(name) || []).length]).filter(([, n]) => n);
+  const list = rankList(entries, data.rows.length, { max: entries.length });
+  // Filas que se pueden tocar: debajo salen sus discos, del más caro al más barato.
+  [...list.querySelectorAll(".stats-bar")].forEach((row, i) => {
+    const [name] = entries[i];
+    const button = el("button", "stats-bar");
+    button.type = "button";
+    button.setAttribute("aria-expanded", String(picks.source === name));
+    if (picks.source === name) button.classList.add("active");
+    button.append(...row.childNodes);
+    button.addEventListener("click", () => {
+      picks.source = picks.source === name ? null : name;
+      rerender();
+    });
+    row.replaceWith(button);
+    if (picks.source !== name) return;
+    const rows = [...byKey.get(name)].sort((a, b) => (b.price ? b.price.value : 0) - (a.price ? a.price.value : 0));
+    const facts = rows.map((r) => ({
+      icon: "💶",
+      label: r.price ? priceSource(r.price).replace(/^./, (c) => c.toUpperCase()) : "Discogs no da precio",
+      item: r.item,
+      value: r.price ? money(r.price.value, r.price.currency) : "—",
+    }));
+    button.after(factGrid(facts, onOpen));
+  });
+  return list;
 }
 
 function yearsCard(data, rerender, onOpen) {
@@ -718,7 +767,7 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl, 
       .filter((r) => r.len)
       .map((r) => ({ item: r.item, seconds: r.len.seconds, estimated: r.len.estimated, tracks: r.s.tracks }));
 
-    const nodes = [summaryTiles(items, artists, countries, lengths, onArtists), valueCard(data, items, onOpen)];
+    const nodes = [summaryTiles(items, artists, countries, lengths, onArtists), valueCard(data, items, onOpen, draw)];
 
     // 🎸 Géneros como un vinilo, y los estilos debajo.
     if (genres.length) {
