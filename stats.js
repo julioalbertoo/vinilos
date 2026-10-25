@@ -307,7 +307,7 @@ const decadeName = (decade) => `los ${decade < 2000 ? String(decade).slice(2) : 
 let yearMode = "original";
 let selectedYear = null;
 let peopleMode = "artists";
-const picks = { country: null, artists: null, labels: null, rarity: null, hot: false, source: null };
+const picks = { country: null, artists: null, labels: null, rarity: null, hot: false, source: null, style: null };
 
 // Entradas de la barra de accesos, en el orden de la página.
 const NAV = [
@@ -775,13 +775,23 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl, 
       const genreCard = genreVinylCard(genres, byGenre, data.withData.length, draw, onOpen);
       if (styles.length) {
         genreCard.append(el("p", "stats-sub", "Estilos más repetidos"));
+        // Tocar un estilo enseña sus discos debajo; tocarlo otra vez los oculta.
+        const byStyle = groupBy(data.withData, (r) => r.s.styles);
         const chips = el("div", "stats-chips");
         for (const [name, count] of styles.slice(0, 12)) {
-          const chip = el("span", "stats-chip", name);
+          const chip = el("button", `stats-chip stats-chip--link${picks.style === name ? " active" : ""}`, name);
+          chip.type = "button";
+          chip.setAttribute("aria-expanded", String(picks.style === name));
           chip.append(el("b", null, String(count)));
+          chip.addEventListener("click", () => {
+            picks.style = picks.style === name ? null : name;
+            draw();
+          });
           chips.append(chip);
         }
         genreCard.append(chips);
+        if (picks.style && byStyle.has(picks.style)) genreCard.append(coverStrip(byStyle.get(picks.style), onOpen, picks.style));
+        else genreCard.append(hint("Toca un estilo para ver sus discos."));
       }
       const pending = items.length - data.withData.length;
       if (pending) genreCard.append(note(`Faltan datos de ${plural(pending, "disco", "discos")}.`));

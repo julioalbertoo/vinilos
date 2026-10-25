@@ -2333,6 +2333,17 @@ button.stats-fact:active {
   font-weight: 700;
 }
 
+.stats-chip--link {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.stats-chip--link.active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
 .stats-chip b {
   font-weight: 800;
   opacity: 0.65;
