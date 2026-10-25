@@ -359,14 +359,28 @@ const sortByYear = (list) => [...list].sort((a, b) => (Number(a.year) || 9999) -
 // Edición de Discogs de un álbum del que solo se sabe artista y título (los de MusicBrainz):
 // la principal de su master si se encuentra; si no, la primera edición en vinilo. null si no hay.
 export async function findAlbumRelease(artist, title, discogsToken) {
-  const masters = await discogsGet("/database/search", { type: "master", artist, release_title: title, per_page: "10" }, discogsToken);
-  const master = bestMaster(masters.results || [], title);
-  if (master) {
-    const id = await masterMainRelease(master.id, discogsToken);
+  // Los títulos muy largos («X; or, Y: …») no los encuentra Discogs: se prueba también con la parte corta.
+  const titles = [...new Set([title, shortAlbumTitle(title)].filter(Boolean))];
+  for (const t of titles) {
+    const masters = await discogsGet("/database/search", { type: "master", artist, release_title: t, per_page: "10" }, discogsToken);
+    const master = bestMaster(masters.results || [], t);
+    if (master) {
+      const id = await masterMainRelease(master.id, discogsToken);
+      if (id) return id;
+    }
+    const releases = await discogsGet("/database/search", { type: "release", artist, release_title: t, format: "Vinyl", per_page: "5" }, discogsToken);
+    const id = ((releases.results || [])[0] || {}).id;
     if (id) return id;
   }
-  const releases = await discogsGet("/database/search", { type: "release", artist, release_title: title, format: "Vinyl", per_page: "5" }, discogsToken);
-  return ((releases.results || [])[0] || {}).id || null;
+  // Último intento: búsqueda libre (por si el nombre del artista se escribe distinto, «&» o «And»).
+  const loose = await discogsGet("/database/search", { type: "master", q: `${artist} ${titles[titles.length - 1]}`, per_page: "10" }, discogsToken);
+  const master = bestMaster(loose.results || [], titles[titles.length - 1]);
+  return master ? await masterMainRelease(master.id, discogsToken) : null;
+}
+
+// «PetroDragonic Apocalypse; or, Dawn of…» → «PetroDragonic Apocalypse».
+function shortAlbumTitle(title) {
+  return String(title || "").split(/\s*[;:(\[]\s*|\s+\/\s+|,\s+or,?\s+/i)[0].trim();
 }
 
 // De los masters encontrados, el del álbum de verdad: mismo título y el que más gente tiene.
@@ -376,6 +390,8 @@ function bestMaster(results, title) {
   const wanted = norm(title);
   const official = results.filter((r) => !lowerWords(r.format).includes("unofficial release"));
   const same = official.filter((r) => norm(splitSearchTitle(r.title).title) === wanted);
+  // Con el título corto, vale el master cuyo título empieza igual.
+  if (!same.length) same.push(...official.filter((r) => norm(splitSearchTitle(r.title).title).startsWith(wanted)));
   const pool = same.length ? same : official.length ? official : results;
   const have = (r) => r.community?.have || 0;
   return pool.reduce((best, r) => (!best || have(r) > have(best) ? r : best), null);
