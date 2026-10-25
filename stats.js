@@ -4,6 +4,7 @@
 // y lo que falte se pide a Discogs poco a poco, en segundo plano, mientras la pestaña está abierta.
 import { CONFIG } from "./config.js";
 import { cachedRelease, cachedPrices, fillDurations, DURATIONS_CHECK } from "./details.js";
+import { RELEASE_VERSION } from "./discogs.js";
 import { loadDetailSummaries, cloudUser } from "./cloud.js";
 import { releaseWeight, isHeavy, countryFlag, countryCodes } from "./discogs.js";
 import {
@@ -70,6 +71,8 @@ function summarize(source) {
     timedTracks: timed.length,
     seconds: timed.reduce((a, b) => a + b, 0),
     durationsChecked: Number(source.durationsChecked) === DURATIONS_CHECK,
+    // Ficha guardada con una versión antigua (p. ej. sin los temas en varias partes): se vuelve a pedir.
+    oldData: Number(source.v || 0) !== RELEASE_VERSION,
   };
 }
 
@@ -122,7 +125,8 @@ export function setStatsActive(on) {
 }
 
 // Faltan duraciones y aún no se han buscado en otras ediciones del álbum.
-const missingDurations = (entry) => Boolean(entry.tracks) && entry.timedTracks < entry.tracks && !entry.durationsChecked;
+const missingDurations = (entry) =>
+  Boolean(entry.oldData) || (Boolean(entry.tracks) && entry.timedTracks < entry.tracks && !entry.durationsChecked);
 
 function needsWork(item) {
   const id = String(item.release_id);
@@ -149,6 +153,8 @@ async function runFill() {
           // Con cuenta, la ficha suele salir de la nube sin preguntar a Discogs.
           const release = await fillDurations(await cachedRelease(item.release_id, token), token);
           Object.assign(entry, summarize(release), { dataAt: entry.dataAt || new Date().toISOString() });
+          // Si Discogs no respondió y quedó la ficha antigua, no se insiste en esta visita.
+          if (entry.oldData) failed.add(id);
         }
         if (!isFresh(entry.pricesAt)) {
           const { prices, at } = await cachedPrices(item.release_id, token);

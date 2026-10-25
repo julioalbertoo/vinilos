@@ -179,6 +179,39 @@ export function searchByText(text, discogsToken, onStep) {
   return runSearchSteps([{ by: "text", params: { q: text }, expandMaster: true }], discogsToken, onStep);
 }
 
+// Sube cuando cambia lo que se guarda de una ficha: las guardadas antes se vuelven a pedir a Discogs
+// (2: los temas en varias partes, como «Shine On You Crazy Diamond (1-5)», ya no se pierden).
+export const RELEASE_VERSION = 2;
+
+// Canciones de una ficha. Un tema en varias partes (type_ "index") cuenta como una canción:
+// posición de su primera parte («A1.1» → «A1») y duración la suya o la suma de las partes.
+function tracksOf(list) {
+  const tracks = [];
+  for (const t of list || []) {
+    if (t.type_ === "track") {
+      tracks.push({ position: t.position, title: t.title, duration: t.duration || "" });
+    } else if (t.type_ === "index" && (t.sub_tracks || []).length) {
+      const parts = t.sub_tracks.filter((p) => p.type_ === "track");
+      const first = (parts[0] && parts[0].position) || "";
+      const secs = parts.map((p) => clockSeconds(p.duration));
+      const sum = secs.every((x) => x > 0) ? secs.reduce((a, b) => a + b, 0) : 0;
+      tracks.push({
+        position: (first.match(/^[A-Z]*\d+/i) || [first])[0],
+        title: t.title,
+        duration: t.duration || (sum ? `${Math.floor(sum / 60)}:${String(sum % 60).padStart(2, "0")}` : ""),
+      });
+    }
+  }
+  return tracks;
+}
+
+// "3:45" → 225; "" → 0.
+function clockSeconds(duration) {
+  const parts = String(duration || "").split(":").map(Number);
+  if (!duration || parts.some((n) => !Number.isFinite(n))) return 0;
+  return parts.reduce((total, n) => total * 60 + n, 0);
+}
+
 export async function getRelease(id, discogsToken) {
   const r = await discogsGet(`/releases/${id}`, null, discogsToken);
   const images = r.images || [];
@@ -205,9 +238,7 @@ export async function getRelease(id, discogsToken) {
     extraImages: images
       .filter((i) => i !== cover && i.uri)
       .map((i) => ({ uri: i.uri, uri150: i.uri150 || i.uri })),
-    tracklist: (r.tracklist || [])
-      .filter((t) => t.type_ === "track")
-      .map((t) => ({ position: t.position, title: t.title, duration: t.duration || "" })),
+    tracklist: tracksOf(r.tracklist),
     released: r.released || "",
     identifiers: (r.identifiers || []).map((i) => ({
       type: i.type || "",
@@ -219,6 +250,7 @@ export async function getRelease(id, discogsToken) {
     notes: cleanNotes(r.notes),
     community: communityData(r.community),
     url: r.uri || releaseUrl(r.id),
+    v: RELEASE_VERSION,
   };
 }
 

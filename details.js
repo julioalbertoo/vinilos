@@ -2,7 +2,7 @@
 // - La ficha (canciones, sellos, notas, enlaces de las fotos…) se reutiliza durante 30 días.
 // - Los precios, durante 7 días.
 // Sin cuenta en la nube, o si Supabase no responde, se pregunta a Discogs como siempre.
-import { getRelease, getPrices, cheapestVinyl, borrowDurations } from "./discogs.js";
+import { getRelease, getPrices, cheapestVinyl, borrowDurations, RELEASE_VERSION } from "./discogs.js";
 import { CONFIG } from "./config.js";
 import { mbTrackLengths, trackKey } from "./musicbrainz.js";
 import { loadDetail, saveDetail } from "./cloud.js";
@@ -45,11 +45,16 @@ function writeRow(id, fields) {
 // Si Discogs falla pero hay una guardada antigua, se usa esa.
 export async function cachedRelease(id, discogsToken) {
   const row = await readRow(id);
-  if (row && row.data && isFresh(row.data_at, RELEASE_MAX_AGE)) return row.data;
+  if (row && row.data && row.data.v === RELEASE_VERSION && isFresh(row.data_at, RELEASE_MAX_AGE)) return row.data;
   try {
     const release = await getRelease(id, discogsToken);
     // El año original no cambia: se conserva el que ya se sabía.
     if (row && row.data && row.data.originalYear !== undefined) release.originalYear = row.data.originalYear;
+    // Las duraciones que ya se habían encontrado en otras fuentes se conservan.
+    if (row && row.data && Array.isArray(row.data.tracklist)) {
+      const old = new Map(row.data.tracklist.filter((t) => t.duration).map((t) => [trackKey(t.title), t.duration]));
+      for (const t of release.tracklist) if (!t.duration && old.has(trackKey(t.title))) t.duration = old.get(trackKey(t.title));
+    }
     writeRow(id, { data: release, data_at: new Date().toISOString() });
     return release;
   } catch (err) {
@@ -83,7 +88,8 @@ async function mbDurations(release) {
   const sameOrder = tracks.length === release.tracklist.length;
   release.tracklist.forEach((t, i) => {
     if (t.duration) return;
-    const seconds = known.get(trackKey(t.title)) || (sameOrder && tracks[i].seconds);
+    const twin = sameOrder && trackKey(tracks[i].title) === trackKey(t.title) && tracks[i].seconds;
+    const seconds = twin || known.get(trackKey(t.title)) || (sameOrder && tracks[i].seconds);
     if (seconds) t.duration = clock(seconds);
   });
   const filled = release.tracklist.filter((t) => t.duration).length;

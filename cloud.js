@@ -284,7 +284,7 @@ export async function loadDetailSummaries() {
     .select(
       "release_id, data_at, prices, prices_at, genres:data->genres, styles:data->styles, country:data->>country, " +
         "labels:data->labels, formats:data->formats, community:data->community, originalYear:data->>originalYear, " +
-        "tracklist:data->tracklist, durationsChecked:data->durationsChecked"
+        "tracklist:data->tracklist, durationsChecked:data->durationsChecked, v:data->v"
     );
   if (error) throw error;
   return data;
