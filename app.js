@@ -14,7 +14,7 @@ import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify, geminiModels, probeModel } from "./ai.js";
 import { quotaReport, nextPacificMidnight } from "./quota.js";
-import { testDiscogsConnection, findCandidates, searchByText, getMasterYear, masterMainRelease, popularVinylVersions, findAlbumRelease, bothYears, countryWithFlag, vinylColor, releaseWeight, releaseDiscs } from "./discogs.js";
+import { testDiscogsConnection, vinylVersions, findCandidates, searchByText, getMasterYear, masterMainRelease, popularVinylVersions, findAlbumRelease, bothYears, countryWithFlag, vinylColor, releaseWeight, releaseDiscs } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -37,7 +37,7 @@ const SEARCH_STEP_LABELS = {
   master: "todas las ediciones del álbum",
 };
 
-const VIEWS = ["guide", "settings", "capture", "results", "detail", "collection", "artist", "wantlist", "explored"];
+const VIEWS = ["guide", "settings", "capture", "results", "detail", "collection", "artist", "wantlist", "explored", "versions"];
 const GUIDE_SCREENS = ["intro", "ai", "discogs"];
 // Pestaña que se marca en la barra inferior para cada pantalla.
 const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "collection", settings: "settings", wantlist: "collection", explored: "capture" };
@@ -45,7 +45,7 @@ const TAB_FOR_VIEW = { capture: "capture", results: "capture", collection: "coll
 // ---------- Botón «atrás» del navegador ----------
 // La app es una sola página: para que «atrás» (o deslizar desde el borde en el iPhone) haga lo mismo que
 // «← Volver», cada pantalla de detalle (candidatos, ficha, artista) deja una marca en el historial.
-const SUB_VIEWS = ["results", "detail", "artist", "wantlist", "explored"];
+const SUB_VIEWS = ["results", "detail", "artist", "wantlist", "explored", "versions"];
 let navDepth = 0;
 let skipPop = false;
 
@@ -68,6 +68,7 @@ function goBack() {
   else if (view === "results") resultsBack();
   else if (view === "wantlist") wantlistBack();
   else if (view === "explored") exploredBack();
+  else if (view === "versions") versionsBack();
 }
 
 window.addEventListener("popstate", (event) => {
@@ -108,8 +109,9 @@ function showView(name) {
 
 // Pestaña de la barra inferior que se marca: las fichas, en la pestaña desde la que se abrieron.
 function tabFor(name) {
-  if (name === "detail") return detailReturnView === "artist" ? artistTab : TAB_FOR_VIEW[detailReturnView];
+  if (name === "detail") return detailReturnView === "artist" ? artistTab : detailReturnView === "versions" ? versionsTab : TAB_FOR_VIEW[detailReturnView];
   if (name === "artist") return artistTab;
+  if (name === "versions") return versionsTab;
   return TAB_FOR_VIEW[name];
 }
 
@@ -421,8 +423,10 @@ function el(tag, className, text) {
   return node;
 }
 
-function renderCard(candidate, index, owned) {
-  const best = index === 0;
+// versions: tarjeta de la lista de ediciones de un álbum (sin «mejor coincidencia»; solo se mira, no se guarda).
+// currentId: la edición de la ficha desde la que se abrió la lista.
+function renderCard(candidate, index, owned, { versions = false, currentId = null } = {}) {
+  const best = index === 0 && !versions;
   const have = owned.has(String(candidate.id));
   const card = el("article", ["card", best && "card--best", have && "card--owned"].filter(Boolean).join(" "));
   if (best) card.append(el("span", "card-badge", "★ Mejor coincidencia"));
@@ -439,19 +443,22 @@ function renderCard(candidate, index, owned) {
 
   const body = el("div", "card-body");
   body.append(el("h3", null, candidate.title));
+  if (versions && String(candidate.id) === String(currentId)) body.append(el("p", "card-matches", "📍 La edición que estabas viendo"));
   if (have) body.append(el("p", "card-owned", "💿 Ya lo tienes"));
   body.append(el("p", null, [candidate.year || "Año ?", countryWithFlag(candidate.country) || "País ?"].join(" · ")));
   body.append(el("p", null, [candidate.label || "Sello ?", candidate.catno || "Nº cat. ?"].join(" · ")));
   body.append(el("p", null, candidate.formats.join(", ")));
   if (candidate.color) body.append(el("p", "card-color", `🎨 ${candidate.color}`));
   if (candidate.weight) body.append(el("p", "card-weight", `⚖️ ${candidate.weight}`));
-  if (candidate.matches.length) {
+  if (versions && candidate.have) body.append(el("p", null, `👥 ${candidate.have.toLocaleString("es-ES")} en colecciones de Discogs`));
+  if (candidate.matches && candidate.matches.length) {
     body.append(el("p", "card-matches", candidate.matches.map((m) => `✓ ${m}`).join("  ")));
   }
   // Solo el mejor candidato lleva el botón lila: es la acción más probable.
-  const select = el("button", best ? "card-select" : "card-select secondary", exploreMode ? "🧭 Explorar este" : "✓ Es este");
+  const label = versions ? "Ver esta edición" : exploreMode ? "🧭 Explorar este" : "✓ Es este";
+  const select = el("button", best ? "card-select" : "card-select secondary", label);
   select.type = "button";
-  select.addEventListener("click", () => openDetail(candidate));
+  select.addEventListener("click", () => (versions ? openDetail(candidate, { returnView: "versions" }) : openDetail(candidate)));
   body.append(select);
 
   const link = el("a", null, "Ver en Discogs ↗");
@@ -951,6 +958,7 @@ const BACK_LABELS = {
   artist: "← Volver al artista",
   wantlist: "← Volver a lo que busco",
   explored: "← Volver a explorados",
+  versions: "← Volver a las ediciones",
 };
 
 // returnView: pantalla a la que lleva "Volver". Desde «Mis discos» el disco ya está
@@ -969,6 +977,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
   savedNote.textContent = "";
   document.getElementById("detail-delete").hidden = true;
   document.getElementById("detail-want").hidden = true;
+  document.getElementById("detail-versions").hidden = true;
 
   // Mientras llega la ficha completa se enseña lo que ya sabemos del candidato.
   renderDetail({
@@ -1025,7 +1034,9 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
   }
 
   const alreadyOwned = getHistory().some((item) => String(item.release_id) === String(candidate.id));
-  if (returnView === "explored") {
+  if (returnView === "versions") {
+    if (request === detailRequest) savedNote.textContent = alreadyOwned ? "💿 Esta edición ya está en tu colección" : "Otra edición del álbum · no está en tu colección";
+  } else if (returnView === "explored") {
     if (request === detailRequest) savedNote.textContent = alreadyOwned ? "🧭 Explorado · 💿 Ya lo tienes en tu colección" : "🧭 Explorado · no está en tu colección";
   } else if ((returnView === "artist" || returnView === "wantlist") && !alreadyOwned) {
     if (request === detailRequest) savedNote.textContent = "Edición principal del álbum · no está en tu colección";
@@ -1073,7 +1084,88 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
     const owned = getHistory().some((item) => String(item.release_id) === String(candidate.id));
     document.getElementById("detail-delete").hidden = !owned;
     if (!owned) showWantButton(release || candidate);
+    if (release && release.masterId) {
+      const button = document.getElementById("detail-versions");
+      button.onclick = () => openVersions(release);
+      button.hidden = false;
+    }
   }
+}
+
+// ---------- Ediciones de un álbum (desde la ficha) ----------
+// Pila: cada vez que se abre la lista desde una ficha se apunta esa ficha, para volver a ella.
+
+const versionsStack = [];
+let versionsTab = "capture";
+let versionsRequest = 0;
+
+async function openVersions(release) {
+  // Desde una ficha que no viene de otra lista de ediciones se empieza una pila nueva.
+  if (detailReturnView !== "versions") {
+    versionsStack.length = 0;
+    versionsTab = tabFor("detail") || "capture";
+  }
+  const entry = { detail: lastDetail, scroll: window.scrollY, release, data: null };
+  versionsStack.push(entry);
+  pushNav();
+  drawVersions(entry);
+  showView("versions");
+  window.scrollTo(0, 0);
+  const request = ++versionsRequest;
+  try {
+    entry.data = await vinylVersions(release.masterId, getDiscogsToken());
+  } catch (err) {
+    entry.error = err;
+  }
+  if (request === versionsRequest && versionsStack[versionsStack.length - 1] === entry) drawVersions(entry);
+}
+
+function drawVersions(entry) {
+  const summary = document.getElementById("versions-summary");
+  const list = document.getElementById("versions-list");
+  const more = document.getElementById("versions-more");
+  const { release, data } = entry;
+  const name = [cleanArtistName(release.artist), release.title].filter(Boolean).join(" — ");
+  list.replaceChildren();
+  more.hidden = true;
+  if (entry.error) {
+    showError(summary, `No se pudieron cargar las ediciones: ${entry.error.message}`, entry.error.authError);
+    return;
+  }
+  if (!data) {
+    summary.textContent = `${name} · buscando ediciones en Discogs…`;
+    return;
+  }
+  const items = data.candidates.map((c) => ({ ...c, artist: c.artist || release.artist }));
+  if (!items.length) {
+    summary.textContent = `${name} · Discogs no tiene más ediciones en vinilo.`;
+    return;
+  }
+  const owned = new Set(getHistory().map((item) => String(item.release_id)));
+  let shown = 0;
+  const showMore = () => {
+    const next = items.slice(shown, shown + (shown ? RESULTS_STEP : 20));
+    list.append(...next.map((c, i) => renderCard(c, shown + i, owned, { versions: true, currentId: release.id })));
+    shown += next.length;
+    const left = items.length - shown;
+    more.hidden = left <= 0;
+    more.textContent = left > RESULTS_STEP ? `Ver ${RESULTS_STEP} más (quedan ${left})` : left === 1 ? "Ver la que queda" : `Ver las ${left} que quedan`;
+  };
+  more.onclick = showMore;
+  const extra = data.total > items.length ? ` (se enseñan las ${items.length} primeras)` : "";
+  summary.textContent = `${name} · ${data.total} ${data.total === 1 ? "edición" : "ediciones"} en vinilo${extra}, de la más común a la menos.`;
+  showMore();
+}
+
+function versionsBack() {
+  const entry = versionsStack.pop();
+  if (!entry) return showView("capture");
+  // La lista de debajo (si la hay) se deja dibujada por si se vuelve a ella.
+  const below = versionsStack[versionsStack.length - 1];
+  if (below) drawVersions(below);
+  if (entry.detail) openDetail(entry.detail.candidate, { returnView: entry.detail.returnView, reopen: true });
+  else showView("capture");
+  restoreScroll(entry.scroll);
 }
 
 // «☆ Lo busco» en la ficha de un disco que no tienes.
@@ -1709,6 +1801,7 @@ function initDetail() {
   document.getElementById("wantlist-back").addEventListener("click", navBack);
   document.getElementById("wantlist-open").addEventListener("click", openWantlist);
   document.getElementById("explored-back").addEventListener("click", navBack);
+  document.getElementById("versions-back").addEventListener("click", navBack);
   document.getElementById("explored-open").addEventListener("click", openExplored);
   document.getElementById("explored-clear").addEventListener("click", () => {
     if (!window.confirm("¿Borrar todo el historial de discos explorados? Tu colección no se toca.")) return;

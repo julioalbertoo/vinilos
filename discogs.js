@@ -392,6 +392,20 @@ export async function masterMainRelease(masterId, discogsToken) {
   return vinyls.reduce((best, v) => (have(v) > have(best) ? v : best)).id;
 }
 
+// Todas las ediciones en vinilo de un álbum (master), como candidatos, de la que más gente tiene a la que menos.
+// Discogs da como mucho 100 por página: se piden hasta 3 páginas. total: cuántas hay en Discogs.
+export async function vinylVersions(masterId, discogsToken) {
+  const found = [];
+  let total = 0;
+  for (let page = 1; page <= 3; page++) {
+    const r = await discogsGet(`/masters/${masterId}/versions`, { format: "Vinyl", per_page: "100", page: String(page) }, discogsToken);
+    found.push(...(r.versions || []).map(fromMasterVersion).filter(isVinyl));
+    total = (r.pagination && r.pagination.items) || found.length;
+    if (page >= ((r.pagination && r.pagination.pages) || 1)) break;
+  }
+  return { candidates: found.sort((a, b) => b.have - a.have), total: Math.max(total, found.length) };
+}
+
 // Ediciones oficiales en vinilo de un álbum, de la que más gente tiene a la que menos (solo ids).
 export async function popularVinylVersions(masterId, discogsToken) {
   const versions = await discogsGet(`/masters/${masterId}/versions`, { format: "Vinyl", per_page: "100" }, discogsToken);
