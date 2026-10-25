@@ -153,3 +153,21 @@ export function quotaReport(models) {
     return { model, used: m.used || 0, search: m.search || 0, plain: current(plain), web: current(m.web) };
   });
 }
+
+// Modelos que hoy se han pasado de tiempo al identificar un disco: se saltan hasta mañana (día del móvil),
+// para no esperar 30 s en cada foto a un modelo saturado.
+const localDay = (date = new Date()) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+export function markSlow(model) {
+  if (!model) return;
+  const data = read();
+  const m = (data.models[model] = data.models[model] || { used: 0, search: 0 });
+  m.slowDay = localDay();
+  write(data);
+}
+
+export function slowToday(model) {
+  const m = read().models[model];
+  return Boolean(m && m.slowDay === localDay());
+}

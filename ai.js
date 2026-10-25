@@ -1,5 +1,5 @@
 import { CONFIG } from "./config.js";
-import { recordCall, shouldSkip } from "./quota.js";
+import { markSlow, recordCall, shouldSkip, slowToday } from "./quota.js";
 
 const RESPONSE_FIELDS = [
   "artist",
@@ -129,7 +129,8 @@ async function tryModel(model, aiKey, imageDataUrl) {
     );
   } catch (err) {
     if (err && err.name === "AbortError") {
-      return { ok: false, detail: `tiempo agotado (${MODEL_TIMEOUT_MS / 1000} s)` };
+      markSlow(model);
+      return { ok: false, detail: `tiempo agotado (${MODEL_TIMEOUT_MS / 1000} s); hoy ya no se vuelve a probar` };
     }
     return { ok: false, detail: `error de red: ${err && err.message ? err.message : err}` };
   }
@@ -169,7 +170,10 @@ const BUSY_RETRIES = 2;
 
 export async function identify(imageDataUrl, aiKey, onAttempt) {
   const { primaryModel, fallbackModel } = CONFIG.AI_PROVIDER;
-  const models = [primaryModel, fallbackModel, ...(await backupModels(aiKey))];
+  const all = [primaryModel, fallbackModel, ...(await backupModels(aiKey))];
+  // Los que hoy se han pasado de tiempo se saltan; si fueran todos, se prueban igual.
+  const fast = all.filter((m) => !slowToday(m));
+  const models = fast.length ? fast : all;
   const attempts = [];
   for (const [index, model] of models.entries()) {
     if (onAttempt) onAttempt(model, attempts.at(-1)?.detail, 0);
