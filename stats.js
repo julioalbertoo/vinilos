@@ -3,7 +3,7 @@
 // Se guarda un resumen pequeño en el móvil; con cuenta, se leen de golpe las fichas guardadas en la nube
 // y lo que falte se pide a Discogs poco a poco, en segundo plano, mientras la pestaña está abierta.
 import { CONFIG } from "./config.js";
-import { cachedRelease, cachedPrices } from "./details.js";
+import { cachedRelease, cachedPrices, fillDurations } from "./details.js";
 import { loadDetailSummaries, cloudUser } from "./cloud.js";
 import { releaseWeight, isHeavy, countryFlag, countryCodes } from "./discogs.js";
 import {
@@ -69,6 +69,7 @@ function summarize(source) {
     tracks: tracks.length,
     timedTracks: timed.length,
     seconds: timed.reduce((a, b) => a + b, 0),
+    durationsChecked: Boolean(source.durationsChecked),
   };
 }
 
@@ -120,11 +121,14 @@ export function setStatsActive(on) {
   active = on;
 }
 
+// Faltan duraciones y aún no se han buscado en otras ediciones del álbum.
+const missingDurations = (entry) => Boolean(entry.tracks) && entry.timedTracks < entry.tracks && !entry.durationsChecked;
+
 function needsWork(item) {
   const id = String(item.release_id);
   if (failed.has(id)) return false;
   const entry = cache[id];
-  return !entry || !entry.dataAt || entry.v !== SUMMARY_VERSION || !isFresh(entry.pricesAt);
+  return !entry || !entry.dataAt || entry.v !== SUMMARY_VERSION || !isFresh(entry.pricesAt) || missingDurations(entry);
 }
 
 async function runFill() {
@@ -141,9 +145,9 @@ async function runFill() {
       latest.onStatus(`🔄 Completando datos con Discogs… ${items.length - pending.length + 1} de ${items.length}`);
       const entry = cache[id] || {};
       try {
-        if (!entry.dataAt || entry.v !== SUMMARY_VERSION) {
+        if (!entry.dataAt || entry.v !== SUMMARY_VERSION || missingDurations(entry)) {
           // Con cuenta, la ficha suele salir de la nube sin preguntar a Discogs.
-          const release = await cachedRelease(item.release_id, token);
+          const release = await fillDurations(await cachedRelease(item.release_id, token), token);
           Object.assign(entry, summarize(release), { dataAt: entry.dataAt || new Date().toISOString() });
         }
         if (!isFresh(entry.pricesAt)) {

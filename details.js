@@ -2,7 +2,7 @@
 // - La ficha (canciones, sellos, notas, enlaces de las fotos…) se reutiliza durante 30 días.
 // - Los precios, durante 7 días.
 // Sin cuenta en la nube, o si Supabase no responde, se pregunta a Discogs como siempre.
-import { getRelease, getPrices, cheapestVinyl } from "./discogs.js";
+import { getRelease, getPrices, cheapestVinyl, borrowDurations } from "./discogs.js";
 import { CONFIG } from "./config.js";
 import { loadDetail, saveDetail } from "./cloud.js";
 
@@ -61,6 +61,16 @@ export async function cachedRelease(id, discogsToken) {
 export function rememberRelease(release) {
   const row = rows.get(Number(release.id));
   writeRow(release.id, { data: release, data_at: (row && row.data_at) || new Date().toISOString() });
+}
+
+// Si Discogs no da la duración de algunas canciones, se copian de otra edición del mismo álbum
+// (se intenta una sola vez por disco y se guarda). Devuelve la ficha, con o sin cambios.
+export async function fillDurations(release, discogsToken) {
+  if (release.durationsChecked || !release.tracklist || release.tracklist.every((t) => t.duration)) return release;
+  await borrowDurations(release, discogsToken); // si falla, quien llama lo apunta y se reintenta otro día
+  release.durationsChecked = true;
+  rememberRelease(release);
+  return release;
 }
 
 // Precios: { prices, at } — at es la fecha de la consulta a Discogs.

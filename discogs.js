@@ -451,6 +451,32 @@ export async function popularVinylVersions(masterId, discogsToken) {
     .map((v) => v.id);
 }
 
+// Si a una edición le faltan duraciones de canciones, se copian de otras ediciones del mismo álbum
+// (la principal y las más comunes), emparejando por título. Cambia release.tracklist; true si añadió alguna.
+export async function borrowDurations(release, discogsToken) {
+  const norm = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const missing = () => release.tracklist.filter((t) => !t.duration);
+  if (!release.masterId || !missing().length) return false;
+  const master = await discogsGet(`/masters/${release.masterId}`, null, discogsToken);
+  const popular = await popularVinylVersions(release.masterId, discogsToken);
+  const ids = [master.main_release, ...popular].filter((id, i, all) => id && id !== release.id && all.indexOf(id) === i).slice(0, 3);
+  let added = false;
+  for (const id of ids) {
+    const other = await discogsGet(`/releases/${id}`, null, discogsToken);
+    const known = new Map();
+    for (const t of other.tracklist || []) if (t.duration && !known.has(norm(t.title))) known.set(norm(t.title), t.duration);
+    for (const t of missing()) {
+      const d = known.get(norm(t.title));
+      if (d) {
+        t.duration = d;
+        added = true;
+      }
+    }
+    if (!missing().length) break;
+  }
+  return added;
+}
+
 // Notas de la edición principal (normalmente la primera) de un álbum. null si es la misma que exceptId o no tiene.
 export async function masterMainNotes(masterId, discogsToken, exceptId) {
   const master = await discogsGet(`/masters/${masterId}`, null, discogsToken);
