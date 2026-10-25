@@ -2333,10 +2333,24 @@ button.stats-fact:active {
   font-weight: 700;
 }
 
+/* Botón con el mismo aspecto que la pastilla (sin el tamaño de los botones grandes). */
 .stats-chip--link {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 4px 10px;
   border: 0;
-  font-family: inherit;
+  box-shadow: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: normal;
+  background: var(--mint);
+  color: var(--mint-text);
   cursor: pointer;
+}
+
+.stats-chip--link:active {
+  background: var(--mint);
 }
 
 .stats-chip--link.active {
