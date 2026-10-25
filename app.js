@@ -874,7 +874,7 @@ function renderAllVinyl() {
   // Suma de todas sus ediciones en vinilo (si tiene más de las leídas, se dice).
   if (community) {
     const partial = versions > community.counted ? ` (en sus ${community.counted} primeras ediciones)` : "";
-    const people = peopleNote(community, "Sumando todas: ");
+    const people = peopleNote(community);
     people.textContent += partial;
     nodes.push(people);
   }
