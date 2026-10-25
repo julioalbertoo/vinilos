@@ -296,7 +296,7 @@ const decadeName = (decade) => `los ${decade < 2000 ? String(decade).slice(2) : 
 let yearMode = "original";
 let selectedYear = null;
 let peopleMode = "artists";
-const picks = { country: null, artists: null, labels: null, rarity: null };
+const picks = { country: null, artists: null, labels: null, rarity: null, hot: false };
 
 // Entradas de la barra de accesos, en el orden de la página.
 const NAV = [
@@ -476,9 +476,34 @@ function rarityCard(data, rerender, onOpen) {
   tiles.append(
     tile(average === null ? "—" : stars(average), "nota media de 5", { icon: "⭐", accent: "butter" }),
     tile(median.toLocaleString("es-ES"), "lo tienen (mediana)", { icon: "👥", accent: "lilac" }),
-    tile(String(hot.length), hot.length === 1 ? "más buscado que tenido" : "más buscados que tenidos", { icon: "🔥", accent: "peach" })
+    tile(String(hot.length), hot.length === 1 ? "más buscado que tenido" : "más buscados que tenidos", {
+      icon: "🔥",
+      accent: "peach",
+      ...(hot.length && {
+        onClick: () => {
+          picks.hot = !picks.hot;
+          rerender();
+        },
+        ariaLabel: picks.hot ? "Ocultar la lista" : "Ver cuáles son",
+      }),
+    })
   );
   const nodes = [tiles];
+  // Los discos que busca más gente de la que los tiene, del más buscado (en proporción) al que menos.
+  if (picks.hot && hot.length) {
+    const n = (x) => x.toLocaleString("es-ES");
+    const facts = [...hot]
+      .sort((a, b) => b.s.want / b.s.have - a.s.want / a.s.have)
+      .map((r) => ({
+        icon: "🔥",
+        label: `${(r.s.want / Math.max(1, r.s.have)).toLocaleString("es-ES", { maximumFractionDigits: 1 })} veces más buscado que tenido`,
+        item: r.item,
+        value: `${n(r.s.want)} lo buscan · ${n(r.s.have)} lo tienen`,
+      }));
+    nodes.push(el("p", "stats-sub", "🔥 Más buscados que tenidos"), factGrid(facts, onOpen));
+  } else if (hot.length) {
+    nodes.push(hint("Toca 🔥 para ver cuáles son."));
+  }
   if (average !== null) nodes.push(pill(`⭐ Tu colección saca un ${stars(average)} de 5`, "butter"));
   nodes.push(pill(`👥 La mitad de tus discos los tienen menos de ${median.toLocaleString("es-ES")} personas en Discogs`, "lilac"));
 

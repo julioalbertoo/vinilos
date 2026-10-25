@@ -64,7 +64,9 @@ function coverImg(item, className) {
   return img;
 }
 
-const itemName = (item) => `${item.title || ""}${item.artist ? ` · ${item.artist}` : ""}`;
+// Sin el «(2)» que Discogs añade a los artistas que se llaman igual.
+const artistName = (name) => String(name || "").replace(/\s*\(\d+\)/g, "").replace(/\*/g, "").trim();
+const itemName = (item) => `${item.title || ""}${item.artist ? ` · ${artistName(item.artist)}` : ""}`;
 
 // Fila de portadas que se desliza en horizontal; tocar una abre su ficha.
 export function coverStrip(items, onOpen, label) {
