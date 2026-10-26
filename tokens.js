@@ -40,9 +40,11 @@ export function applyTokenState({ aiKey, discogsToken, geniusToken, aiVerified, 
   else localStorage.removeItem(KEYS.discogsVerified);
 }
 
-function clean(value) {
+// La llave tal como se guardará: sin espacios ni saltos de línea (al pegarla se suele colar alguno).
+export function cleanToken(value) {
   return (value || "").trim().replace(/\s+/g, "");
 }
+const clean = cleanToken;
 
 export function getAiKey() {
   return localStorage.getItem(KEYS.aiKey) || "";

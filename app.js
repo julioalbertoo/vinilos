@@ -11,6 +11,8 @@ import {
   markDiscogsVerified,
   hasTokens,
   areTokensVerified,
+  getTokenState,
+  cleanToken,
 } from "./tokens.js";
 import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
@@ -220,6 +222,11 @@ function initGuideNavigation() {
 
   document.getElementById("guide-ai-save").addEventListener("click", () => {
     const input = document.getElementById("guide-ai-input");
+    // Si cambia una llave que ya funcionaba (o la deja vacía), se pregunta dos veces.
+    if (!confirmKeyChanges({ aiKey: cleanToken(input.value) })) {
+      input.value = getAiKey();
+      return;
+    }
     const hint = document.getElementById("guide-ai-hint");
     hint.textContent = isValidAiKeyFormat(input.value) ? "" : GUIDE_TEXT.ai.formatHint;
     input.value = setAiKey(input.value);
@@ -233,10 +240,47 @@ function initGuideNavigation() {
 
   document.getElementById("guide-discogs-save").addEventListener("click", () => {
     const input = document.getElementById("guide-discogs-input");
+    if (!confirmKeyChanges({ discogsToken: cleanToken(input.value) })) {
+      input.value = getDiscogsToken();
+      return;
+    }
     input.value = setDiscogsToken(input.value);
     document.getElementById("discogs-token-input").value = input.value;
     showView("settings");
   });
+}
+
+// ---------- Doble confirmación al tocar las llaves ----------
+
+const KEY_NAMES = { aiKey: "la llave de Gemini", discogsToken: "el token de Discogs", geniusToken: "la llave de Genius" };
+const joinNames = (list) => (list.length > 1 ? `${list.slice(0, -1).join(", ")} y ${list[list.length - 1]}` : list[0]);
+
+// next: los valores nuevos de las llaves que se van a guardar ({ aiKey, discogsToken, geniusToken }, ya limpios).
+// Si alguna se borra, o cambia una que funciona, se pregunta dos veces. Devuelve true si se puede seguir.
+// La de Genius no se puede probar: si ya hay una, se da por buena.
+function confirmKeyChanges(next) {
+  const state = getTokenState();
+  const works = { aiKey: state.aiVerified, discogsToken: state.discogsVerified, geniusToken: true };
+  const removed = [];
+  const changed = [];
+  for (const [field, value] of Object.entries(next)) {
+    const old = state[field] || "";
+    if (!old || value === old) continue;
+    if (!value) removed.push(KEY_NAMES[field]);
+    else if (works[field]) changed.push(KEY_NAMES[field]);
+  }
+  if (!removed.length && !changed.length) return true;
+  const lines = [];
+  if (removed.length) lines.push(`Vas a borrar ${joinNames(removed)}.`);
+  if (changed.length) {
+    lines.push(
+      `Vas a cambiar ${joinNames(changed)}, que ahora ${changed.length > 1 ? "funcionan" : "funciona"}. ` +
+        "Si lo nuevo está mal, la app dejará de funcionar hasta que lo arregles."
+    );
+  }
+  if (!window.confirm(`${lines.join("\n\n")}\n\n¿Seguir?`)) return false;
+  const where = cloudSignedIn ? " Se cambiará también en tu cuenta de la nube." : "";
+  return window.confirm(`¿Seguro? Si no tienes lo anterior apuntado en otro sitio, tendrás que crear una llave nueva.${where}`);
 }
 
 function initSettings() {
@@ -250,6 +294,14 @@ function initSettings() {
   geniusInput.value = getGeniusToken();
 
   document.getElementById("settings-save").addEventListener("click", () => {
+    const next = { aiKey: cleanToken(aiInput.value), discogsToken: cleanToken(discogsInput.value), geniusToken: cleanToken(geniusInput.value) };
+    if (!confirmKeyChanges(next)) {
+      aiInput.value = getAiKey();
+      discogsInput.value = getDiscogsToken();
+      geniusInput.value = getGeniusToken();
+      status.textContent = "Sin cambios: tus llaves siguen como estaban.";
+      return;
+    }
     aiInput.value = setAiKey(aiInput.value);
     discogsInput.value = setDiscogsToken(discogsInput.value);
     geniusInput.value = setGeniusToken(geniusInput.value);
@@ -257,6 +309,19 @@ function initSettings() {
   });
 
   document.getElementById("settings-clear").addEventListener("click", () => {
+    const { aiKey, discogsToken, geniusToken } = getTokenState();
+    if (!aiKey && !discogsToken && !geniusToken) {
+      status.textContent = "No hay llaves que borrar.";
+      return;
+    }
+    const where = cloudSignedIn ? " También se borrarán de tu cuenta en la nube." : "";
+    const sure =
+      window.confirm(`¿Borrar tus llaves (Gemini, Discogs y Genius)?${where}`) &&
+      window.confirm("¿Seguro? Sin llaves la app no puede identificar discos. Si no las tienes apuntadas en otro sitio, tendrás que crear unas nuevas.");
+    if (!sure) {
+      status.textContent = "No se ha borrado nada.";
+      return;
+    }
     clearAiKey();
     clearDiscogsToken();
     aiInput.value = "";

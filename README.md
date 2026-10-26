@@ -68,7 +68,7 @@ La primera vez que abres la web, una guía de bienvenida te lleva paso a paso. A
 
 ### 3. Pegarlas y comprobarlas
 
-Pega cada llave en la guía (o en **⚙️ Ajustes**) y pulsa **Probar conexión** en las dos. Con las dos en ✅, la web abrirá directamente en Identificar.
+Pega cada llave en la guía (o en **⚙️ Ajustes**) y pulsa **Probar conexión** en las dos. Con las dos en ✅, la web abrirá directamente en Identificar. Para no perder una llave sin querer, cambiar una que ya funciona, dejarla vacía o pulsar **Borrar llaves** pide confirmación dos veces.
 
 ---
 
@@ -134,7 +134,7 @@ Web estática (HTML + CSS + JavaScript sin frameworks) que habla directamente de
 | `wantlist.js` | «Lo que busco»: álbumes que quieres conseguir, guardados en el móvil. |
 | `trivia.js` | «¿Sabías que…?» de la ficha: dato curioso buscado por Gemini con Google; solo se enseña si viene respaldado por páginas, con sus enlaces. |
 | `details.js` | Fichas y precios guardados en la nube (tabla `vinilos.details`): la ficha se reutiliza 30 días y los precios 7. Sin cuenta, se pregunta a Discogs como siempre. |
-| `cloud.js` | Copia en la nube con Supabase: entrada por email, sube cada cambio y mezcla lo del móvil con lo de la nube. Los discos van en la tabla `vinilos.records` y las llaves en `vinilos.settings`; cada cuenta solo ve lo suyo (reglas RLS). |
+| `cloud.js` | Copia en la nube con Supabase: entrada por email, sube cada cambio y mezcla lo del móvil con lo de la nube. Los discos van en la tabla `vinilos.records`, lo que buscas en `vinilos.wantlist` y las llaves en `vinilos.settings`; cada cuenta solo ve lo suyo (reglas RLS). |
 | `gallery.js` | Galería horizontal: el disco del centro sale de la funda y gira. |
 | `labels.js` | Busca en segundo plano la foto de la galleta de cada disco guardado y la recorta. Como Discogs no deja que una web lea sus fotos, las descarga a través de [wsrv.nl](https://wsrv.nl), que solo recibe el enlace público de cada foto. |
 | `guide.js` | Textos de la guía de bienvenida: si cambian los menús de Google o Discogs, se edita solo aquí. |
