@@ -496,9 +496,14 @@ export function decadeTagCard(rows, tags, rerender, onOpen, kind = "genres") {
 
 // Color principal de una portada: el tono con más color (se ignoran blancos, negros y grises
 // salvo que la portada sea toda así). Devuelve { hex, h, s, l } o null si no se puede leer la foto.
+// Discogs no deja leer los píxeles de sus fotos (falta el permiso CORS): se piden, pequeñas,
+// a través de wsrv.nl, que las reenvía con ese permiso (igual que las galletas en labels.js).
+const readable = (src) => (/^https?:/.test(src) ? `https://wsrv.nl/?url=${encodeURIComponent(src)}&w=48&output=jpg` : src);
+
 export function coverColor(src) {
   return new Promise((resolve) => {
     if (!src) return resolve(null);
+    src = readable(src);
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.decoding = "async";

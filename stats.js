@@ -350,7 +350,8 @@ let coloring = false;
 const coverSrc = (item) => item.thumb || item.cover || "";
 const needsColor = (item) => {
   const entry = cache[String(item.release_id)];
-  return coverSrc(item) && !(entry && "cc" in entry);
+  // Los fallos de antes de leer las fotos por wsrv.nl (sin ccv) se reintentan una vez.
+  return coverSrc(item) && !(entry && "cc" in entry && (entry.cc || entry.ccv === 2));
 };
 
 async function runColors() {
@@ -363,7 +364,7 @@ async function runColors() {
       const colors = await Promise.all(batch.map((item) => coverColor(coverSrc(item))));
       batch.forEach((item, i) => {
         const id = String(item.release_id);
-        cache[id] = { ...(cache[id] || {}), cc: colors[i] || false }; // false = no se pudo leer
+        cache[id] = { ...(cache[id] || {}), cc: colors[i] || false, ccv: 2 }; // false = no se pudo leer
       });
       writeCache();
       since += batch.length;
