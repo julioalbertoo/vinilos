@@ -596,6 +596,42 @@ function rainbowOrder(a, b) {
   return 0;
 }
 
+// Si el mosaico está en modo colores; se recuerda al repintar la tarjeta.
+let mosaicTiles = false;
+
+// Tocar hace una cosa y mantener pulsado (medio segundo) otra.
+function onTapOrHold(node, onTap, onHold) {
+  let timer = null;
+  let held = false;
+  let start = null;
+  const cancel = () => {
+    clearTimeout(timer);
+    timer = null;
+  };
+  node.addEventListener("pointerdown", (ev) => {
+    held = false;
+    start = [ev.clientX, ev.clientY];
+    cancel();
+    timer = setTimeout(() => {
+      timer = null;
+      held = true;
+      onHold();
+    }, 500);
+  });
+  node.addEventListener("pointermove", (ev) => {
+    // Si el dedo se mueve es que está desplazando la página.
+    if (timer && start && Math.hypot(ev.clientX - start[0], ev.clientY - start[1]) > 10) cancel();
+  });
+  node.addEventListener("pointerup", cancel);
+  node.addEventListener("pointercancel", cancel);
+  node.addEventListener("pointerleave", cancel);
+  node.addEventListener("contextmenu", (ev) => ev.preventDefault());
+  node.addEventListener("click", () => {
+    if (held) held = false;
+    else onTap();
+  });
+}
+
 // entries: [{ item, color }] (color null si no se sabe).
 export function rainbowCard(entries, colored, onOpen, pending) {
   const sorted = [...entries].sort(rainbowOrder);
@@ -612,7 +648,7 @@ export function rainbowCard(entries, colored, onOpen, pending) {
     nodes.push(strip);
   }
 
-  const mosaic = el("div", "stats-mosaic");
+  const mosaic = el("div", mosaicTiles ? "stats-mosaic is-tiles" : "stats-mosaic");
   for (const e of sorted) {
     const cell = el("button", "stats-mosaic-cell");
     cell.type = "button";
@@ -620,7 +656,11 @@ export function rainbowCard(entries, colored, onOpen, pending) {
     cell.setAttribute("aria-label", cell.title);
     if (e.color) cell.style.background = e.color.hex;
     cell.append(coverImg(e.item, "stats-mosaic-img"));
-    cell.addEventListener("click", () => onOpen(e.item));
+    onTapOrHold(
+      cell,
+      () => (mosaicTiles = mosaic.classList.toggle("is-tiles")), // tocar: todas las portadas pasan a su color, y vuelta
+      () => onOpen(e.item), // mantener pulsado: abre el disco
+    );
     mosaic.append(cell);
   }
   nodes.push(mosaic);
@@ -651,7 +691,7 @@ export function rainbowCard(entries, colored, onOpen, pending) {
     nodes.push(row);
   }
   return card(
-    { icon: "🌈", title: "Tus portadas por colores", sub: "Del rojo al violeta; toca una para abrirla", accent: "pink", nav: "colors" },
+    { icon: "🌈", title: "Tus portadas por colores", sub: "Del rojo al violeta; toca para ver solo los colores y mantén pulsada una para abrirla", accent: "pink", nav: "colors" },
     ...nodes
   );
 }

@@ -2781,13 +2781,27 @@ button.stats-fact:active {
   overflow: hidden;
 }
 
+.stats-mosaic-cell {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .stats-mosaic-img {
+  transition: opacity 0.45s ease;
+  -webkit-touch-callout: none;
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Al tocar el mosaico, todas las portadas se funden a la vez en su color. */
+.stats-mosaic.is-tiles .stats-mosaic-img {
+  opacity: 0;
 }
 
 .stats-discs {
