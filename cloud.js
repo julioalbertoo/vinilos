@@ -167,6 +167,16 @@ export function isCloudReady() {
   return Boolean(client);
 }
 
+// Sin esperar a que cargue Supabase: ¿quedó una sesión guardada en este móvil? (su clave por defecto).
+export function hasSavedSession() {
+  try {
+    const ref = new URL(url).hostname.split(".")[0];
+    return Boolean(localStorage.getItem(`sb-${ref}-auth-token`));
+  } catch {
+    return false;
+  }
+}
+
 export function cloudUser() {
   return user;
 }

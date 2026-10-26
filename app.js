@@ -30,7 +30,7 @@ import { loadTrivia } from "./trivia.js";
 import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
 import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease } from "./wantlist.js";
 import { initAutoUpdate, currentVersion, latestVersion, reloadTo } from "./updater.js";
-import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
+import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady, hasSavedSession } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -2363,6 +2363,8 @@ initUpdates();
 if (cloudPinnedMessage) {
   showView("settings");
   setTimeout(() => document.getElementById("cloud-status").scrollIntoView({ block: "center" }), 0);
-} else if (areTokensVerified()) showView("capture");
-else if (hasTokens()) showView("settings");
+} else if (areTokensVerified()) {
+  // Con sesión iniciada se empieza en «Mis discos»; sin ella, en «Identificar».
+  showView(hasSavedSession() ? "collection" : "capture");
+} else if (hasTokens()) showView("settings");
 else openGuide();
