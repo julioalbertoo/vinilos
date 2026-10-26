@@ -254,6 +254,7 @@ export function renderGallery(items, onOpen) {
   const count = document.getElementById("gallery-count");
   const slides = items.map(renderSlide);
   track.replaceChildren(...slides);
+  document.getElementById("gallery-random").hidden = items.length < 2;
   if (!items.length) return;
 
   let current = -1;
@@ -308,6 +309,15 @@ export function renderGallery(items, onOpen) {
       else slide.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
     });
   });
+
+  // Dado: lleva al centro un disco al azar (nunca el que ya está).
+  const random = document.getElementById("gallery-random");
+  random.hidden = items.length < 2;
+  random.onclick = () => {
+    let next = Math.floor(Math.random() * (items.length - 1));
+    if (next >= current) next += 1;
+    slides[next].scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  };
 
   track.onkeydown = (event) => {
     const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];

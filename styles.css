@@ -1533,8 +1533,33 @@ input[type="text"]:focus {
 }
 
 .gallery-caption {
+  position: relative;
   min-height: 84px;
   text-align: center;
+}
+
+/* Dado pequeño a la derecha del contador: salta a un disco al azar. */
+.gallery-random {
+  position: absolute;
+  right: 4px;
+  bottom: 0;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--lilac);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.gallery-random:active {
+  transform: rotate(-20deg) scale(0.92);
+  background: var(--lilac);
 }
 
 .view .gallery-title {
