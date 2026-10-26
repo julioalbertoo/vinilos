@@ -61,6 +61,8 @@ function coverImg(item, className) {
   img.alt = "";
   img.loading = "lazy";
   img.decoding = "async";
+  // Hay álbumes sin portada en el archivo de MusicBrainz: se pone un disco.
+  img.addEventListener("error", () => img.replaceWith(el("span", className, "💿")), { once: true });
   return img;
 }
 
@@ -387,6 +389,94 @@ export function genreVinylCard(genres, byGenre, records, rerender, onOpen) {
   );
 }
 
+// ---------- 1b. Géneros por década ----------
+
+let selectedDecade = null;
+
+// "los 70", "los 2000".
+const decadeWords = (decade) => `los ${decade < 2000 ? String(decade).slice(2) : decade}`;
+
+// rows: [{ item, year, genres }] de los discos con año del álbum y géneros.
+// genres: [[nombre, cuántos]] de toda la colección: mismo orden y colores que el vinilo de géneros.
+export function decadeGenreCard(rows, genres, rerender, onOpen) {
+  const head = { icon: "🎸", title: "Géneros por década", sub: "Lo que escuchas de cada época, según el año del álbum", accent: "lilac", nav: "genres" };
+  if (!rows.length) return card(head, note("Aún no se sabe el año y el género de tus discos."));
+  const colorOf = new Map(genres.slice(0, MAX_SLICES).map(([name], i) => [name, GENRE_COLORS[i]]));
+  const rank = new Map(genres.map(([name], i) => [name, i]));
+  const decades = new Map();
+  for (const r of rows) {
+    const decade = Math.floor(r.year / 10) * 10;
+    const d = decades.get(decade) || { items: [], genres: new Map(), bands: new Map() };
+    d.items.push(r.item);
+    for (const g of r.genres) {
+      d.genres.set(g, (d.genres.get(g) || 0) + 1);
+      // Los géneros que no caben en el vinilo van juntos, en gris, como allí.
+      const band = colorOf.has(g) ? g : "Otros";
+      d.bands.set(band, (d.bands.get(band) || 0) + 1);
+    }
+    decades.set(decade, d);
+  }
+  if (selectedDecade !== null && !decades.has(selectedDecade)) selectedDecade = null;
+  const peak = Math.max(...[...decades.values()].map((d) => d.items.length));
+  const byCount = (map) => [...map.entries()].sort((a, b) => b[1] - a[1] || (rank.get(a[0]) ?? 99) - (rank.get(b[0]) ?? 99));
+
+  const list = el("div", "stats-decades");
+  const used = new Set();
+  for (const decade of [...decades.keys()].sort((a, b) => a - b)) {
+    const d = decades.get(decade);
+    const [topName, topCount] = byCount(d.genres)[0];
+    const row = el("button", `stats-decade${decade === selectedDecade ? " active" : ""}`);
+    row.type = "button";
+    row.setAttribute("aria-expanded", String(decade === selectedDecade));
+    const bar = el("span", "stats-decade-bar");
+    bar.style.width = `${Math.max(8, (d.items.length / peak) * 100)}%`;
+    for (const [band, count] of byCount(d.bands).sort((a, b) => (a[0] === "Otros") - (b[0] === "Otros"))) {
+      used.add(band);
+      const part = el("span", "stats-decade-part");
+      part.style.flexGrow = String(count);
+      part.style.background = colorOf.get(band) || OTHER_COLOR;
+      bar.append(part);
+    }
+    const track = el("span", "stats-decade-track");
+    track.append(bar);
+    row.append(
+      el("span", "stats-decade-name", `${String(decade).slice(2)}s`),
+      track,
+      el("span", "stats-decade-top", `${topName} · ${topCount} de ${plural(d.items.length, "disco", "discos")}`)
+    );
+    row.addEventListener("click", () => {
+      selectedDecade = selectedDecade === decade ? null : decade;
+      rerender();
+    });
+    list.append(row);
+    if (decade === selectedDecade) {
+      const label = `${decadeWords(decade).replace(/^l/, "L")} · ${byCount(d.genres).slice(0, 4).map(([g, n]) => `${g} ${n}`).join(", ")}`;
+      list.append(coverStrip(d.items, onOpen, label));
+    }
+  }
+
+  // Leyenda: los colores que salen, en el orden del vinilo.
+  const keys = el("div", "stats-decade-keys");
+  for (const [name] of [...genres.slice(0, MAX_SLICES), ["Otros"]]) {
+    if (!used.has(name)) continue;
+    const key = el("span", "stats-decade-key");
+    const dot = el("span", "stats-genre-dot");
+    dot.style.background = colorOf.get(name) || OTHER_COLOR;
+    key.append(dot, el("span", null, name));
+    keys.append(key);
+  }
+
+  const nodes = [keys, list];
+  if (selectedDecade === null) nodes.push(hint("Toca una década para ver sus discos."));
+  // La década con más géneros distintos.
+  if (decades.size > 1) {
+    const [decade, d] = [...decades.entries()].sort((a, b) => b[1].genres.size - a[1].genres.size || b[1].items.length - a[1].items.length)[0];
+    if (d.genres.size >= 3) nodes.push(pill(`🔀 Tu década más variada: ${decadeWords(decade)} · ${plural(d.genres.size, "género", "géneros")}`, "lilac"));
+  }
+  nodes.push(note("Un disco con varios géneros cuenta en todos ellos."));
+  return card(head, ...nodes);
+}
+
 // ---------- 2. Arcoíris de portadas ----------
 
 // Color principal de una portada: el tono con más color (se ignoran blancos, negros y grises
@@ -563,7 +653,7 @@ const COMPARISONS = [
 
 // Compara una cantidad con la cosa conocida más grande que no la supera: «2,5 veces un gato».
 // list: [[cantidad, «un gato», emoji]] de menor a mayor. almost: cómo empieza si no llega a la primera.
-function compareTo(list, value, almost = "Casi lo que dura") {
+export function compareTo(list, value, almost = "Casi lo que dura") {
   const fit = list.filter(([m]) => m <= value).pop();
   if (!fit) return `${list[0][2]} ${almost} ${list[0][1]}`;
   const times = value / fit[0];

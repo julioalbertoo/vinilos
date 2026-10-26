@@ -2916,6 +2916,114 @@ button.stats-fact:active {
   border-radius: 50%;
 }
 
+/* Géneros por década: una fila por década, con su barra partida por géneros y el que más se repite debajo. */
+.stats-decades {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+}
+
+button.stats-decade {
+  display: grid;
+  grid-template-columns: 2.6em minmax(0, 1fr);
+  align-items: center;
+  gap: 3px 10px;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 7px 8px;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 400;
+  text-align: left;
+}
+
+button.stats-decade:active {
+  background: var(--accent);
+  transform: none;
+}
+
+button.stats-decade.active {
+  border-radius: 12px 12px 0 0;
+  background: var(--accent);
+}
+
+.stats-decade-name {
+  grid-row: 1 / span 2;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-decade-track {
+  display: block;
+  min-width: 0;
+}
+
+.stats-decade-bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.stats-decade-part {
+  min-width: 3px;
+}
+
+.stats-decade-top {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stats-decades .stats-pick {
+  margin: 0 0 6px;
+  border-radius: 0 0 12px 12px;
+}
+
+.stats-decade-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.stats-decade-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Pastillas que se pueden tocar con el color de su tarjeta (p. ej., las ediciones especiales). */
+.stats-chip--accent,
+.stats-chip--accent:active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.view .stats-pill--pink { background: var(--pink); color: var(--rose-text); }
+
+/* Botón a la ficha del artista dentro de una fila desplegada (discografías). */
+.stats-pick > button.stats-artist-go {
+  width: calc(100% - 24px);
+  margin: 10px 12px 0;
+}
+
+/* Récords con textos largos (títulos de canciones): que no se salgan de la casilla. */
+.stats-fact-value {
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Ficha del artista ---------- */
 
 /* La casilla «artistas» de «Datos» se puede tocar: flecha en la esquina. */

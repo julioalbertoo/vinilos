@@ -169,6 +169,17 @@ export async function mbAlbumAnnotation(masterId) {
   return { title: group.title || "", url: `https://musicbrainz.org/release-group/${group.id}`, text };
 }
 
+// Álbum (master) de Discogs al que enlaza un álbum de MusicBrainz, o null si no enlaza a ninguno.
+export async function mbDiscogsMaster(mbid) {
+  if (!mbid) return null;
+  const group = await mbGet(`/release-group/${mbid}`, { inc: "url-rels" });
+  for (const rel of (group && group.relations) || []) {
+    const match = /discogs\.com\/master\/(\d+)/.exec((rel.url && rel.url.resource) || "");
+    if (match) return Number(match[1]);
+  }
+  return null;
+}
+
 // Título para emparejar canciones entre fuentes: sin acentos, sin «(Live)», «[Remastered]»… ni signos.
 export const trackKey = (title) =>
   String(title || "")

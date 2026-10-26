@@ -435,6 +435,18 @@ export async function findAlbumRelease(artist, title, discogsToken) {
   return master ? await masterMainRelease(master.id, discogsToken) : null;
 }
 
+// Álbum (master) de Discogs del que solo se sabe artista y título: el que tiene el mismo título
+// (al menos su parte corta) y más gente tiene. null si no hay.
+export async function findAlbumMaster(artist, title, discogsToken) {
+  const short = shortAlbumTitle(title);
+  for (const t of [...new Set([title, short].filter(Boolean))]) {
+    const r = await discogsGet("/database/search", { type: "master", artist, release_title: t, per_page: "10" }, discogsToken);
+    const master = bestMaster(r.results || [], title, true);
+    if (master) return master.id;
+  }
+  return null;
+}
+
 // «PetroDragonic Apocalypse; or, Dawn of…» → «PetroDragonic Apocalypse».
 function shortAlbumTitle(title) {
   return String(title || "").split(/\s*[;:(\[]\s*|\s+\/\s+|,\s+or,?\s+/i)[0].trim();

@@ -3,19 +3,23 @@
 // Se guarda un resumen pequeño en el móvil; con cuenta, se leen de golpe las fichas guardadas en la nube
 // y lo que falte se pide a Discogs poco a poco, en segundo plano, mientras la pestaña está abierta.
 import { CONFIG } from "./config.js";
-import { cachedRelease, cachedPrices, fillDurations, DURATIONS_CHECK } from "./details.js";
-import { RELEASE_VERSION } from "./discogs.js";
+import { cachedRelease, cachedPrices, fillDurations, DURATIONS_CHECK, cachedCheapest, savedCheapest } from "./details.js";
+import { RELEASE_VERSION, findAlbumMaster } from "./discogs.js";
 import { loadDetailSummaries, cloudUser } from "./cloud.js";
 import { releaseWeight, isHeavy, countryFlag, countryCodes } from "./discogs.js";
+import { mbDiscogsMaster } from "./musicbrainz.js";
+import { getWantlist, updateWanted, wantKey } from "./wantlist.js";
+import { savedDiscography, ensureDiscography, discographyProgress, hasArtistPage } from "./artist.js";
 import {
   el, card, tile, note, hint, pill, plural, level, legend, segmented, coverStrip, rankList, podium, factGrid, navBar,
-  genreVinylCard, rainbowCard, coverColor, durationCard, timelineCard, mapCard, stackCard, splitBar,
+  genreVinylCard, decadeGenreCard, rainbowCard, coverColor, durationCard, timelineCard, mapCard, stackCard, splitBar, compareTo,
 } from "./charts.js";
 
 const CACHE_KEY = CONFIG.STORAGE_KEYS.statsCache;
 const PRICES_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
-// Sube cuando el resumen guarda campos nuevos: los resúmenes antiguos se rehacen (2: canciones y duración).
-const SUMMARY_VERSION = 2;
+// Sube cuando el resumen guarda campos nuevos: los resúmenes antiguos se rehacen
+// (2: canciones y duración; 3: ediciones especiales, caras, tamaño y canciones récord).
+const SUMMARY_VERSION = 3;
 // Si Discogs no da la duración de ninguna canción de un disco, se cuenta esto por canción.
 const DEFAULT_TRACK_SECONDS = 4 * 60;
 
@@ -49,13 +53,59 @@ function seconds(duration) {
   return parts.reduce((total, n) => total * 60 + n, 0);
 }
 
+// Lo especial de una edición según su formato en Discogs. [clave, nombre en «Datos», nombre corto, ¿la tiene?]
+// d: descripciones del formato en minúsculas («limited edition», «45 rpm»…); t: el texto libre; names: nombres del formato.
+const FORMAT_TAGS = [
+  ["limited", "🔢 Limitadas", "limitada", (d, t) => d.has("limited edition") || /\blimited\b/.test(t)],
+  ["numbered", "#️⃣ Numeradas", "numerada", (d, t) => d.has("numbered") || /numbered/.test(t)],
+  ["picture", "🖼️ Picture disc", "picture disc", (d, t) => d.has("picture disc") || /picture ?disc/.test(t)],
+  ["gatefold", "📖 Con carpeta (gatefold)", "con carpeta", (d, t) => d.has("gatefold") || /gate-?fold/.test(t)],
+  ["deluxe", "✨ Deluxe o especiales", "deluxe", (d, t) => d.has("deluxe edition") || d.has("special edition") || /\bdeluxe\b/.test(t)],
+  ["box", "📦 En caja", "en caja", (d, t, names) => names.has("box set")],
+  ["double", "💿 Dobles o más", "doble", () => false], // sale del número de vinilos, no del texto
+  ["rpm45", "⚡ A 45 rpm", "a 45 rpm", (d) => d.has("45 rpm")],
+  ["mono", "📻 En mono", "mono", (d) => d.has("mono")],
+  ["remaster", "🎚️ Remasterizadas", "remasterizada", (d) => d.has("remastered")],
+  ["promo", "📣 Promo o de prueba", "promo", (d) => d.has("promo") || d.has("test pressing") || d.has("white label")],
+  ["unofficial", "🏴‍☠️ No oficiales", "no oficial", (d) => d.has("unofficial release")],
+];
+// Las que hacen de un disco una edición especial (las demás son detalles del formato).
+const SPECIAL_TAGS = new Set(["limited", "numbered", "picture", "deluxe", "box", "promo", "unofficial"]);
+
+function formatTags(formats) {
+  const d = new Set(formats.flatMap((f) => f.descriptions || []).map((x) => String(x).toLowerCase()));
+  const t = formats.map((f) => f.text || "").join(" ").toLowerCase();
+  const names = new Set(formats.map((f) => String(f.name || "").toLowerCase()));
+  return FORMAT_TAGS.filter(([, , , has]) => has(d, t, names)).map(([key]) => key);
+}
+
+// Tamaño del vinilo en pulgadas (7, 10 o 12; 12 si Discogs no lo dice).
+function inchesOf(formats) {
+  const d = formats.flatMap((f) => f.descriptions || []).join(" ");
+  return /\b7"/.test(d) ? 7 : /\b10"/.test(d) ? 10 : 12;
+}
+
+// Caras del disco según las posiciones de las canciones (A1, B2, C1… → 3). 0 si no usan letras.
+function sidesOf(tracks) {
+  const sides = new Set();
+  for (const t of tracks) {
+    const match = /^([A-Z])\1?(?:\d|$)/.exec(String(t.position || "").trim().toUpperCase());
+    if (match) sides.add(match[0].replace(/\d+$/, ""));
+  }
+  return sides.size;
+}
+
 // Lo que interesa de una ficha (completa, o el resumen que llega de la nube).
 function summarize(source) {
   const community = source.community || null;
   const labels = Array.isArray(source.labels) ? source.labels : [];
   const formats = Array.isArray(source.formats) ? source.formats : [];
   const tracks = (Array.isArray(source.tracklist) ? source.tracklist : []).filter((t) => !t.type_ || t.type_ === "track");
-  const timed = tracks.map((t) => seconds(t.duration)).filter((s) => s > 0);
+  const songs = tracks.map((t) => ({ t: String(t.title || "").trim(), s: seconds(t.duration) })).filter((x) => x.s > 0);
+  const timed = songs.map((x) => x.s);
+  const vinyl = formats.filter((f) => /vinyl|lp/i.test(f.name || ""));
+  // La más corta: se ignoran los cortes de pocos segundos (silencios entre canciones, pistas ocultas).
+  const real = songs.filter((x) => x.s >= 10);
   return {
     v: SUMMARY_VERSION,
     genres: Array.isArray(source.genres) ? source.genres : [],
@@ -71,6 +121,12 @@ function summarize(source) {
     timedTracks: timed.length,
     seconds: timed.reduce((a, b) => a + b, 0),
     durationsChecked: Number(source.durationsChecked) === DURATIONS_CHECK,
+    tags: formatTags(formats),
+    vinyls: vinyl.reduce((sum, f) => sum + (Number.parseInt(f.qty, 10) || 1), 0),
+    sides: sidesOf(tracks),
+    inches: inchesOf(formats),
+    longest: songs.length ? songs.reduce((a, b) => (b.s > a.s ? b : a)) : null,
+    shortest: real.length ? real.reduce((a, b) => (b.s < a.s ? b : a)) : null,
     // Ficha guardada con una versión antigua (p. ej. sin los temas en varias partes): se vuelve a pedir.
     oldData: Number(source.v || 0) !== RELEASE_VERSION,
   };
@@ -135,46 +191,158 @@ function needsWork(item) {
   return !entry || !entry.dataAt || entry.v !== SUMMARY_VERSION || !isFresh(entry.pricesAt) || missingDurations(entry);
 }
 
+// Si al volver a la pestaña aún seguía la vuelta anterior, se da otra al terminar.
+let again = false;
+
 async function runFill() {
   running = true;
+  again = false;
   try {
     // Primero lo que haya en la nube: suele traerlo casi todo sin preguntar a Discogs.
     if (await primeFromCloud()) latest.onUpdate();
-    while (active && latest.token) {
-      const { items, token } = latest;
-      const pending = items.filter(needsWork);
-      if (!pending.length) break;
-      const item = pending[0];
-      const id = String(item.release_id);
-      latest.onStatus(`🔄 Completando datos con Discogs… ${items.length - pending.length + 1} de ${items.length}`);
-      const entry = cache[id] || {};
-      try {
-        if (!entry.dataAt || entry.v !== SUMMARY_VERSION || missingDurations(entry)) {
-          // Con cuenta, la ficha suele salir de la nube sin preguntar a Discogs.
-          const release = await fillDurations(await cachedRelease(item.release_id, token), token);
-          Object.assign(entry, summarize(release), { dataAt: entry.dataAt || new Date().toISOString() });
-          // Si Discogs no respondió y quedó la ficha antigua, no se insiste en esta visita.
-          if (entry.oldData) failed.add(id);
-        }
-        if (!isFresh(entry.pricesAt)) {
-          const { prices, at } = await cachedPrices(item.release_id, token);
-          Object.assign(entry, { prices, pricesAt: at });
-        }
-      } catch (err) {
-        failed.add(id);
-        if (err.authError) {
-          latest.onStatus("❌ El token de Discogs no es válido: revisa tus llaves en Ajustes.");
-          return;
-        }
-      }
-      cache[id] = entry;
-      writeCache();
-      if (active) latest.onUpdate();
-    }
+    // Luego tus discos, después los precios de lo que buscas y al final las discografías.
+    if (!(await fillRecords()) || !(await fillWantlist()) || !(await fillDiscographies())) return;
     latest.onStatus(latest.token ? "" : "Añade tu token de Discogs en Ajustes para ver precios, géneros y duración.");
   } finally {
     running = false;
+    if (again && active) runFill().catch(() => {});
   }
+}
+
+const authFailed = () => latest.onStatus("❌ El token de Discogs no es válido: revisa tus llaves en Ajustes.");
+
+// Géneros, precios, canciones… de tus discos. false si el token no vale.
+async function fillRecords() {
+  while (active && latest.token) {
+    const { items, token } = latest;
+    const pending = items.filter(needsWork);
+    if (!pending.length) return true;
+    const item = pending[0];
+    const id = String(item.release_id);
+    latest.onStatus(`🔄 Completando datos con Discogs… ${items.length - pending.length + 1} de ${items.length}`);
+    const entry = cache[id] || {};
+    try {
+      if (!entry.dataAt || entry.v !== SUMMARY_VERSION || missingDurations(entry)) {
+        // Con cuenta, la ficha suele salir de la nube sin preguntar a Discogs.
+        const release = await fillDurations(await cachedRelease(item.release_id, token), token);
+        Object.assign(entry, summarize(release), { dataAt: entry.dataAt || new Date().toISOString() });
+        // Si Discogs no respondió y quedó la ficha antigua, no se insiste en esta visita.
+        if (entry.oldData) failed.add(id);
+      }
+      if (!isFresh(entry.pricesAt)) {
+        const { prices, at } = await cachedPrices(item.release_id, token);
+        Object.assign(entry, { prices, pricesAt: at });
+      }
+    } catch (err) {
+      failed.add(id);
+      if (err.authError) {
+        authFailed();
+        return false;
+      }
+    }
+    cache[id] = entry;
+    writeCache();
+    if (active) latest.onUpdate();
+  }
+  return true;
+}
+
+// ---------- Lo que busco: el vinilo más barato de cada álbum ----------
+
+// Álbumes ya mirados en esta visita (bien o mal), para no insistir; y lo encontrado, por si no cabe en el móvil.
+const wantTried = new Set();
+const wantPrices = new Map();
+
+const cheapestOf = (w) => (w.masterId ? wantPrices.get(String(w.masterId)) || savedCheapest(w.masterId) : null);
+const wantNeedsWork = (w) => !wantTried.has(wantKey(w.artist, w.title)) && (w.masterId ? !cheapestOf(w) : !w.masterChecked);
+
+// Álbum (master) de Discogs de algo de tu lista: por su edición, por el enlace de MusicBrainz o buscándolo.
+async function findWantedMaster(w, token) {
+  if (w.id) {
+    const release = await cachedRelease(w.id, token);
+    if (release.masterId) return release.masterId;
+  }
+  if (w.mbid) {
+    try {
+      const id = await mbDiscogsMaster(w.mbid);
+      if (id) return id;
+    } catch {
+      // Se busca en Discogs.
+    }
+  }
+  return findAlbumMaster(w.artist, w.title, token);
+}
+
+async function fillWantlist() {
+  while (active && latest.token) {
+    const list = getWantlist();
+    const pending = list.filter(wantNeedsWork);
+    if (!pending.length) return true;
+    const w = pending[0];
+    wantTried.add(wantKey(w.artist, w.title));
+    latest.onStatus(`🔄 Buscando precios de lo que buscas… ${list.length - pending.length + 1} de ${list.length}`);
+    try {
+      let masterId = w.masterId;
+      if (!masterId) {
+        masterId = await findWantedMaster(w, latest.token);
+        updateWanted(w.artist, w.title, masterId ? { masterId } : { masterChecked: true });
+      }
+      if (masterId) {
+        const result = await cachedCheapest(masterId, latest.token, { stop: () => !active });
+        // Cortado al salir de la pestaña: se termina otra vez.
+        if (!result) {
+          wantTried.delete(wantKey(w.artist, w.title));
+          return true;
+        }
+        wantPrices.set(String(masterId), result);
+      }
+    } catch (err) {
+      if (err.authError) {
+        authFailed();
+        return false;
+      }
+    }
+    if (active) latest.onUpdate();
+  }
+  return true;
+}
+
+// ---------- Discografías de tus artistas ----------
+
+// Se miran tus artistas con más discos (con dos o más; si hay pocos, los primeros aunque tengan uno).
+const DISCOGRAPHY_MAX = 12;
+
+function discographyArtists(items) {
+  const counts = countBy(items.map((i) => cleanName(i.artist))).filter(([name]) => hasArtistPage(name));
+  const repeated = counts.filter(([, n]) => n >= 2);
+  const pick = repeated.length >= 3 ? repeated.slice(0, DISCOGRAPHY_MAX) : counts.slice(0, 5);
+  return pick.map(([name]) => name);
+}
+
+const discTried = new Set();
+const discographies = new Map(); // nombre → ficha con discografía (también si no cupo en el móvil)
+const discographyOf = (name) => discographies.get(name) || savedDiscography(name);
+
+async function fillDiscographies() {
+  while (active && latest.token) {
+    const names = discographyArtists(latest.items);
+    const pending = names.filter((name) => !discTried.has(name) && !discographyOf(name));
+    if (!pending.length) return true;
+    const name = pending[0];
+    discTried.add(name);
+    latest.onStatus(`🔄 Buscando discografías de tus artistas… ${names.length - pending.length + 1} de ${names.length}`);
+    try {
+      const entry = await ensureDiscography(name, latest.items, latest.token);
+      if (entry) discographies.set(name, entry);
+    } catch (err) {
+      if (err.authError) {
+        authFailed();
+        return false;
+      }
+    }
+    if (active) latest.onUpdate();
+  }
+  return true;
 }
 
 // Colores de las portadas: se leen de la foto en el propio móvil, una vez por disco.
@@ -214,6 +382,7 @@ async function runColors() {
 function startFill(items, token, onUpdate, onStatus) {
   latest = { items, token, onUpdate, onStatus };
   if (!running) runFill().catch(() => {});
+  else again = true;
   if (!coloring) runColors().catch(() => {});
 }
 
@@ -307,19 +476,27 @@ const decadeName = (decade) => `los ${decade < 2000 ? String(decade).slice(2) : 
 let yearMode = "original";
 let selectedYear = null;
 let peopleMode = "artists";
-const picks = { country: null, artists: null, labels: null, rarity: null, hot: false, source: null, style: null };
+const picks = {
+  country: null, artists: null, labels: null, rarity: null, hot: false, source: null, style: null,
+  special: null, discog: null, wantAll: false,
+};
 
 // Entradas de la barra de accesos, en el orden de la página.
 const NAV = [
   ["value", "💶 Valor"],
   ["genres", "🎸 Géneros"],
   ["duration", "⏱️ Duración"],
+  ["songs", "🎵 Canciones"],
+  ["needle", "🪡 Aguja"],
   ["stack", "📦 Pila"],
+  ["special", "🎛️ Ediciones"],
   ["years", "📅 Años"],
   ["colors", "🌈 Colores"],
   ["map", "🌍 Mapa"],
   ["rare", "💎 Rareza"],
   ["people", "🎤 Artistas"],
+  ["discog", "🧩 Discografías"],
+  ["want", "⭐ Lo que busco"],
   ["fun", "✨ Curiosidades"],
   ["added", "🗓️ Añadidos"],
 ];
@@ -643,6 +820,65 @@ function peopleCard(artists, labels, byArtist, byLabel, rerender, onOpen, onArti
   return card({ icon: "🎤", title: "Artistas y sellos", sub: "Los que más se repiten en tu colección", accent: "peach", nav: "people" }, ...nodes);
 }
 
+// Rachas de siempre (no solo de los últimos 6 meses): semanas seguidas añadiendo discos, día de la semana
+// favorito, y el mes y el día con más discos.
+const WEEKDAYS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+// Número de semana (de lunes a domingo) de una fecha, contando desde 1970.
+const weekOf = (d) => Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000 + 3) / 7);
+
+function streakPills(items) {
+  const dates = items.map((i) => new Date(i.date || "")).filter((d) => !Number.isNaN(d.getTime()));
+  if (dates.length < 2) return [];
+  const months = new Map();
+  const days = new Map();
+  const weekdays = new Array(7).fill(0);
+  const weeks = new Set();
+  for (const d of dates) {
+    const month = new Date(d.getFullYear(), d.getMonth(), 1);
+    months.set(month.getTime(), (months.get(month.getTime()) || 0) + 1);
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    days.set(day.getTime(), (days.get(day.getTime()) || 0) + 1);
+    weekdays[(d.getDay() + 6) % 7] += 1;
+    weeks.add(weekOf(d));
+  }
+  const pills = [];
+
+  // Semanas seguidas: la racha más larga y la de ahora (sigue viva si añadiste algo esta semana o la pasada).
+  const sorted = [...weeks].sort((a, b) => a - b);
+  let longest = 1;
+  let run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    run = sorted[i] === sorted[i - 1] + 1 ? run + 1 : 1;
+    longest = Math.max(longest, run);
+  }
+  const now = weekOf(new Date());
+  let current = 0;
+  for (let w = weeks.has(now) ? now : now - 1; weeks.has(w); w--) current += 1;
+  if (current >= 2) {
+    pills.push(pill(`🔥 Llevas ${current} semanas seguidas añadiendo discos${current >= longest ? ": ¡tu récord!" : ` (tu récord: ${longest})`}`, "lilac"));
+  } else if (longest >= 2) {
+    pills.push(pill(`🔥 Tu racha más larga: ${longest} semanas seguidas añadiendo discos`, "lilac"));
+  }
+
+  // Día de la semana favorito, si destaca.
+  const order = weekdays.map((n, i) => [i, n]).sort((a, b) => b[1] - a[1]);
+  if (order[0][1] >= 3 && order[0][1] > order[1][1]) {
+    pills.push(pill(`📆 Tu día favorito para añadir discos: el ${WEEKDAYS[order[0][0]]} (${order[0][1]} de ${dates.length})`, "lilac"));
+  }
+
+  const [bestMonth, monthCount] = [...months.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+  if (monthCount > 1) {
+    const name = new Date(bestMonth).toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+    pills.push(pill(`📈 Tu mes récord: ${name} · ${plural(monthCount, "disco", "discos")}`, "lilac"));
+  }
+  const [bestDay, dayCount] = [...days.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+  if (dayCount >= 3) {
+    const name = new Date(bestDay).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+    pills.push(pill(`🚀 Tu día récord: el ${name} añadiste ${plural(dayCount, "disco", "discos")}`, "lilac"));
+  }
+  return pills;
+}
+
 // Calendario de cuándo se añadió cada disco (las últimas 26 semanas), como el de GitHub.
 function calendarCard(items) {
   const WEEKS = 26;
@@ -652,7 +888,6 @@ function calendarCard(items) {
   const dayIndex = (today.getDay() + 6) % 7; // lunes = 0
   const start = new Date(today.getTime() - (dayIndex + (WEEKS - 1) * 7) * DAY);
   const counts = new Map();
-  const months = new Map();
   for (const item of items) {
     if (!item.date) continue;
     const d = new Date(item.date);
@@ -660,8 +895,6 @@ function calendarCard(items) {
     if (d < start || d > today) continue;
     const key = d.toDateString();
     counts.set(key, (counts.get(key) || 0) + 1);
-    const month = d.toLocaleDateString("es-ES", { month: "long" });
-    months.set(month, (months.get(month) || 0) + 1);
   }
   const peak = Math.max(1, ...counts.values());
 
@@ -707,8 +940,8 @@ function calendarCard(items) {
     wrap,
     legend(),
   ];
-  const best = [...months.entries()].sort((a, b) => b[1] - a[1])[0];
-  if (best && best[1] > 1) nodes.push(pill(`📈 Tu mejor mes: ${best[0]} · ${plural(best[1], "disco", "discos")}`, "lilac"));
+  const streaks = streakPills(items);
+  if (streaks.length) nodes.push(el("p", "stats-sub", "🔥 Tus rachas"), ...streaks);
   return card({ icon: "🗓️", title: "Cuándo los añadiste", sub: "Cada casilla es un día", accent: "lilac", nav: "added" }, ...nodes);
 }
 
@@ -752,8 +985,362 @@ function curiositiesCard(data, items, styles, onOpen) {
   );
 }
 
+// ---------- 🎵 Canciones récord ----------
+
+// "3:45"; "1:02:10".
+function clock(total) {
+  const s = Math.round(total);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+}
+
+// «40 días», «8 meses», «3,4 años».
+function daysText(days) {
+  if (days < 60) return plural(days, "día", "días");
+  if (days < 730) return plural(Math.round(days / 30.4), "mes", "meses");
+  return `${(days / 365).toLocaleString("es-ES", { maximumFractionDigits: 1 })} años`;
+}
+
+// Lo que dura la canción más larga, comparado con algo conocido. null si es una canción normal.
+function longSongPill(seconds) {
+  const minutes = seconds / 60;
+  if (minutes >= 45) return "⚽ La más larga dura más que la primera parte de un partido de fútbol";
+  if (minutes >= 40) return "⚽ La más larga dura casi lo que la primera parte de un partido de fútbol";
+  if (minutes >= 30) return "📺 La más larga dura más que un capítulo de Friends";
+  if (minutes >= 20) return "📺 La más larga dura lo que un capítulo de Friends";
+  const songs = Math.round(minutes / 3.5);
+  return songs >= 2 ? `📻 La más larga dura lo que ${songs} canciones normales de la radio` : null;
+}
+
+function songsCard(data, onOpen) {
+  const head = { icon: "🎵", title: "Canciones récord", sub: "Cuántas tienes, y las más largas y cortas", accent: "peach", nav: "songs" };
+  const rows = data.withData.filter((r) => r.s.tracks);
+  if (!rows.length) return card(head, note("Aún no se sabe: falta la lista de canciones de tus discos."));
+  const total = rows.reduce((sum, r) => sum + r.s.tracks, 0);
+  const nodes = [
+    el("p", "stats-big", total.toLocaleString("es-ES")),
+    el("p", "stats-big-note", total === 1 ? "canción en tus discos" : "canciones en tus discos"),
+    pill(`📅 Escuchando una al día, tardarías ${daysText(total)} en oírlas todas`, "peach"),
+  ];
+  const facts = [];
+  const timed = rows.filter((r) => r.s.longest);
+  const longest = timed.length ? timed.reduce((a, b) => (b.s.longest.s > a.s.longest.s ? b : a)) : null;
+  if (longest) {
+    facts.push({ icon: "🐢", label: "La canción más larga", item: longest.item, value: `«${longest.s.longest.t}» · ${clock(longest.s.longest.s)}` });
+  }
+  const short = rows.filter((r) => r.s.shortest);
+  const shortest = short.length ? short.reduce((a, b) => (b.s.shortest.s < a.s.shortest.s ? b : a)) : null;
+  if (shortest) {
+    facts.push({ icon: "🐇", label: "La canción más corta", item: shortest.item, value: `«${shortest.s.shortest.t}» · ${clock(shortest.s.shortest.s)}` });
+  }
+  const most = rows.reduce((a, b) => (b.s.tracks > a.s.tracks ? b : a));
+  facts.push({ icon: "📚", label: "El disco con más canciones", item: most.item, value: plural(most.s.tracks, "canción", "canciones") });
+  const fewest = rows.reduce((a, b) => (b.s.tracks < a.s.tracks ? b : a));
+  if (fewest.s.tracks < most.s.tracks) {
+    facts.push({ icon: "🎯", label: "El disco con menos canciones", item: fewest.item, value: plural(fewest.s.tracks, "canción", "canciones") });
+  }
+  nodes.push(factGrid(facts, onOpen));
+  const compare = longest && longSongPill(longest.s.longest.s);
+  if (compare) nodes.push(pill(compare, "peach"));
+  if (rows.length < data.rows.length) nodes.push(note(`Sin contar ${plural(data.rows.length - rows.length, "disco", "discos")} sin lista de canciones todavía.`));
+  return card(head, ...nodes);
+}
+
+// ---------- 🪡 La aguja ----------
+
+// Radio medio de la zona grabada de un vinilo, en metros, según su tamaño en pulgadas.
+const GROOVE_RADIUS = { 7: 0.069, 10: 0.09, 12: 0.103 };
+// Lo que suele durar la punta de una aguja, en horas (depende mucho de cuál sea y de cómo se cuide).
+const STYLUS_HOURS = 1000;
+const DISTANCES = [
+  [0.105, "un campo de fútbol", "⚽"],
+  [0.33, "la altura de la torre Eiffel", "🗼"],
+  [5, "una carrera de 5 km", "🏃"],
+  [21.1, "una media maratón", "🏃"],
+  [42.2, "una maratón", "🏅"],
+  [620, "el camino de Madrid a Barcelona en coche", "🚗"],
+  [1000, "España de norte a sur", "🗺️"],
+];
+
+// Caras de un disco: las de sus canciones (A, B, C…) o, si no lo dicen, dos por vinilo.
+const sidesOfRow = (r) => r.s.sides || (r.s.vinyls || Number(r.item.discs) || 1) * 2;
+const bigNumber = (n) => (n >= 10000 ? `${Math.round(n / 1000).toLocaleString("es-ES")} mil` : Math.round(n).toLocaleString("es-ES"));
+const oneDecimal = (n) => n.toLocaleString("es-ES", { maximumFractionDigits: n < 10 ? 1 : 0 });
+
+function needleCard(data) {
+  const head = { icon: "🪡", title: "La aguja", sub: "Caras, vueltas y kilómetros de surco de tu colección", accent: "sky", nav: "needle" };
+  const sides = data.rows.reduce((sum, r) => sum + sidesOfRow(r), 0);
+  let turns = 0;
+  let meters = 0;
+  let seconds = 0;
+  for (const r of data.withData) {
+    const len = recordLength(r.s);
+    if (!len) continue;
+    const rpm = (r.s.tags || []).includes("rpm45") ? 45 : 100 / 3;
+    const minutes = len.seconds / 60;
+    turns += minutes * rpm;
+    meters += minutes * rpm * 2 * Math.PI * (GROOVE_RADIUS[r.s.inches] || GROOVE_RADIUS[12]);
+    seconds += len.seconds;
+  }
+  const nodes = [
+    el("p", "stats-big", sides.toLocaleString("es-ES")),
+    el("p", "stats-big-note", sides === 1 ? "cara de vinilo" : "caras de vinilo"),
+    pill(`🧍 Para oírlo todo te levantarías ${plural(sides, "vez", "veces")} a poner un disco o darle la vuelta`, "sky"),
+  ];
+  if (seconds) {
+    const km = meters / 1000;
+    const plays = (STYLUS_HOURS * 3600) / seconds;
+    const playsText = oneDecimal(plays);
+    const tiles = el("div", "stats-tiles");
+    tiles.append(
+      tile(bigNumber(turns), "vueltas del plato", { icon: "🔄", accent: "sky" }),
+      tile(km < 1 ? `${Math.round(meters)} m` : `${oneDecimal(km)} km`, "de surco", { icon: "〰️", accent: "sky" }),
+      tile(playsText, "escuchas por aguja", { icon: "🪡", accent: "sky" })
+    );
+    // «🏅 2,3 veces una maratón» → «🏅 La aguja recorre 2,3 veces una maratón».
+    const [emoji, ...words] = compareTo(DISTANCES, km, "Casi").split(" ");
+    const text = words.join(" ");
+    const hours = STYLUS_HOURS.toLocaleString("es-ES");
+    nodes.push(
+      tiles,
+      pill(`${emoji} La aguja recorre ${text.charAt(0).toLowerCase()}${text.slice(1)}`, "sky"),
+      pill(
+        plays >= 1
+          ? `🪡 Una aguja dura unas ${hours} horas: te da para escuchar tu colección entera ${playsText} ${playsText === "1" ? "vez" : "veces"}`
+          : `🪡 Una aguja dura unas ${hours} horas: para oír tu colección entera necesitarías ${Math.ceil(1 / plays)} agujas`,
+        "sky"
+      )
+    );
+  }
+  nodes.push(
+    note(
+      "Aproximado: a 33⅓ vueltas por minuto (45 si Discogs lo dice), con el radio medio de los surcos y solo con los discos que " +
+        "tienen lista de canciones. Las caras salen de las canciones (A, B, C…) o, si no, de cuántos vinilos trae cada disco. " +
+        "Lo que dura una aguja depende de cuál sea y de cómo se cuide."
+    )
+  );
+  return card(head, ...nodes);
+}
+
+// ---------- 🎛️ Ediciones especiales ----------
+
+// Lo especial de un disco: lo que dice su formato y si trae dos vinilos o más.
+const tagsOfRow = (r) => [...(r.s.tags || []), ...((r.s.vinyls || Number(r.item.discs) || 1) >= 2 ? ["double"] : [])];
+
+function specialCard(data, rerender, onOpen) {
+  const head = { icon: "🎛️", title: "Ediciones especiales", sub: "Lo que dice Discogs del formato de tus discos", accent: "pink", nav: "special" };
+  const rows = data.withData;
+  if (!rows.length) return card(head, note("Aún no hay datos de Discogs de tus discos."));
+  const byTag = new Map();
+  for (const r of rows) for (const tag of tagsOfRow(r)) byTag.set(tag, [...(byTag.get(tag) || []), r.item]);
+  const tags = FORMAT_TAGS.filter(([key]) => byTag.has(key)).sort((a, b) => byTag.get(b[0]).length - byTag.get(a[0]).length);
+  if (picks.special && !byTag.has(picks.special)) picks.special = null;
+  const special = rows.filter((r) => tagsOfRow(r).some((t) => SPECIAL_TAGS.has(t)));
+  const of = `de tus ${rows.length.toLocaleString("es-ES")} discos`;
+  const nodes = [
+    special.length
+      ? pill(special.length === 1 ? `✨ 1 ${of} es una edición especial` : `✨ ${special.length.toLocaleString("es-ES")} ${of} son ediciones especiales`, "pink")
+      : pill("Ninguno es una edición especial: ni limitada, ni numerada, ni picture disc.", "pink"),
+  ];
+  if (tags.length) {
+    const chips = el("div", "stats-chips");
+    for (const [key, label] of tags) {
+      const chip = el("button", `stats-chip stats-chip--link stats-chip--accent${picks.special === key ? " active" : ""}`, label);
+      chip.type = "button";
+      chip.setAttribute("aria-expanded", String(picks.special === key));
+      chip.append(el("b", null, String(byTag.get(key).length)));
+      chip.addEventListener("click", () => {
+        picks.special = picks.special === key ? null : key;
+        rerender();
+      });
+      chips.append(chip);
+    }
+    nodes.push(chips);
+    if (picks.special) {
+      const [, label] = FORMAT_TAGS.find(([key]) => key === picks.special);
+      const list = byTag.get(picks.special);
+      nodes.push(coverStrip(list, onOpen, `${label} · ${plural(list.length, "disco", "discos")}`));
+    } else {
+      nodes.push(hint("Toca una para ver sus discos."));
+    }
+  } else {
+    nodes.push(note("Discogs no dice nada especial del formato de tus discos."));
+  }
+  // El que junta más cosas especiales (al menos dos).
+  const best = special
+    .map((r) => ({ r, all: tagsOfRow(r), n: tagsOfRow(r).filter((t) => SPECIAL_TAGS.has(t)).length }))
+    .sort((a, b) => b.n - a.n || b.all.length - a.all.length)[0];
+  if (best && best.n >= 2) {
+    const names = FORMAT_TAGS.filter(([key]) => best.all.includes(key)).map(([, , short]) => short);
+    nodes.push(factGrid([{ icon: "🏅", label: "El más especial", item: best.r.item, value: names.join(", ") }], onOpen));
+  }
+  nodes.push(
+    note(
+      "«Con carpeta» (gatefold): la funda se abre como un libro. «Picture disc»: el dibujo va impreso en el propio vinilo. " +
+        "«Promo»: copias para radios y prensa, que no se vendían."
+    )
+  );
+  return card(head, ...nodes);
+}
+
+// ---------- 🧩 Discografías ----------
+
+// «A», «A y B», «A, B y C», «A, B, C y 2 más».
+function listNames(names) {
+  if (names.length <= 1) return names.join("");
+  if (names.length > 3) return `${names.slice(0, 3).join(", ")} y ${names.length - 3} más`;
+  return `${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}`;
+}
+
+function discographyCard(items, token, rerender, onOpenAlbum, onArtist) {
+  const head = { icon: "🧩", title: "Discografías", sub: "Cuántos LP de estudio de tus artistas tienes", accent: "mint", nav: "discog" };
+  const names = discographyArtists(items);
+  if (!names.length) return card(head, note("Aún no hay artistas con ficha en tu colección."));
+  const rows = [];
+  for (const name of names) {
+    const entry = discographyOf(name);
+    const progress = entry && discographyProgress(entry, name, items);
+    if (progress) rows.push({ name, ...progress, pct: progress.have / progress.total });
+  }
+  const pending = names.filter((name) => !discTried.has(name) && !discographyOf(name)).length;
+  const waiting = token ? "⏳ Buscando las discografías de tus artistas…" : "Añade tu token de Discogs en Ajustes para ver las discografías.";
+  if (!rows.length) return card(head, pill(pending || !token ? waiting : "No encuentro las discografías de tus artistas.", "mint"));
+
+  rows.sort((a, b) => b.pct - a.pct || b.have - a.have || a.total - b.total);
+  if (picks.discog && !rows.some((r) => r.name === picks.discog)) picks.discog = null;
+  const nodes = [];
+  const complete = rows.filter((r) => !r.missing.length && !r.more);
+  // La que está a punto de completarse (le faltan como mucho 3 LP).
+  const close = rows
+    .filter((r) => r.have && r.missing.length && r.missing.length <= 3)
+    .sort((a, b) => a.missing.length - b.missing.length || b.pct - a.pct)[0];
+  if (complete.length) {
+    nodes.push(pill(`🏆 Tienes todos los LP de ${listNames(complete.map((r) => r.name))}`, "mint"));
+  } else if (rows[0].have && (!close || close.name !== rows[0].name)) {
+    nodes.push(pill(`🏆 Tu discografía más completa: ${rows[0].name} · ${rows[0].have} de ${rows[0].total} LP`, "mint"));
+  }
+  if (close) {
+    const left = close.missing.length === 1 ? "Te falta solo 1 LP" : `Te faltan solo ${close.missing.length} LP`;
+    nodes.push(pill(`🎯 ${left} de ${close.name} para tenerlos todos`, "mint"));
+  }
+
+  const list = el("div", "stats-bars");
+  for (const r of rows) {
+    const open = picks.discog === r.name;
+    const row = el("button", `stats-bar${open ? " active" : ""}`);
+    row.type = "button";
+    row.setAttribute("aria-expanded", String(open));
+    const track = el("span", "stats-bar-track");
+    const fill = el("span", "stats-bar-fill");
+    fill.style.width = `${Math.max(4, r.pct * 100)}%`;
+    track.append(fill);
+    const count = el("span", "stats-bar-count");
+    count.append(el("b", null, String(r.have)), ` de ${r.total}${r.more ? "+" : ""}`);
+    row.append(el("span", "stats-bar-name", `${!r.missing.length && !r.more ? "✅ " : ""}${r.name}`), track, count);
+    row.addEventListener("click", () => {
+      picks.discog = open ? null : r.name;
+      rerender();
+    });
+    list.append(row);
+    if (!open) continue;
+    let box;
+    if (r.missing.length) {
+      const label = `${r.missing.length === 1 ? "Te falta" : "Te faltan"} ${plural(r.missing.length, "LP", "LP")} · toca uno para abrirlo`;
+      box = coverStrip(r.missing, (album) => onOpenAlbum && onOpenAlbum(album, r.name), label);
+    } else {
+      box = el("div", "stats-pick");
+      box.append(el("p", "stats-pick-label", "🎉 Tienes todos sus LP de estudio"));
+    }
+    if (onArtist) {
+      const go = el("button", "secondary stats-artist-go", `🎤 Ver la ficha de ${r.name}`);
+      go.type = "button";
+      go.addEventListener("click", () => onArtist(r.name));
+      box.append(go);
+    }
+    list.append(box);
+  }
+  nodes.push(list);
+  if (!picks.discog) nodes.push(hint("Toca un artista para ver los LP que te faltan."));
+  if (pending && token) nodes.push(note(`🔄 Buscando la discografía de ${plural(pending, "artista más", "artistas más")}…`));
+  nodes.push(
+    note(
+      "Solo cuentan los LP de estudio (ni directos ni recopilatorios), según MusicBrainz o, si no conoce al artista, Discogs. " +
+        "Se miran tus artistas con más discos."
+    )
+  );
+  return card(head, ...nodes);
+}
+
+// ---------- ⭐ Lo que busco ----------
+
+const WANT_SHOWN = 8;
+
+function wantCard(token, rerender, onOpenAlbum, onWantlist) {
+  const head = { icon: "⭐", title: "Lo que busco", sub: "Lo que costaría conseguir los discos de tu lista", accent: "butter", nav: "want" };
+  const list = getWantlist();
+  if (!list.length) {
+    return card(head, note("Aún no buscas ningún disco. Apúntalos con ☆ en la discografía de un artista o en la ficha de un disco que no tienes."));
+  }
+  const rows = list.map((w) => {
+    const cheapest = cheapestOf(w);
+    const state = cheapest ? (cheapest.best ? "priced" : "unsold") : !w.masterId && w.masterChecked ? "missing" : "pending";
+    return { w, cheapest, state };
+  });
+  const priced = rows.filter((r) => r.state === "priced").sort((a, b) => a.cheapest.best.value - b.cheapest.best.value);
+  const totals = new Map();
+  for (const r of priced) {
+    const currency = r.cheapest.best.currency || "EUR";
+    totals.set(currency, (totals.get(currency) || 0) + Number(r.cheapest.best.value));
+  }
+  const nodes = [];
+  if (priced.length) {
+    const what = priced.length === list.length
+      ? `para conseguir ${list.length === 1 ? "el disco" : `los ${list.length} discos`} de tu lista`
+      : `para conseguir ${plural(priced.length, "disco", "discos")} de los ${list.length} de tu lista`;
+    nodes.push(el("p", "stats-big", [...totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ")), el("p", "stats-big-note", what));
+  } else {
+    nodes.push(el("p", "stats-big", "—"), el("p", "stats-big-note", plural(list.length, "disco en tu lista", "discos en tu lista")));
+  }
+
+  // Del más barato al más caro; luego los que aún se buscan, los que nadie vende y los que no salen en Discogs.
+  const order = [...priced, ...["pending", "unsold", "missing"].flatMap((state) => rows.filter((r) => r.state === state))];
+  const facts = (picks.wantAll ? order : order.slice(0, WANT_SHOWN)).map(({ w, cheapest, state }) => {
+    if (state === "priced") {
+      const b = cheapest.best;
+      const edition = [b.country ? `${countryFlag(b.country)} ${b.country}`.trim() : "", b.year].filter(Boolean).join(" · ");
+      return { icon: "🛒", label: "Desde", item: w, value: money(b.value, b.currency || "EUR"), detail: edition ? `Edición: ${edition}` : "" };
+    }
+    if (state === "unsold") return { icon: "🚫", label: "Nadie lo vende ahora", item: w, value: "—" };
+    if (state === "missing") return { icon: "❓", label: "No lo encuentro en Discogs", item: w, value: "—" };
+    return token ? { icon: "⏳", label: "Buscando su precio…", item: w, value: "…" } : { icon: "💶", label: "Sin precio", item: w, value: "—" };
+  });
+  nodes.push(factGrid(facts, (w) => onOpenAlbum && onOpenAlbum({ ...w }, w.artist)));
+  if (order.length > WANT_SHOWN) {
+    const more = el("button", "ghost stats-artist-all", picks.wantAll ? "Ver menos" : `Ver los ${order.length}`);
+    more.type = "button";
+    more.addEventListener("click", () => {
+      picks.wantAll = !picks.wantAll;
+      rerender();
+    });
+    nodes.push(more);
+  }
+  if (!token) nodes.push(note("Añade tu token de Discogs en Ajustes para ver los precios."));
+  nodes.push(note("Precio del vinilo más barato a la venta ahora entre sus ediciones más comunes, sin gastos de envío. Toca uno para abrir su ficha."));
+  if (onWantlist) {
+    const all = el("button", "ghost stats-artist-all", "⭐ Ver tu lista ›");
+    all.type = "button";
+    all.addEventListener("click", onWantlist);
+    nodes.push(all);
+  }
+  return card(head, ...nodes);
+}
+
 // Pinta la pestaña «Datos». onOpen(item) abre la ficha de un disco.
-export function renderStats(container, items, { discogsToken, onOpen, statusEl, onArtists, onArtist }) {
+// onOpenAlbum(album, artista) abre un álbum que no tienes (de lo que buscas o de una discografía);
+// onWantlist abre la lista de lo que buscas.
+export function renderStats(container, items, { discogsToken, onOpen, statusEl, onArtists, onArtist, onOpenAlbum, onWantlist }) {
   setStatsActive(true);
   const draw = () => {
     const data = compute(items, yearMode);
@@ -796,10 +1383,17 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl, 
       const pending = items.length - data.withData.length;
       if (pending) genreCard.append(note(`Faltan datos de ${plural(pending, "disco", "discos")}.`));
       nodes.push(genreCard);
+      // Qué géneros hay en cada década (por el año del álbum).
+      const decadeRows = data.withData
+        .filter((r) => r.original && r.s.genres.length)
+        .map((r) => ({ item: r.item, year: r.original, genres: r.s.genres }));
+      nodes.push(decadeGenreCard(decadeRows, genres, draw, onOpen));
     }
 
-    // ⏱️ Duración.
+    // ⏱️ Duración, 🎵 canciones récord y 🪡 la aguja.
     nodes.push(durationCard(lengths, items.length, onOpen));
+    nodes.push(songsCard(data, onOpen));
+    nodes.push(needleCard(data));
 
     // 📦 La pila: del más antiguo en tu colección (abajo) al último que añadiste (arriba).
     const pile = [...items]
@@ -810,6 +1404,9 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl, 
         return { item, grams: grams >= 80 && grams <= 300 ? grams : null, color: entry.cc ? entry.cc.hex : null };
       });
     nodes.push(stackCard(pile));
+
+    // 🎛️ Ediciones especiales.
+    nodes.push(specialCard(data, draw, onOpen));
 
     // 📅 Años y 🕰️ línea del tiempo.
     nodes.push(yearsCard(data, draw, onOpen));
@@ -872,6 +1469,10 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl, 
         nodes[nodes.length - 1].append(all);
       }
     }
+
+    // 🧩 Discografías de tus artistas y ⭐ lo que buscas.
+    nodes.push(discographyCard(items, discogsToken, draw, onOpenAlbum, onArtist));
+    nodes.push(wantCard(discogsToken, draw, onOpenAlbum, onWantlist));
 
     nodes.push(curiositiesCard(data, items, styles, onOpen));
     nodes.push(calendarCard(items));

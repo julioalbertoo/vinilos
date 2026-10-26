@@ -99,7 +99,8 @@ function showView(name) {
   if (name === "explored") renderExplored();
   if (name === "capture") updateExploredLink();
   if (name === "settings") renderQuota();
-  else setStatsActive(false);
+  // «Datos» sigue completándose solo mientras se ve «Mis discos» (renderCollection lo enciende si toca).
+  if (name !== "collection") setStatsActive(false);
   for (const view of VIEWS) {
     document.getElementById(`view-${view}`).classList.toggle("active", view === name);
   }
@@ -1119,7 +1120,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
     if (request === detailRequest) savedNote.textContent = alreadyOwned ? "💿 Esta edición ya está en tu colección" : "Otra edición del álbum · no está en tu colección";
   } else if (returnView === "explored") {
     if (request === detailRequest) savedNote.textContent = alreadyOwned ? "🧭 Explorado · 💿 Ya lo tienes en tu colección" : "🧭 Explorado · no está en tu colección";
-  } else if ((returnView === "artist" || returnView === "wantlist") && !alreadyOwned) {
+  } else if ((returnView === "artist" || returnView === "wantlist" || returnView === "collection") && !alreadyOwned) {
     if (request === detailRequest) savedNote.textContent = "Edición principal del álbum · no está en tu colección";
   } else if (fromHistory) {
     // Ya guardado: no se toca.
@@ -1788,6 +1789,9 @@ function renderCollection() {
       onOpen: (item) => openDetail(historyItemToCandidate(item), { returnView: "collection" }),
       onArtists: openArtistIndex,
       onArtist: (name) => openArtist({ name }),
+      // Álbumes que no tienes (de lo que buscas o de una discografía): se abren sin guardarse.
+      onOpenAlbum: (album, name) => openAlbum(album, name, "collection"),
+      onWantlist: openWantlist,
     });
     return;
   }

@@ -53,6 +53,16 @@ export function addWanted(entry) {
   save(items);
 }
 
+// Cambia campos de un álbum de la lista sin moverlo de sitio (p. ej. su álbum de Discogs, para el precio).
+export function updateWanted(artist, title, patch) {
+  const key = wantKey(artist, title);
+  const items = getWantlist();
+  const item = items.find((i) => wantKey(i.artist, i.title) === key);
+  if (!item) return;
+  Object.assign(item, patch);
+  save(items);
+}
+
 export function removeWanted(artist, title) {
   const key = wantKey(artist, title);
   save(getWantlist().filter((item) => wantKey(item.artist, item.title) !== key));

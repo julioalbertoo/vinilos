@@ -186,6 +186,44 @@ async function loadAlbums(entry, token, onProgress) {
   }
 }
 
+// ---------- Discografías para «Datos» ----------
+
+// Ficha guardada de un artista de tu colección, con su discografía completa. null si aún no se ha buscado.
+export function savedDiscography(name) {
+  const id = cache.ids[key(name)];
+  const entry = id && cache.artists[id];
+  return fresh(entry) && hasAlbums(entry) ? entry : null;
+}
+
+// Busca (y guarda) la ficha y la discografía de un artista de tu colección. null si Discogs no lo conoce.
+// Si la discografía no llega entera, lanza un error (se reintenta en otra visita).
+export async function ensureDiscography(name, items, token) {
+  const saved = savedDiscography(name);
+  if (saved) return saved;
+  const id = await resolveId(name, ownedBy(items, [name]), token);
+  if (!id) return null;
+  const entry = await loadArtist(id, token);
+  if (!hasAlbums(entry)) await loadAlbums(entry, token, () => {});
+  if (!hasAlbums(entry)) throw new Error("Discografía incompleta");
+  return entry;
+}
+
+// Cuántos LP de estudio del artista tienes. Devuelve { total, have, missing, more } o null si no tiene LP.
+// Sin tipos (discografía de Discogs sin clasificar), cuentan todos sus álbumes.
+export function discographyProgress(entry, name, items) {
+  const albums = entry.albums || [];
+  const typed = albums.length > 0 && albums.every((a) => a.kind);
+  const lps = typed ? albums.filter((a) => a.kind === "album") : albums;
+  if (!lps.length) return null;
+  const owned = ownedBy(items, [name, entry.artist ? entry.artist.name : ""]);
+  const ids = new Set(owned.map((item) => String(item.release_id)));
+  const titles = new Set(owned.map((item) => titleKey(item.title)));
+  const isOwned = (album) => (album.id && ids.has(String(album.id))) || titles.has(titleKey(album.title));
+  const missing = lps.filter((album) => !isOwned(album));
+  const more = Boolean(entry.more && (typed ? entry.more.album : Object.values(entry.more).some(Boolean)));
+  return { total: lps.length, have: lps.length - missing.length, missing, more };
+}
+
 // ---------- Lista de tus artistas ----------
 
 let indexSort = "count";

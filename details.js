@@ -188,6 +188,12 @@ function readCheapest() {
   }
 }
 
+// Lo ya guardado en el móvil para un álbum (si es de la última semana), sin preguntar a nadie. null si no hay.
+export function savedCheapest(masterId) {
+  const saved = masterId ? readCheapest()[masterId] : null;
+  return saved && saved.community && isFresh(saved.at, PRICES_MAX_AGE) ? saved : null;
+}
+
 // Devuelve { best, checked, total, versions, community, at } o null si se cortó (stop).
 export async function cachedCheapest(masterId, discogsToken, options = {}) {
   const all = readCheapest();
