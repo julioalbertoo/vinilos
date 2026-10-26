@@ -362,6 +362,7 @@ export async function getArtistAlbums(id, name, discogsToken, onProgress = () =>
   const albums = [];
   const more = {};
   const seen = new Set();
+  const toCheck = [];
   for (const [kind, format, maxPages] of KIND_SEARCHES) {
     for (let page = 1; page <= maxPages; page++) {
       const r = await discogsGet(
@@ -380,12 +381,17 @@ export async function getArtistAlbums(id, name, discogsToken, onProgress = () =>
         if (seen.has(x.id) || seen.has(same)) continue;
         seen.add(x.id);
         seen.add(same);
-        albums.push({ id: null, masterId: x.id, title, year: x.year ? String(x.year) : "", thumb: x.thumb || "", kind: k });
+        const album = { id: null, masterId: x.id, title, year: x.year ? String(x.year) : "", thumb: x.thumb || "", kind: k };
+        // El formato que da el buscador es solo el de la edición principal: un LP cuya edición
+        // principal es un CD («Punk In Drublic») queda en «otros» hasta mirar sus demás ediciones.
+        if (kind === "album" && k === "other") toCheck.push(album);
+        albums.push(album);
       }
       const pages = (r.pagination && r.pagination.pages) || 1;
       if (page >= pages) break;
       if (page === maxPages) more[kind] = true;
     }
+    if (kind === "album") await rescueVinylAlbums(toCheck, discogsToken);
     onProgress({ albums: sortByYear(albums), more, done: false });
   }
   if (!albums.length) {
@@ -396,6 +402,20 @@ export async function getArtistAlbums(id, name, discogsToken, onProgress = () =>
   const result = { albums: sortByYear(albums), more, done: true };
   onProgress(result);
   return result;
+}
+
+// Pasa a LP (o directo) los álbumes que tienen alguna edición en vinilo aunque la principal no lo sea.
+// Como mucho MAX_VINYL_CHECKS consultas por artista; si una falla, el disco se queda en «otros».
+const MAX_VINYL_CHECKS = 25;
+async function rescueVinylAlbums(list, discogsToken) {
+  for (const album of list.slice(0, MAX_VINYL_CHECKS)) {
+    try {
+      const r = await discogsGet(`/masters/${album.masterId}/versions`, { format: "Vinyl", per_page: "1" }, discogsToken);
+      if (r.pagination && r.pagination.items > 0) album.kind = isLiveTitle(album.title) ? "live" : "album";
+    } catch {
+      // se queda en «otros»
+    }
+  }
 }
 
 // Del más antiguo al más nuevo; los que no tienen año, al final.
