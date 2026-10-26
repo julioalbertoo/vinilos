@@ -23,6 +23,8 @@ export const CONFIG = {
     settingsTable: "settings",
     // Fichas de Discogs y sus precios, para no volver a pedirlos cada vez (details.js).
     detailsTable: "details",
+    // Otras respuestas de Discogs, MusicBrainz, TheAudioDB y Genius (artistas, ediciones, textos…).
+    cacheTable: "cache",
   },
   STORAGE_KEYS: {
     aiKey: "vinilos_ai_key",

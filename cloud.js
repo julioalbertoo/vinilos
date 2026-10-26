@@ -6,7 +6,7 @@ import { CONFIG } from "./config.js";
 import { getHistory, onHistoryChange, replaceHistory } from "./history.js";
 import { getTokenState, onTokensChange, applyTokenState } from "./tokens.js";
 
-const { url, publishableKey, schema, table, settingsTable, detailsTable } = CONFIG.SUPABASE;
+const { url, publishableKey, schema, table, settingsTable, detailsTable, cacheTable } = CONFIG.SUPABASE;
 const SYNCED_KEY = CONFIG.STORAGE_KEYS.cloudSynced;
 const PENDING_KEY = CONFIG.STORAGE_KEYS.cloudPendingDeletes;
 
@@ -294,6 +294,24 @@ export async function loadDetailSummaries() {
 export async function saveDetail(releaseId, fields) {
   if (!client || !user) return;
   const { error } = await client.from(detailsTable).upsert({ user_id: user.id, release_id: Number(releaseId), ...fields });
+  if (error) throw error;
+}
+
+// ---------- Otras respuestas guardadas (artistas, ediciones, textos del dato curioso…) ----------
+
+// kind: qué es ("artist", "versions"…); key: de cuál (un id o un nombre). Devuelve { data, at } o null.
+export async function loadCache(kind, key) {
+  if (!client || !user) return null;
+  const { data, error } = await client.from(cacheTable).select("data, at").eq("kind", kind).eq("key", String(key)).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function saveCache(kind, key, data) {
+  if (!client || !user) return;
+  const { error } = await client
+    .from(cacheTable)
+    .upsert({ user_id: user.id, kind, key: String(key), data, at: new Date().toISOString() });
   if (error) throw error;
 }
 

@@ -22,7 +22,7 @@ import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory, updateHistoryItem } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
-import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest, fillDurations, DURATIONS_CHECK } from "./details.js";
+import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest, fillDurations, DURATIONS_CHECK, cloudCached, WEEK_MS } from "./details.js";
 import { renderStats, setStatsActive, estimate, priceSource } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
@@ -1195,7 +1195,7 @@ async function openVersions(release) {
   window.scrollTo(0, 0);
   const request = ++versionsRequest;
   try {
-    entry.data = await vinylVersions(release.masterId, getDiscogsToken());
+    entry.data = await cloudCached("versions", release.masterId, WEEK_MS, () => vinylVersions(release.masterId, getDiscogsToken()));
   } catch (err) {
     entry.error = err;
   }

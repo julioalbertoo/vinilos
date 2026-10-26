@@ -1,9 +1,9 @@
 // Ficha del artista: su foto y biografía de Discogs, tus discos suyos y su discografía,
 // marcando los álbumes que ya tienes. También la lista de todos tus artistas.
-// Lo que llega de Discogs se guarda en el móvil 30 días para no volver a pedirlo.
+// Lo que llega de Discogs se guarda 30 días en el móvil y en la nube para no volver a pedirlo.
 import { CONFIG } from "./config.js";
 import { getArtist, getArtistAlbums, findArtistId } from "./discogs.js";
-import { cachedRelease } from "./details.js";
+import { cachedRelease, readCloud, writeCloud } from "./details.js";
 import { findMbArtist, mbDiscography } from "./musicbrainz.js";
 import { el, card, tile, note, pill, plural, segmented, coverStrip } from "./charts.js";
 import { isWanted, toggleWanted } from "./wantlist.js";
@@ -125,12 +125,21 @@ const hasAlbums = (entry) => entry && entry.albumsV === ALBUMS_VERSION && Array.
 async function loadArtist(id, token) {
   const saved = cache.artists[id];
   if (fresh(saved)) return saved;
+  // Luego, la guardada en la nube (desde este u otro móvil), con su discografía si la tiene.
+  const cloud = await readCloud("artist", id);
+  if (cloud && cloud.value && cloud.value.artist && fresh(cloud.value)) {
+    cache.artists[id] = cloud.value;
+    cache.ids[key(cloud.value.artist.name)] = id;
+    writeCache();
+    return cloud.value;
+  }
   try {
     const artist = await getArtist(id, token);
     const entry = { artist, at: new Date().toISOString() };
     cache.artists[id] = entry;
     cache.ids[key(artist.name)] = id;
     writeCache();
+    writeCloud("artist", id, entry);
     return entry;
   } catch (err) {
     if (saved) return saved; // mejor antigua que nada
@@ -168,6 +177,7 @@ async function loadAlbums(entry, token, onProgress) {
     delete entry.partial;
     Object.assign(entry, { albums: result.albums, more: result.more, source, albumsV: ALBUMS_VERSION });
     writeCache();
+    if (entry.artist && entry.artist.id) writeCloud("artist", entry.artist.id, entry);
   } catch {
     // Se enseña lo que haya llegado; la próxima vez se vuelve a intentar.
     const got = entry.partial ? entry.partial.albums : [];

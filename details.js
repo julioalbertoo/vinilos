@@ -5,7 +5,7 @@
 import { getRelease, getPrices, cheapestVinyl, borrowDurations, RELEASE_VERSION } from "./discogs.js";
 import { CONFIG } from "./config.js";
 import { mbTrackLengths, trackKey } from "./musicbrainz.js";
-import { loadDetail, saveDetail } from "./cloud.js";
+import { loadDetail, saveDetail, loadCache, saveCache } from "./cloud.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RELEASE_MAX_AGE = 30 * DAY_MS;
@@ -130,6 +130,53 @@ export async function cachedPrices(id, discogsToken) {
   }
 }
 
+// ---------- Otras respuestas guardadas en Supabase ----------
+
+export const MONTH_MS = RELEASE_MAX_AGE;
+export const WEEK_MS = PRICES_MAX_AGE;
+
+// Respuestas ya leídas en esta visita (también las que no se encontraron).
+const cacheRows = new Map();
+
+// Lee una respuesta guardada: { value, at } o null. Sin cuenta, sin red o si tarda, null.
+export async function readCloud(kind, key) {
+  const id = `${kind}|${key}`;
+  if (cacheRows.has(id)) return cacheRows.get(id);
+  let row = null;
+  try {
+    row = await withTimeout(loadCache(kind, key));
+  } catch {
+    row = null;
+  }
+  const entry = row && row.data ? { value: row.data.value, at: row.at } : null;
+  if (entry) cacheRows.set(id, entry);
+  return entry;
+}
+
+export function writeCloud(kind, key, value) {
+  cacheRows.set(`${kind}|${key}`, { value, at: new Date().toISOString() });
+  // Si no se puede guardar, la próxima vez se vuelve a preguntar: no pasa nada.
+  saveCache(kind, key, { value }).catch(() => {});
+}
+
+// Respuesta guardada si es reciente; si no, se pide con fetcher() y se guarda (también si no encontró
+// nada, para no volver a buscarlo). Si fetcher falla pero hay una guardada antigua, se usa esa.
+// valid(value): false para descartar guardadas de otra forma (p. ej. versiones antiguas).
+export async function cloudCached(kind, key, maxAge, fetcher, valid = () => true) {
+  if (key === undefined || key === null || key === "") return fetcher();
+  const saved = await readCloud(kind, key);
+  const usable = saved && valid(saved.value);
+  if (usable && isFresh(saved.at, maxAge)) return saved.value;
+  try {
+    const value = await fetcher();
+    writeCloud(kind, key, value === undefined ? null : value);
+    return value;
+  } catch (err) {
+    if (usable) return saved.value;
+    throw err;
+  }
+}
+
 // Vinilo más barato de un álbum (entre sus ediciones más comunes), guardado en el móvil 7 días.
 const CHEAPEST_KEY = CONFIG.STORAGE_KEYS.cheapestCache;
 
@@ -147,9 +194,15 @@ export async function cachedCheapest(masterId, discogsToken, options = {}) {
   const saved = all[masterId];
   // Los guardados antes de contar quién lo tiene/busca (sin community) se vuelven a pedir.
   if (saved && saved.community && isFresh(saved.at, PRICES_MAX_AGE)) return saved;
-  const result = await cheapestVinyl(masterId, discogsToken, options);
-  if (!result) return null;
-  const entry = { ...result, at: new Date().toISOString() };
+  // Luego, lo guardado en la nube (desde este u otro móvil).
+  const cloud = await readCloud("cheapest", masterId);
+  let entry = cloud && cloud.value && cloud.value.community && isFresh(cloud.value.at, PRICES_MAX_AGE) ? cloud.value : null;
+  if (!entry) {
+    const result = await cheapestVinyl(masterId, discogsToken, options);
+    if (!result) return null;
+    entry = { ...result, at: new Date().toISOString() };
+    writeCloud("cheapest", masterId, entry);
+  }
   const fresh = readCheapest();
   // Solo se guardan los álbumes de la última semana, para no llenar el móvil.
   for (const [key, value] of Object.entries(fresh)) if (!isFresh(value.at, PRICES_MAX_AGE)) delete fresh[key];

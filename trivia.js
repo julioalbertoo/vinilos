@@ -14,6 +14,7 @@ import { getArtist, masterMainNotes, getLabelProfile } from "./discogs.js";
 import { geniusSongStory } from "./genius.js";
 import { audioDbAlbum, audioDbArtist } from "./audiodb.js";
 import { mbAlbumAnnotation } from "./musicbrainz.js";
+import { cloudCached, MONTH_MS } from "./details.js";
 
 const SEEN_KEY = "vinilos_trivia_seen";
 const SEEN_PER_DISC = 10;
@@ -329,12 +330,12 @@ function documentPlans(release, { discogsToken, geniusToken }) {
   if (release.masterId) {
     // Notas de la edición principal del álbum (casi siempre la primera, la más documentada).
     albumPlans.push(async () => {
-      const main = await masterMainNotes(release.masterId, discogsToken, release.id);
+      const main = await cloudCached("mainNotes", `${release.masterId}|${release.id}`, MONTH_MS, () => masterMainNotes(release.masterId, discogsToken, release.id));
       return main && enough(main.text) && { name: `Discogs: notas de la edición original${main.where ? ` (${main.where})` : ""}`, url: main.url, text: main.text, topic: album };
     });
     // Nota del álbum en MusicBrainz (pocos la tienen, pero suele ser buena).
     albumPlans.push(async () => {
-      const note = await mbAlbumAnnotation(release.masterId);
+      const note = await cloudCached("mbAnnotation", release.masterId, MONTH_MS, () => mbAlbumAnnotation(release.masterId));
       return note && enough(note.text) && { name: `MusicBrainz: ${note.title || title}`, url: note.url, text: note.text, topic: album };
     });
   }
@@ -342,7 +343,7 @@ function documentPlans(release, { discogsToken, geniusToken }) {
   if (!isVarious) {
     // Reseña del álbum en TheAudioDB.
     albumPlans.push(async () => {
-      const found = await audioDbAlbum(artist, title);
+      const found = await cloudCached("audioDbAlbum", `${artist}|${title}`.toLowerCase(), MONTH_MS, () => audioDbAlbum(artist, title));
       return found && enough(found.text) && { name: `TheAudioDB: ${found.title}`, url: found.url, text: found.text, topic: album };
     });
   }
@@ -362,7 +363,7 @@ function documentPlans(release, { discogsToken, geniusToken }) {
   if (tracks.length && geniusToken && !isVarious) {
     const track = pick(tracks);
     albumPlans.push(async () => {
-      const story = await geniusSongStory(geniusToken, artist, track);
+      const story = await cloudCached("genius", `${artist}|${track}`.toLowerCase(), MONTH_MS, () => geniusSongStory(geniusToken, artist, track));
       return story && enough(story.text, 120) && { name: `Genius: ${story.title}`, url: story.url, text: story.text, topic: `la canción «${track}»` };
     });
   }
@@ -387,20 +388,20 @@ function documentPlans(release, { discogsToken, geniusToken }) {
       )
     );
     artistPlans.push(async () => {
-      const found = await audioDbArtist(artist);
+      const found = await cloudCached("audioDbArtist", artist.toLowerCase(), MONTH_MS, () => audioDbArtist(artist));
       return found && enough(found.text, 200) && { name: `TheAudioDB: ${found.title}`, url: found.url, text: found.text, topic: artistTopic, focus: title };
     });
   }
   if (mainArtist && mainArtist.id) {
     artistPlans.push(async () => {
-      const info = await getArtist(mainArtist.id, discogsToken);
+      const info = await cloudCached("artistInfo", mainArtist.id, MONTH_MS, () => getArtist(mainArtist.id, discogsToken));
       return enough(info.profile, 200) && { name: `Discogs: ${cleanArtist(info.name)}`, url: info.url, text: info.profile, topic: artistTopic, focus: title };
     });
   }
   const label = (release.labels || []).find((l) => l.id);
   if (label) {
     artistPlans.push(async () => {
-      const found = await getLabelProfile(label.id, discogsToken);
+      const found = await cloudCached("label", label.id, MONTH_MS, () => getLabelProfile(label.id, discogsToken));
       return found && enough(found.text, 200) && { name: `Discogs: sello ${cleanArtist(found.name)}`, url: found.url, text: found.text, topic: `el sello ${cleanArtist(found.name)}, que publicó esta edición` };
     });
   }
