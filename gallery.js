@@ -237,7 +237,7 @@ function renderSlide(item) {
 }
 
 // Formas de salir el disco de la funda (ver styles.css). Nunca la misma dos veces seguidas.
-const DISC_ANIMS = ["rebote", "giro", "salto", "asoma", "elastico", "lento"];
+const DISC_ANIMS = ["rebote", "giro", "salto", "asoma", "elastico", "lento", "tambaleo", "moneda", "latido", "cohete", "zigzag", "temblor"];
 let lastDiscAnim = "";
 
 function randomDiscAnim() {
