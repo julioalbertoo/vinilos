@@ -12,7 +12,7 @@ import { getWantlist, updateWanted, wantKey } from "./wantlist.js";
 import { savedDiscography, ensureDiscography, discographyProgress, hasArtistPage } from "./artist.js";
 import {
   el, card, tile, note, hint, pill, plural, level, legend, segmented, coverStrip, rankList, podium, factGrid, navBar,
-  genreVinylCard, decadeGenreCard, rainbowCard, coverColor, durationCard, timelineCard, mapCard, stackCard, splitBar, compareTo,
+  genreVinylCard, decadeTagCard, rainbowCard, coverColor, durationCard, timelineCard, mapCard, stackCard, splitBar, compareTo,
 } from "./charts.js";
 
 const CACHE_KEY = CONFIG.STORAGE_KEYS.statsCache;
@@ -1383,11 +1383,11 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl, 
       const pending = items.length - data.withData.length;
       if (pending) genreCard.append(note(`Faltan datos de ${plural(pending, "disco", "discos")}.`));
       nodes.push(genreCard);
-      // Qué géneros hay en cada década (por el año del álbum).
-      const decadeRows = data.withData
-        .filter((r) => r.original && r.s.genres.length)
-        .map((r) => ({ item: r.item, year: r.original, genres: r.s.genres }));
-      nodes.push(decadeGenreCard(decadeRows, genres, draw, onOpen));
+      // Qué géneros y qué estilos hay en cada década (por el año del álbum).
+      const byDecade = (key) =>
+        data.withData.filter((r) => r.original && r.s[key].length).map((r) => ({ item: r.item, year: r.original, tags: r.s[key] }));
+      nodes.push(decadeTagCard(byDecade("genres"), genres, draw, onOpen, "genres"));
+      if (styles.length) nodes.push(decadeTagCard(byDecade("styles"), styles, draw, onOpen, "styles"));
     }
 
     // ⏱️ Duración, 🎵 canciones récord y 🪡 la aguja.

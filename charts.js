@@ -389,34 +389,49 @@ export function genreVinylCard(genres, byGenre, records, rerender, onOpen) {
   );
 }
 
-// ---------- 1b. Géneros por década ----------
+// ---------- 1b. Géneros y estilos por década ----------
 
-let selectedDecade = null;
+// Década abierta en cada tarjeta (la de géneros y la de estilos van por separado).
+const selectedDecades = { genres: null, styles: null };
 
 // "los 70", "los 2000".
 const decadeWords = (decade) => `los ${decade < 2000 ? String(decade).slice(2) : decade}`;
 
-// rows: [{ item, year, genres }] de los discos con año del álbum y géneros.
-// genres: [[nombre, cuántos]] de toda la colección: mismo orden y colores que el vinilo de géneros.
-export function decadeGenreCard(rows, genres, rerender, onOpen) {
-  const head = { icon: "🎸", title: "Géneros por década", sub: "Lo que escuchas de cada época, según el año del álbum", accent: "lilac", nav: "genres" };
-  if (!rows.length) return card(head, note("Aún no se sabe el año y el género de tus discos."));
-  const colorOf = new Map(genres.slice(0, MAX_SLICES).map(([name], i) => [name, GENRE_COLORS[i]]));
-  const rank = new Map(genres.map(([name], i) => [name, i]));
+const DECADE_TEXTS = {
+  genres: {
+    icon: "🎸", title: "Géneros por década", sub: "Lo que escuchas de cada época, según el año del álbum",
+    one: "género", many: "géneros", what: "el género",
+  },
+  styles: {
+    icon: "🎼", title: "Estilos por década", sub: "Más al detalle: los estilos de cada época, según el año del álbum",
+    one: "estilo", many: "estilos", what: "los estilos",
+  },
+};
+
+// rows: [{ item, year, tags }] de los discos con año del álbum y algún género (o estilo).
+// tags: [[nombre, cuántos]] de toda la colección; los primeros llevan color (en los géneros, los mismos que el vinilo).
+// kind: "genres" o "styles".
+export function decadeTagCard(rows, tags, rerender, onOpen, kind = "genres") {
+  const text = DECADE_TEXTS[kind];
+  const head = { icon: text.icon, title: text.title, sub: text.sub, accent: "lilac", nav: "genres" };
+  if (!rows.length) return card(head, note(`Aún no se sabe el año y ${text.what} de tus discos.`));
+  const colorOf = new Map(tags.slice(0, MAX_SLICES).map(([name], i) => [name, GENRE_COLORS[i]]));
+  const rank = new Map(tags.map(([name], i) => [name, i]));
   const decades = new Map();
   for (const r of rows) {
     const decade = Math.floor(r.year / 10) * 10;
-    const d = decades.get(decade) || { items: [], genres: new Map(), bands: new Map() };
+    const d = decades.get(decade) || { items: [], tags: new Map(), bands: new Map() };
     d.items.push(r.item);
-    for (const g of r.genres) {
-      d.genres.set(g, (d.genres.get(g) || 0) + 1);
-      // Los géneros que no caben en el vinilo van juntos, en gris, como allí.
-      const band = colorOf.has(g) ? g : "Otros";
+    for (const tag of r.tags) {
+      d.tags.set(tag, (d.tags.get(tag) || 0) + 1);
+      // Los que no tienen color van juntos, en gris, como en el vinilo.
+      const band = colorOf.has(tag) ? tag : "Otros";
       d.bands.set(band, (d.bands.get(band) || 0) + 1);
     }
     decades.set(decade, d);
   }
-  if (selectedDecade !== null && !decades.has(selectedDecade)) selectedDecade = null;
+  let selected = selectedDecades[kind];
+  if (selected !== null && !decades.has(selected)) selected = selectedDecades[kind] = null;
   const peak = Math.max(...[...decades.values()].map((d) => d.items.length));
   const byCount = (map) => [...map.entries()].sort((a, b) => b[1] - a[1] || (rank.get(a[0]) ?? 99) - (rank.get(b[0]) ?? 99));
 
@@ -424,10 +439,10 @@ export function decadeGenreCard(rows, genres, rerender, onOpen) {
   const used = new Set();
   for (const decade of [...decades.keys()].sort((a, b) => a - b)) {
     const d = decades.get(decade);
-    const [topName, topCount] = byCount(d.genres)[0];
-    const row = el("button", `stats-decade${decade === selectedDecade ? " active" : ""}`);
+    const [topName, topCount] = byCount(d.tags)[0];
+    const row = el("button", `stats-decade${decade === selected ? " active" : ""}`);
     row.type = "button";
-    row.setAttribute("aria-expanded", String(decade === selectedDecade));
+    row.setAttribute("aria-expanded", String(decade === selected));
     const bar = el("span", "stats-decade-bar");
     bar.style.width = `${Math.max(8, (d.items.length / peak) * 100)}%`;
     for (const [band, count] of byCount(d.bands).sort((a, b) => (a[0] === "Otros") - (b[0] === "Otros"))) {
@@ -445,19 +460,19 @@ export function decadeGenreCard(rows, genres, rerender, onOpen) {
       el("span", "stats-decade-top", `${topName} · ${topCount} de ${plural(d.items.length, "disco", "discos")}`)
     );
     row.addEventListener("click", () => {
-      selectedDecade = selectedDecade === decade ? null : decade;
+      selectedDecades[kind] = selected === decade ? null : decade;
       rerender();
     });
     list.append(row);
-    if (decade === selectedDecade) {
-      const label = `${decadeWords(decade).replace(/^l/, "L")} · ${byCount(d.genres).slice(0, 4).map(([g, n]) => `${g} ${n}`).join(", ")}`;
+    if (decade === selected) {
+      const label = `${decadeWords(decade).replace(/^l/, "L")} · ${byCount(d.tags).slice(0, 4).map(([t, n]) => `${t} ${n}`).join(", ")}`;
       list.append(coverStrip(d.items, onOpen, label));
     }
   }
 
-  // Leyenda: los colores que salen, en el orden del vinilo.
+  // Leyenda: los colores que salen, en orden.
   const keys = el("div", "stats-decade-keys");
-  for (const [name] of [...genres.slice(0, MAX_SLICES), ["Otros"]]) {
+  for (const [name] of [...tags.slice(0, MAX_SLICES), ["Otros"]]) {
     if (!used.has(name)) continue;
     const key = el("span", "stats-decade-key");
     const dot = el("span", "stats-genre-dot");
@@ -467,13 +482,13 @@ export function decadeGenreCard(rows, genres, rerender, onOpen) {
   }
 
   const nodes = [keys, list];
-  if (selectedDecade === null) nodes.push(hint("Toca una década para ver sus discos."));
-  // La década con más géneros distintos.
+  if (selected === null) nodes.push(hint("Toca una década para ver sus discos."));
+  // La década con más géneros (o estilos) distintos.
   if (decades.size > 1) {
-    const [decade, d] = [...decades.entries()].sort((a, b) => b[1].genres.size - a[1].genres.size || b[1].items.length - a[1].items.length)[0];
-    if (d.genres.size >= 3) nodes.push(pill(`🔀 Tu década más variada: ${decadeWords(decade)} · ${plural(d.genres.size, "género", "géneros")}`, "lilac"));
+    const [decade, d] = [...decades.entries()].sort((a, b) => b[1].tags.size - a[1].tags.size || b[1].items.length - a[1].items.length)[0];
+    if (d.tags.size >= 3) nodes.push(pill(`🔀 Tu década más variada: ${decadeWords(decade)} · ${plural(d.tags.size, text.one, text.many)}`, "lilac"));
   }
-  nodes.push(note("Un disco con varios géneros cuenta en todos ellos."));
+  nodes.push(note(`Un disco con varios ${text.many} cuenta en todos ellos.`));
   return card(head, ...nodes);
 }
 
