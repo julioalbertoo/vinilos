@@ -34,6 +34,7 @@ export const CONFIG = {
     // Llave opcional de Genius (historias de canciones para el dato curioso).
     geniusToken: "vinilos_genius_token",
     history: "vinilos_history",
+    // Ya no se usa (el orden de «Mis discos» no se recuerda): se borra al abrir la app.
     collectionSort: "vinilos_collection_sort",
     // "1" = modo explorador (tema oscuro; lo que se identifica no se guarda en «Mis discos»).
     exploreMode: "vinilos_explore_mode",

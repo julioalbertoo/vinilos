@@ -1709,13 +1709,13 @@ function renderHistoryItem(item) {
 // «Mis discos» se abre en galería; el modo elegido se mantiene al volver de una ficha.
 let collectionMode = "gallery";
 
-// Orden de «Mis discos». "recent" es el del historial (último confirmado primero). Se recuerda en el móvil.
-const SORT_KEY = CONFIG.STORAGE_KEYS.collectionSort;
+// Orden de «Mis discos». "recent" es el del historial (último confirmado primero).
+// Al abrir la app siempre se empieza en «Recientes»; el orden elegido vale hasta cerrarla.
 let collectionSort = "recent";
 try {
-  collectionSort = localStorage.getItem(SORT_KEY) || "recent";
+  localStorage.removeItem(CONFIG.STORAGE_KEYS.collectionSort); // lo guardaban versiones anteriores
 } catch {
-  // Sin almacenamiento: se queda en «Recientes».
+  // Sin almacenamiento: no hay nada que borrar.
 }
 
 const collator = new Intl.Collator("es", { sensitivity: "base", numeric: true });
@@ -1815,11 +1815,6 @@ function initHistory() {
     const button = event.target.closest("button");
     if (!button || button.dataset.sort === collectionSort) return;
     collectionSort = button.dataset.sort;
-    try {
-      localStorage.setItem(SORT_KEY, collectionSort);
-    } catch {
-      // Si no se puede guardar, el orden vale hasta cerrar la app.
-    }
     renderCollection();
   });
   document.getElementById("history-clear").addEventListener("click", () => {
