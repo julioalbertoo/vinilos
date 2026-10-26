@@ -30,7 +30,7 @@ import { loadTrivia } from "./trivia.js";
 import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
 import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease } from "./wantlist.js";
 import { initAutoUpdate, currentVersion, latestVersion, reloadTo } from "./updater.js";
-import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady, hasSavedSession } from "./cloud.js";
+import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudWantlistChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady, hasSavedSession } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
   barcode: "por código de barras",
@@ -2215,6 +2215,12 @@ function initCloudSettings() {
   // Si la sincronización trae o quita discos, se repinta «Mis discos» si está a la vista.
   onCloudHistoryChanged(() => {
     if (document.getElementById("view-collection").classList.contains("active")) renderCollection();
+  });
+  // «Lo que busco» llegado de otro móvil: el enlace con el número, la lista y la tarjeta de «Datos».
+  onCloudWantlistChanged(() => {
+    updateWantlistLink();
+    if (activeView() === "wantlist") renderWantlist();
+    else if (activeView() === "collection") renderCollection();
   });
 
   sendButton.addEventListener("click", async () => {

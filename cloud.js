@@ -1,20 +1,24 @@
-// Copia en la nube de «Mis discos» y de las llaves de Gemini y Discogs (Supabase). Lo que usa la app sigue
-// saliendo del móvil (history.js, tokens.js); esto sube los cambios y, al entrar o al abrir la app, mezcla
-// lo de aquí con lo de allí.
+// Copia en la nube de «Mis discos», de «Lo que busco» y de las llaves de Gemini y Discogs (Supabase). Lo que usa
+// la app sigue saliendo del móvil (history.js, wantlist.js, tokens.js); esto sube los cambios y, al entrar o al
+// abrir la app, mezcla lo de aquí con lo de allí.
 // Si la librería no carga o no hay red, la app funciona igual que sin cuenta.
 import { CONFIG } from "./config.js";
 import { getHistory, onHistoryChange, replaceHistory } from "./history.js";
 import { getTokenState, onTokensChange, applyTokenState } from "./tokens.js";
+import { getWantlist, onWantlistChange, replaceWantlist, wantKey } from "./wantlist.js";
 
-const { url, publishableKey, schema, table, settingsTable, detailsTable, cacheTable } = CONFIG.SUPABASE;
+const { url, publishableKey, schema, table, settingsTable, detailsTable, cacheTable, wantlistTable } = CONFIG.SUPABASE;
 const SYNCED_KEY = CONFIG.STORAGE_KEYS.cloudSynced;
 const PENDING_KEY = CONFIG.STORAGE_KEYS.cloudPendingDeletes;
+const WANT_SYNCED_KEY = CONFIG.STORAGE_KEYS.cloudWantSynced;
+const WANT_PENDING_KEY = CONFIG.STORAGE_KEYS.cloudWantPendingDeletes;
 
 let client = null;
 let user = null;
 let syncing = null;
 const statusListeners = [];
 const changeListeners = [];
+const wantListeners = [];
 const tokenListeners = [];
 
 // ---------- Pequeñas listas guardadas en el móvil ----------
@@ -46,6 +50,11 @@ export function onCloudStatus(cb) {
 // cb() — cuando la sincronización cambia la lista de discos del móvil.
 export function onCloudHistoryChanged(cb) {
   changeListeners.push(cb);
+}
+
+// cb() — cuando la sincronización cambia «Lo que busco» en este móvil.
+export function onCloudWantlistChanged(cb) {
+  wantListeners.push(cb);
 }
 
 // cb() — cuando la sincronización trae llaves de la nube a este móvil.
@@ -145,6 +154,7 @@ export async function initCloud() {
   }
 
   onHistoryChange(pushChange);
+  onWantlistChange(pushWantChange);
   onTokensChange(pushTokens);
 
   client.auth.onAuthStateChange((event, session) => {
@@ -215,6 +225,8 @@ export async function signOut() {
   // Los discos se quedan en el móvil; solo se olvida qué había en la nube de esta cuenta.
   localStorage.removeItem(SYNCED_KEY);
   localStorage.removeItem(PENDING_KEY);
+  localStorage.removeItem(WANT_SYNCED_KEY);
+  localStorage.removeItem(WANT_PENDING_KEY);
 }
 
 function describeAuthError(error) {
@@ -269,6 +281,118 @@ async function pushChange(change) {
   } catch {
     setStatus("error", "☁️ Sin conexión con la nube: se subirá la próxima vez que abras la app.");
   }
+}
+
+// ---------- Lo que busco ----------
+
+function wantToRow(item) {
+  return {
+    user_id: user.id,
+    key: wantKey(item.artist, item.title),
+    artist: item.artist || "",
+    title: item.title || "",
+    year: String(item.year || ""),
+    thumb: item.thumb || "",
+    release_id: item.id ? Number(item.id) : null,
+    master_id: item.masterId ? Number(item.masterId) : null,
+    mbid: item.mbid || null,
+    master_checked: Boolean(item.masterChecked),
+    saved_at: item.date || new Date().toISOString(),
+  };
+}
+
+function wantFromRow(row) {
+  const item = {
+    artist: row.artist,
+    title: row.title,
+    year: row.year,
+    thumb: row.thumb,
+    id: row.release_id === null ? null : Number(row.release_id),
+    masterId: row.master_id === null ? null : Number(row.master_id),
+    mbid: row.mbid,
+    date: row.saved_at,
+  };
+  if (row.master_checked) item.masterChecked = true;
+  return item;
+}
+
+// Si un álbum está en los dos sitios, manda lo del móvil, pero se aprovecha lo que solo sepa la nube
+// (por ejemplo, su álbum de Discogs, ya buscado desde otro móvil).
+function mergeWanted(local, remote) {
+  const merged = { ...remote, ...local };
+  for (const field of ["year", "thumb", "id", "masterId", "mbid"]) {
+    if (!local[field] && remote[field]) merged[field] = remote[field];
+  }
+  if (remote.masterChecked && !merged.masterId) merged.masterChecked = true;
+  return merged;
+}
+
+async function pushWantChange(change) {
+  if (!client || !user) return;
+  const synced = readIds(WANT_SYNCED_KEY);
+  try {
+    if (change.type === "upsert") {
+      const row = wantToRow(change.item);
+      const { error } = await client.from(wantlistTable).upsert(row);
+      if (error) throw error;
+      synced.add(row.key);
+      writeIds(WANT_SYNCED_KEY, synced);
+    } else if (change.type === "remove" && change.keys.length) {
+      // Se apuntan antes de intentarlo: si falla, se reintenta en la próxima sincronización.
+      const pending = readIds(WANT_PENDING_KEY);
+      change.keys.forEach((key) => pending.add(key));
+      writeIds(WANT_PENDING_KEY, pending);
+      const { error } = await client.from(wantlistTable).delete().in("key", change.keys);
+      if (error) throw error;
+      change.keys.forEach((key) => {
+        pending.delete(key);
+        synced.delete(key);
+      });
+      writeIds(WANT_PENDING_KEY, pending);
+      writeIds(WANT_SYNCED_KEY, synced);
+    }
+    setStatus("ok", `☁️ Guardado en la nube · ${timeLabel()}`);
+  } catch {
+    setStatus("error", "☁️ Sin conexión con la nube: se subirá la próxima vez que abras la app.");
+  }
+}
+
+// Mezcla «Lo que busco» de aquí con el de la nube, con las mismas reglas que los discos.
+// Devuelve cuántos álbumes quedan.
+async function syncWantlist() {
+  const pending = readIds(WANT_PENDING_KEY);
+  if (pending.size) {
+    const { error } = await client.from(wantlistTable).delete().in("key", [...pending]);
+    if (error) throw error;
+    writeIds(WANT_PENDING_KEY, new Set());
+  }
+  const { data, error } = await client.from(wantlistTable).select("*");
+  if (error) throw error;
+  const remote = new Map(data.map((row) => [row.key, wantFromRow(row)]));
+
+  // Uno que está aquí, no está allí y ya se había subido → se quitó en otro móvil: también se quita aquí.
+  const synced = readIds(WANT_SYNCED_KEY);
+  const merged = [];
+  const seen = new Set();
+  for (const local of getWantlist()) {
+    const key = wantKey(local.artist, local.title);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (remote.has(key)) merged.push(mergeWanted(local, remote.get(key)));
+    else if (!synced.has(key)) merged.push(local);
+  }
+  for (const [key, item] of remote) if (!seen.has(key)) merged.push(item);
+  merged.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+
+  if (merged.length) {
+    const { error: upsertError } = await client.from(wantlistTable).upsert(merged.map(wantToRow));
+    if (upsertError) throw upsertError;
+  }
+  const before = JSON.stringify(getWantlist());
+  replaceWantlist(merged);
+  writeIds(WANT_SYNCED_KEY, new Set(merged.map((item) => wantKey(item.artist, item.title))));
+  if (JSON.stringify(merged) !== before) for (const cb of wantListeners) cb();
+  return merged.length;
 }
 
 // ---------- Fichas y precios guardados (los usa details.js) ----------
@@ -432,7 +556,15 @@ async function runSync() {
     writeIds(SYNCED_KEY, new Set(merged.map((item) => Number(item.release_id))));
     if (JSON.stringify(merged) !== before) for (const cb of changeListeners) cb();
 
-    setStatus("ok", `☁️ Sincronizado · ${merged.length} ${merged.length === 1 ? "disco" : "discos"} · ${timeLabel()}`);
+    // 5. «Lo que busco», aparte: si falla, los discos ya están sincronizados.
+    const discs = `${merged.length} ${merged.length === 1 ? "disco" : "discos"}`;
+    try {
+      const wanted = await syncWantlist();
+      const want = wanted ? ` y ${wanted} en lo que buscas` : "";
+      setStatus("ok", `☁️ Sincronizado · ${discs}${want} · ${timeLabel()}`);
+    } catch {
+      setStatus("error", `☁️ Sincronizado · ${discs}; «Lo que busco» no se pudo sincronizar ahora, se reintentará.`);
+    }
   } catch {
     setStatus("error", "☁️ No se pudo sincronizar ahora. Tus discos siguen en este móvil; se reintentará.");
   }
