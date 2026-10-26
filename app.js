@@ -29,6 +29,7 @@ import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { loadTrivia } from "./trivia.js";
 import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
 import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease } from "./wantlist.js";
+import { initAutoUpdate, currentVersion, latestVersion, reloadTo } from "./updater.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady } from "./cloud.js";
 
 const SEARCH_STEP_LABELS = {
@@ -2317,6 +2318,36 @@ function initCloudSettings() {
   });
 }
 
+// Recarga sola cuando hay versión nueva, pero solo si no hay nada a medias.
+function isSafeToReload() {
+  const active = document.querySelector(".view.active")?.id;
+  if (document.activeElement?.matches?.("input, textarea")) return false;
+  if (active === "view-collection" || active === "view-settings") return true;
+  return active === "view-capture"
+    && document.getElementById("capture-preview-wrap").hidden
+    && document.getElementById("scanner").hidden;
+}
+
+function initUpdates() {
+  initAutoUpdate(isSafeToReload);
+  const button = document.getElementById("settings-update");
+  const status = document.getElementById("settings-update-status");
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    status.textContent = "Buscando la última versión…";
+    let latest = currentVersion();
+    try {
+      latest = await latestVersion();
+      status.textContent = latest === currentVersion()
+        ? `✅ Ya tienes la última (v${latest}). Refrescando…`
+        : `⬆️ Actualizando a v${latest}…`;
+    } catch {
+      status.textContent = "No pude comprobarlo, pero refresco igualmente…";
+    }
+    setTimeout(() => reloadTo(latest), 600);
+  });
+}
+
 initTabbar();
 initTypingMode();
 populateGuideText();
@@ -2328,6 +2359,7 @@ initResults(resetCapture);
 initDetail();
 initHistory();
 initCloudSettings();
+initUpdates();
 if (cloudPinnedMessage) {
   showView("settings");
   setTimeout(() => document.getElementById("cloud-status").scrollIntoView({ block: "center" }), 0);
