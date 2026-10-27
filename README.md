@@ -48,6 +48,7 @@ Interruptor debajo de los botones de Identificar. Al activarlo:
 - La app se pone en **tema oscuro** (así sabes que está activo).
 - Lo que identificas **no se guarda** en tu colección; el botón pasa a ser **🧭 Explorar este**.
 - Queda apuntado en **🧭 Discos explorados** (solo en este móvil), con aviso de si ya lo tienes. Puedes quitar uno o borrar todo el historial.
+- Abajo del todo aparece una **🔎 barra de búsqueda** de artistas y álbumes: escribes un nombre (sin hacer foto) y tocas un artista para ver su ficha o un álbum para abrir su edición principal en vinilo (que también se apunta en explorados).
 
 Ejemplo: estás en una tienda de segunda mano, fotografías un disco y ves su precio y su edición sin llenar tu colección de discos que no son tuyos.
 

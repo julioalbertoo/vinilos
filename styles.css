@@ -595,7 +595,8 @@ input[type="text"]:focus {
 #view-capture.scanning .btn-row,
 #view-capture.scanning .preview-wrap,
 #view-capture.scanning .raw-json,
-#view-capture.scanning .explore-toggle {
+#view-capture.scanning .explore-toggle,
+#view-capture.scanning .explore-search {
   display: none !important;
 }
 
@@ -1841,6 +1842,38 @@ body.typing .tabbar {
 .explore-toggle input:focus-visible + .explore-track {
   outline: 3px solid #b9adff;
   outline-offset: 2px;
+}
+
+/* Barra de búsqueda del modo explorador, al final de «Identificar». */
+.explore-search {
+  margin-top: 20px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.explore-search-bar {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.explore-search-bar input {
+  flex: 1;
+  min-width: 0;
+}
+
+.view .explore-search-bar button {
+  width: auto;
+  margin: 0;
+  padding: 0 16px;
+  flex: 0 0 auto;
+}
+
+.explore-search-head {
+  margin: 18px 0 6px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--muted);
 }
 
 /* Colores fijos claros que el tema oscuro no cubre con los tokens. */

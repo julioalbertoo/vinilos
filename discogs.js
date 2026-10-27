@@ -580,6 +580,34 @@ export async function getLabelProfile(id, discogsToken) {
   return profile ? { name: l.name || "", text: profile, url: l.uri || `https://www.discogs.com/label/${id}` } : null;
 }
 
+// Búsqueda libre del modo explorador: artistas y álbumes (masters) que encajan con el texto.
+// artists: [{ id, name, thumb }]; albums: [{ masterId, title, artist, year, thumb }].
+export async function searchArtistsAndAlbums(text, discogsToken) {
+  const [a, m] = await Promise.all([
+    discogsGet("/database/search", { type: "artist", q: text, per_page: "5" }, discogsToken),
+    discogsGet("/database/search", { type: "master", q: text, per_page: "12" }, discogsToken),
+  ]);
+  const image = (r) => {
+    const url = r.cover_image || r.thumb || "";
+    return /spacer\.gif/.test(url) ? "" : url;
+  };
+  const clean = (t) => String(t || "").split(" = ")[0].replace(/\*/g, "").replace(/\s*\(\d+\)/g, "").trim();
+  const artists = (a.results || []).map((r) => ({ id: r.id, name: clean(r.title), thumb: image(r) }));
+  const albums = (m.results || [])
+    .filter((r) => !lowerWords(r.format).includes("unofficial release"))
+    .map((r) => {
+      const [artistPart, ...rest] = String(r.title || "").split(" - ");
+      return {
+        masterId: r.id,
+        title: clean(rest.length ? rest.join(" - ") : artistPart),
+        artist: rest.length ? clean(artistPart) : "",
+        year: r.year || "",
+        thumb: image(r),
+      };
+    });
+  return { artists, albums };
+}
+
 // Busca un artista por su nombre; devuelve su id o null. Primero el que se llama igual.
 export async function findArtistId(name, discogsToken) {
   const r = await discogsGet("/database/search", { type: "artist", q: name, per_page: "10" }, discogsToken);

@@ -18,7 +18,7 @@ import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify, geminiModels, probeModel } from "./ai.js";
 import { quotaReport, nextPacificMidnight } from "./quota.js";
-import { testDiscogsConnection, vinylVersions, findCandidates, searchByText, getMasterYear, masterMainRelease, popularVinylVersions, findAlbumRelease, bothYears, countryWithFlag, vinylColor, COLOR_REV, releaseWeight, releaseDiscs } from "./discogs.js";
+import { testDiscogsConnection, vinylVersions, findCandidates, searchByText, searchArtistsAndAlbums, getMasterYear, masterMainRelease, popularVinylVersions, findAlbumRelease, bothYears, countryWithFlag, vinylColor, COLOR_REV, releaseWeight, releaseDiscs } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -1106,13 +1106,14 @@ const BACK_LABELS = {
   wantlist: "← Volver a lo que busco",
   explored: "← Volver a explorados",
   versions: "← Volver a las ediciones",
+  capture: "← Volver a la búsqueda",
 };
 
 // returnView: pantalla a la que lleva "Volver". Desde «Mis discos» el disco ya está
 // guardado, así que no se vuelve a guardar; desde un artista, tampoco (si no lo tienes, no se guarda).
 // reopen: se vuelve a una ficha ya vista; no se guarda otra vez ni se mueve el scroll.
 async function openDetail(candidate, { returnView = "results", reopen = false } = {}) {
-  const fromHistory = returnView !== "results" || reopen;
+  const fromHistory = (returnView !== "results" && returnView !== "capture") || reopen;
   if (!reopen && activeView() !== "detail") {
     detailScroll = window.scrollY;
     pushNav();
@@ -1974,6 +1975,7 @@ function setExploreMode(on) {
   document.querySelector('meta[name="theme-color"]').content = on ? "#17141f" : "#fbf6f1";
   document.getElementById("explore-toggle").checked = on;
   document.getElementById("identify-title").textContent = on ? "¿Qué disco exploras?" : "¿Qué disco tienes?";
+  document.getElementById("explore-search").hidden = !on;
   updateExploredLink();
   try {
     if (on) localStorage.setItem(EXPLORE_KEY, "1");
@@ -1990,6 +1992,83 @@ function initExploreMode() {
   } catch {}
   setExploreMode(saved);
   document.getElementById("explore-toggle").addEventListener("change", (event) => setExploreMode(event.target.checked));
+}
+
+// Barra de búsqueda del modo explorador: artistas y álbumes por nombre, sin hacer foto.
+function initExploreSearch() {
+  const input = document.getElementById("explore-search-input");
+  const button = document.getElementById("explore-search-go");
+  const status = document.getElementById("explore-search-status");
+  const box = document.getElementById("explore-search-results");
+  let run = 0;
+
+  function row(thumb, title, meta, onClick) {
+    const line = el("div", "artist-album-line");
+    const btn = el("button", "artist-album");
+    btn.type = "button";
+    const img = el(thumb ? "img" : "span", "artist-album-cover");
+    if (thumb) {
+      img.src = thumb;
+      img.alt = "";
+      img.loading = "lazy";
+      img.addEventListener("error", () => img.replaceWith(el("span", "artist-album-cover", "💿")), { once: true });
+    } else {
+      img.textContent = "💿";
+    }
+    const text = el("span", "artist-album-text");
+    text.append(el("span", "artist-album-title", title));
+    if (meta) text.append(el("span", "artist-album-year", meta));
+    btn.append(img, text, el("span", "artist-row-go", "›"));
+    btn.addEventListener("click", onClick);
+    line.append(btn);
+    return line;
+  }
+
+  async function search() {
+    const text = input.value.trim();
+    if (!text) return;
+    const mine = ++run;
+    input.blur();
+    button.disabled = true;
+    status.textContent = "Buscando en Discogs...";
+    box.replaceChildren();
+    try {
+      const { artists, albums } = await searchArtistsAndAlbums(text, getDiscogsToken());
+      if (mine !== run) return;
+      if (!artists.length && !albums.length) {
+        status.textContent = `❌ No hay resultados para «${text}». Prueba con menos palabras.`;
+        return;
+      }
+      status.textContent = "";
+      const nodes = [];
+      const people = artists.filter((a) => hasArtistPage(a.name));
+      if (people.length) {
+        nodes.push(el("p", "explore-search-head", "🎤 Artistas"));
+        const list = el("div", "artist-albums");
+        for (const a of people) list.append(row(a.thumb, a.name, "", () => openArtist({ name: a.name, id: a.id })));
+        nodes.push(list);
+      }
+      if (albums.length) {
+        nodes.push(el("p", "explore-search-head", "💿 Álbumes"));
+        const list = el("div", "artist-albums");
+        for (const album of albums) {
+          const meta = [album.artist, album.year].filter(Boolean).join(" · ");
+          list.append(row(album.thumb, album.title, meta, () => openAlbum({ ...album }, album.artist, "capture")));
+        }
+        nodes.push(list);
+      }
+      box.replaceChildren(...nodes);
+    } catch (err) {
+      if (mine === run) showError(status, err.message, err.authError);
+    } finally {
+      if (mine === run) button.disabled = false;
+    }
+  }
+
+  button.addEventListener("click", search);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") search();
+  });
 }
 
 function initCapture() {
@@ -2424,6 +2503,7 @@ populateGuideText();
 initGuideNavigation();
 initSettings();
 initExploreMode();
+initExploreSearch();
 const resetCapture = initCapture();
 initResults(resetCapture);
 initDetail();
