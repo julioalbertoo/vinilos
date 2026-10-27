@@ -3232,6 +3232,28 @@ button.detail-artist-link:active {
   background: var(--peach);
 }
 
+/* «☆ Lo busco» junto al artista, en la ficha de un disco que no tienes. */
+button.detail-want-top {
+  display: inline-flex;
+  width: auto;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 14px;
+  background: var(--line);
+  color: var(--text);
+  box-shadow: none;
+  font-size: 0.92rem;
+}
+
+button.detail-want-top.is-on {
+  background: var(--butter);
+  color: var(--butter-text);
+}
+
+button.detail-want-top:active {
+  background: var(--line);
+}
+
 .detail-artist-name {
   overflow: hidden;
   white-space: nowrap;

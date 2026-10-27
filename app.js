@@ -1334,10 +1334,27 @@ function showWantButton(release) {
     masterId: release.masterId,
   };
   if (!entry.artist || !entry.title) return;
+  // Además del botón del final, una estrella arriba, junto al artista, para no tener que bajar.
+  document.getElementById("detail-want-top")?.remove();
+  const top = el("button", "detail-want-top");
+  top.type = "button";
+  top.id = "detail-want-top";
+  const content = document.getElementById("detail-content");
+  const row = content.querySelector(".detail-artists");
+  if (row) row.append(top);
+  else {
+    const own = el("div", "detail-artists");
+    own.append(top);
+    content.querySelector("h2")?.after(own);
+  }
   const paint = () => {
-    button.textContent = isWanted(entry.artist, entry.title) ? "★ En lo que busco · quitar" : "☆ Añadir a lo que busco";
+    const on = isWanted(entry.artist, entry.title);
+    button.textContent = on ? "★ En lo que busco · quitar" : "☆ Añadir a lo que busco";
+    top.textContent = on ? "★ Lo busco" : "☆ Lo busco";
+    top.classList.toggle("is-on", on);
+    top.setAttribute("aria-label", on ? "Quitar de lo que busco" : "Añadir a lo que busco");
   };
-  button.onclick = () => {
+  button.onclick = top.onclick = () => {
     toggleWanted(entry);
     paint();
   };
