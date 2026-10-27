@@ -15,7 +15,11 @@ function interpretStatus(status) {
   return `Discogs respondió con un error inesperado (código ${status}).`;
 }
 
-async function discogsGet(path, params, discogsToken) {
+// Pausas antes de reintentar cuando la petición ni llega a Discogs (corte de red o Discogs saturado:
+// si se pasa del límite, a veces responde sin el permiso del navegador y parece un fallo de conexión).
+const RETRY_WAITS_MS = [3000, 8000];
+
+async function discogsGet(path, params, discogsToken, attempt = 0) {
   // Turno en la cola: si hay varias consultas a la vez, salen de una en una con su pausa.
   const turn = queue.then(() => {
     const wait = lastRequestAt + MIN_GAP_MS - Date.now();
@@ -33,7 +37,11 @@ async function discogsGet(path, params, discogsToken) {
       headers: { Authorization: `Discogs token=${discogsToken}` },
     });
   } catch {
-    throw new Error("No se pudo contactar con Discogs. Comprueba tu conexión a internet.");
+    if (attempt < RETRY_WAITS_MS.length) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_WAITS_MS[attempt]));
+      return discogsGet(path, params, discogsToken, attempt + 1);
+    }
+    throw new Error("No se pudo contactar con Discogs: o no hay conexión o Discogs está saturado por tantas consultas. Espera un minuto y vuelve a probar.");
   }
   if (!response.ok) {
     const error = new Error(interpretStatus(response.status));
