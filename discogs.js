@@ -365,8 +365,10 @@ async function artistReleaseList(id, discogsToken) {
 // Se pregunta al buscador de Discogs por cada tipo; así salen todos sus álbumes aunque tenga miles de ediciones.
 // onProgress({ albums, more, done }) se llama al terminar cada tipo, para enseñar los LP cuanto antes.
 // more: { tipo: true } si hay más de los que se han traído.
+// name: el nombre tal cual en Discogs, con su número si lo tiene («The Prodigy (2)» es otro grupo).
 export async function getArtistAlbums(id, name, discogsToken, onProgress = () => {}) {
-  const wanted = name.toLowerCase().replace(/\*/g, "").trim();
+  const isMine = artistMatcher(name);
+  name = name.replace(/\s*\(\d+\)/g, "").replace(/\*/g, "").trim();
   const albums = [];
   const more = {};
   const seen = new Set();
@@ -379,10 +381,10 @@ export async function getArtistAlbums(id, name, discogsToken, onProgress = () =>
         discogsToken
       );
       for (const x of r.results || []) {
-        const { artist, title } = splitSearchTitle(x.title);
+        const { title } = splitSearchTitle(x.title);
         // El buscador también trae otros artistas con nombre parecido ("The Beatles Revival Band"):
         // solo valen los suyos, o los que comparte con «&» ("Lou Reed & John Cale").
-        if (artist !== wanted && !artist.split(/\s+&\s+/).includes(wanted)) continue;
+        if (!isMine(String(x.title || "").split(" - ")[0])) continue;
         const k = searchKind(kind, x.format, title);
         // Un mismo título solo una vez por tipo (hay singles con varios masters casi iguales).
         const same = `${k}|${title.toLowerCase()}`;
@@ -410,6 +412,20 @@ export async function getArtistAlbums(id, name, discogsToken, onProgress = () =>
   const result = { albums: sortByYear(albums), more, done: true };
   onProgress(result);
   return result;
+}
+
+// ¿Es del artista `name` el disco firmado como `credit` («Prodigy* & Otro»)? Sin asterisco tiene que ser
+// el mismo nombre, número incluido («The Prodigy (2)» es otro grupo). Con asterisco es una variante del
+// nombre («Prodigy*» en «The Fat Of The Land»): vale si coincide sin el número ni el «The».
+function artistMatcher(name) {
+  const lower = (t) => String(t || "").toLowerCase().trim();
+  const base = (t) => lower(t).replace(/\*/g, "").replace(/\s*\(\d+\)/g, "").replace(/^the\s+/, "").trim();
+  const full = lower(name).replace(/\*/g, "");
+  return (credit) =>
+    String(credit || "")
+      .split(/\s+&\s+/)
+      .map((piece) => piece.split(" = ")[0].trim())
+      .some((piece) => (piece.endsWith("*") ? base(piece) === base(name) : lower(piece) === full));
 }
 
 // Pasa a LP (o directo) los álbumes que tienen alguna edición en vinilo aunque la principal no lo sea.

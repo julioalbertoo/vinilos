@@ -11,8 +11,9 @@ import { isWanted, toggleWanted } from "./wantlist.js";
 const CACHE_KEY = CONFIG.STORAGE_KEYS.artistCache;
 const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const ALBUMS_SHOWN = 12;
-// Sube cuando la discografía guardada cambia de forma (7: los piratas, aparte).
-const ALBUMS_VERSION = 8;
+// Sube cuando la discografía guardada cambia de forma (7: los piratas, aparte;
+// 9: en Discogs, los firmados con variante del nombre y sin los de otro artista con el mismo nombre).
+const ALBUMS_VERSION = 9;
 
 // Filtros de la discografía, en este orden. Por defecto, solo los LP.
 const KINDS = [
@@ -172,7 +173,7 @@ async function loadAlbums(entry, token, onProgress) {
     }
     if (!result) {
       delete entry.partial;
-      result = await getArtistAlbums(entry.artist.id, cleanName(entry.artist.name), token, progress);
+      result = await getArtistAlbums(entry.artist.id, entry.artist.name, token, progress);
     }
     delete entry.partial;
     Object.assign(entry, { albums: result.albums, more: result.more, source, albumsV: ALBUMS_VERSION });
