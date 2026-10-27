@@ -1650,26 +1650,71 @@ function albumCandidate(album, artistName) {
   };
 }
 
+// Edición principal ya buscada de cada álbum (por master o por artista y título), para abrirlo al momento la próxima vez.
+const resolvedAlbums = new Map();
+let albumRun = 0;
+
+// Ficha provisional mientras se busca la edición del álbum: se abre al momento con su portada y un aviso.
+function showAlbumLoading(album, name, returnView) {
+  detailScroll = window.scrollY;
+  pushNav();
+  lastDetail = null;
+  detailReturnView = returnView;
+  document.getElementById("detail-back").textContent = BACK_LABELS[returnView];
+  document.getElementById("detail-saved").textContent = "";
+  for (const id of ["detail-delete", "detail-want", "detail-versions"]) document.getElementById(id).hidden = true;
+  renderDetail({
+    artist: name || "",
+    artists: [],
+    title: album.title,
+    year: album.year,
+    country: "",
+    labels: [],
+    formats: [],
+    image: album.thumb,
+    tracklist: [],
+    url: "",
+  });
+  const content = document.getElementById("detail-content");
+  // Sin artista ni año todavía: solo portada, título y el aviso.
+  content.querySelectorAll(".detail-artists, .detail-meta").forEach((node) => node.remove());
+  content.append(el("p", "status loading", "Buscando su edición en vinilo en Discogs..."));
+  showView("detail");
+  window.scrollTo(0, 0);
+}
+
 // Un álbum de la discografía: si solo se sabe su master, se busca antes su edición principal.
 async function openAlbum(album, name, returnView = "artist") {
   // Con master se busca siempre su edición principal en vinilo (la que da Discogs puede ser un CD o digital).
   if (!album.resolved && (album.masterId || (!album.id && album.mbid))) {
-    const fallback = album.id;
-    try {
-      // Los de MusicBrainz no tienen id de Discogs: se busca por artista y título.
-      album.id = album.masterId
-        ? await masterMainRelease(album.masterId, getDiscogsToken())
-        : await findAlbumRelease(name, album.title, getDiscogsToken());
-      album.id = album.id || fallback;
-      album.resolved = Boolean(album.id);
-      if (!album.id) {
-        window.alert(`No encuentro «${album.title}» en Discogs.`);
-        return;
+    const key = album.masterId ? `m${album.masterId}` : `t${name}|${album.title}`.toLowerCase();
+    if (resolvedAlbums.has(key)) {
+      album.id = resolvedAlbums.get(key);
+      album.resolved = true;
+    } else {
+      const run = ++albumRun;
+      const fallback = album.id;
+      showAlbumLoading(album, name, returnView);
+      // Si mientras tanto se ha vuelto atrás o se ha abierto otra cosa, no se hace nada más.
+      const stillHere = () => run === albumRun && activeView() === "detail" && !lastDetail;
+      let failure = "";
+      try {
+        // Los de MusicBrainz no tienen id de Discogs: se busca por artista y título.
+        album.id = album.masterId
+          ? await masterMainRelease(album.masterId, getDiscogsToken())
+          : await findAlbumRelease(name, album.title, getDiscogsToken());
+        if (album.id) resolvedAlbums.set(key, album.id);
+        album.id = album.id || fallback;
+        album.resolved = Boolean(album.id);
+        if (!album.id) failure = `No encuentro «${album.title}» en Discogs.`;
+      } catch (err) {
+        album.id = fallback;
+        if (!album.id) failure = `No se pudo abrir el álbum: ${err.message}`;
       }
-    } catch (err) {
-      album.id = fallback;
-      if (!album.id) {
-        window.alert(`No se pudo abrir el álbum: ${err.message}`);
+      if (!stillHere()) return;
+      if (failure) {
+        window.alert(failure);
+        navBack();
         return;
       }
     }
