@@ -28,6 +28,7 @@ import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest, fillDurat
 import { renderStats, setStatsActive, estimate, priceSource, fillWantPrices, wantPrice, money } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
+import { mbDiscogsMaster } from "./musicbrainz.js";
 import { loadTrivia } from "./trivia.js";
 import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
 import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease } from "./wantlist.js";
@@ -1759,7 +1760,16 @@ async function openAlbum(album, name, returnView = "artist") {
       const stillHere = () => run === albumRun && activeView() === "detail" && !lastDetail;
       let failure = "";
       try {
-        // Los de MusicBrainz no tienen id de Discogs: se busca por artista y título.
+        // Los de MusicBrainz no tienen id de Discogs: primero su enlace a Discogs (si MusicBrainz lo tiene)
+        // y si no, se busca por artista y título (que falla si Discogs lo llama distinto: «El patio» es «Triana»).
+        if (!album.masterId && album.mbid) {
+          try {
+            const masterId = await mbDiscogsMaster(album.mbid);
+            if (masterId) album.masterId = masterId;
+          } catch {
+            // Se busca por título.
+          }
+        }
         album.id = album.masterId
           ? await masterMainRelease(album.masterId, getDiscogsToken())
           : await findAlbumRelease(name, album.title, getDiscogsToken());

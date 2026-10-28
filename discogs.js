@@ -506,7 +506,10 @@ function bestMaster(results, title, strict) {
   const official = results.filter((r) => !lowerWords(r.format).includes("unofficial release"));
   const titleOf = (r) => splitSearchTitle(r.title).title;
   const same = official.filter((r) => norm(titleOf(r)) === wanted);
-  const similar = official.filter((r) => norm(shortAlbumTitle(titleOf(r))) === wantedShort);
+  // Por la parte corta del título no valen los recopilatorios: «El Patio / Hijos Del Agobio» no es «El patio».
+  const similar = official.filter(
+    (r) => norm(shortAlbumTitle(titleOf(r))) === wantedShort && !lowerWords(r.format).includes("compilation")
+  );
   const pool = same.length ? same : similar.length ? similar : strict ? [] : official.length ? official : results;
   const have = (r) => r.community?.have || 0;
   return pool.reduce((best, r) => (!best || have(r) > have(best) ? r : best), null);
