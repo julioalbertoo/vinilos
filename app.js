@@ -1388,6 +1388,23 @@ function renderWantlist() {
     return;
   }
   nodes.push(el("p", "wantlist-sub", `${items.length} ${items.length === 1 ? "disco" : "discos"} · al guardarlo en tus discos sale solo de aquí`));
+  // Suma del vinilo más barato de cada uno (los que ya tienen precio).
+  const totals = new Map();
+  let priced = 0;
+  for (const item of items) {
+    const price = wantPrice(item);
+    if (!price || price.unsold) continue;
+    priced += 1;
+    totals.set(price.currency, (totals.get(price.currency) || 0) + Number(price.value));
+  }
+  if (priced) {
+    const total = el("div", "wantlist-total");
+    total.append(
+      el("span", "wantlist-total-value", [...totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ")),
+      el("span", "wantlist-total-note", priced === items.length ? `para conseguir los ${items.length}` : `para conseguir ${priced} de los ${items.length} (los que tienen precio)`)
+    );
+    nodes.push(total);
+  }
   const progress = el("p", "wantlist-progress", wantProgress);
   progress.id = "wantlist-progress";
   progress.hidden = !wantProgress;

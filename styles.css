@@ -3463,6 +3463,25 @@ button.artist-album.is-owned {
   font-weight: 700;
 }
 
+.wantlist-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.wantlist-total-value {
+  color: var(--accent-text);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.wantlist-total-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .wantlist-progress {
   color: var(--accent-text);
   font-size: 0.85rem;
