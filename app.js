@@ -1381,14 +1381,14 @@ function wantlistBack() {
 function renderWantlist() {
   const items = getWantlist();
   const box = document.getElementById("wantlist-content");
-  const nodes = [el("h2", null, "⭐ Lo que busco")];
+  const title = el("h2", null, "⭐ Lo que busco");
+  const nodes = [title];
   if (!items.length) {
     nodes.push(el("p", "wantlist-empty", "Aún no buscas ningún disco. En la discografía de un artista, toca ☆ junto a un álbum que no tengas para apuntarlo aquí."));
     box.replaceChildren(...nodes);
     return;
   }
-  nodes.push(el("p", "wantlist-sub", `${items.length} ${items.length === 1 ? "disco" : "discos"} · al guardarlo en tus discos sale solo de aquí`));
-  // Suma del vinilo más barato de cada uno (los que ya tienen precio).
+  // Suma del vinilo más barato de cada uno (los que ya tienen precio), al lado del título.
   const totals = new Map();
   let priced = 0;
   for (const item of items) {
@@ -1398,13 +1398,13 @@ function renderWantlist() {
     totals.set(price.currency, (totals.get(price.currency) || 0) + Number(price.value));
   }
   if (priced) {
-    const total = el("div", "wantlist-total");
-    total.append(
-      el("span", "wantlist-total-value", [...totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ")),
-      el("span", "wantlist-total-note", priced === items.length ? `para conseguir los ${items.length}` : `para conseguir ${priced} de los ${items.length} (los que tienen precio)`)
-    );
-    nodes.push(total);
+    const head = el("div", "wantlist-head");
+    head.append(title, el("span", "wantlist-total", [...totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ")));
+    nodes[0] = head;
   }
+  const count = `${items.length} ${items.length === 1 ? "disco" : "discos"}`;
+  const pricedNote = priced && priced < items.length ? ` · total de ${priced === 1 ? "1" : `los ${priced}`} con precio` : "";
+  nodes.push(el("p", "wantlist-sub", `${count}${pricedNote} · al guardarlo en tus discos sale solo de aquí`));
   const progress = el("p", "wantlist-progress", wantProgress);
   progress.id = "wantlist-progress";
   progress.hidden = !wantProgress;
