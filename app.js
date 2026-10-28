@@ -1388,6 +1388,10 @@ function renderWantlist() {
     return;
   }
   nodes.push(el("p", "wantlist-sub", `${items.length} ${items.length === 1 ? "disco" : "discos"} · al guardarlo en tus discos sale solo de aquí`));
+  const progress = el("p", "wantlist-progress", wantProgress);
+  progress.id = "wantlist-progress";
+  progress.hidden = !wantProgress;
+  nodes.push(progress);
   const list = el("div", "artist-albums");
   for (const item of items) {
     const line = el("div", "artist-album-line");
@@ -1422,26 +1426,40 @@ function renderWantlist() {
   const { discogsToken } = getTokenState();
   if (discogsToken) nodes.push(el("p", "wantlist-note", "Precio del vinilo más barato a la venta ahora entre sus ediciones más comunes, sin envío."));
   box.replaceChildren(...nodes);
-  fillWantlistPrices();
+  // Después de que showView marque la lista como visible (si no, la búsqueda se cortaría al empezar).
+  setTimeout(fillWantlistPrices, 0);
 }
 
 // Mientras se ve la lista, busca en segundo plano los precios que faltan (los ya buscados están guardados 7 días).
 let fillingWantPrices = false;
+let wantProgress = ""; // «🔄 Buscando precios… 3 de 30» mientras se busca; vacío si no
+
+function setWantProgress(text) {
+  wantProgress = text;
+  const line = document.getElementById("wantlist-progress");
+  if (!line) return;
+  line.textContent = text;
+  line.hidden = !text;
+}
+
 async function fillWantlistPrices() {
   const { discogsToken } = getTokenState();
   if (fillingWantPrices || !discogsToken) return;
   fillingWantPrices = true;
+  let ok = true;
   try {
-    await fillWantPrices(discogsToken, {
+    ok = await fillWantPrices(discogsToken, {
       isActive: () => activeView() === "wantlist",
       onUpdate: () => {
         if (activeView() === "wantlist") renderWantlist();
       },
+      onStatus: (_text, { current, total }) => setWantProgress(`🔄 Buscando precios… ${current} de ${total}`),
     });
   } catch {
     // Sin red: se vuelve a intentar la próxima vez que se abra la lista.
   } finally {
     fillingWantPrices = false;
+    setWantProgress(ok ? "" : "❌ El token de Discogs no es válido: revisa tus llaves en Ajustes.");
   }
 }
 

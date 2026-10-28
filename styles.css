@@ -3463,6 +3463,13 @@ button.artist-album.is-owned {
   font-weight: 700;
 }
 
+.wantlist-progress {
+  color: var(--accent-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0.25rem 0 0.5rem;
+}
+
 .wantlist-note {
   color: var(--muted);
   font-size: 0.8rem;

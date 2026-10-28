@@ -274,7 +274,7 @@ async function findWantedMaster(w, token) {
 }
 
 // Busca, uno a uno, el precio de los álbumes de tu lista que aún no lo tienen.
-// isActive() false corta la búsqueda; onUpdate() repinta; onStatus(texto) cuenta por dónde va.
+// isActive() false corta la búsqueda; onUpdate() repinta; onStatus(texto, { current, total }) cuenta por dónde va.
 // Devuelve false si la llave de Discogs no vale.
 export async function fillWantPrices(token, { isActive, onUpdate, onStatus = () => {} }) {
   while (isActive() && token) {
@@ -283,7 +283,10 @@ export async function fillWantPrices(token, { isActive, onUpdate, onStatus = () 
     if (!pending.length) return true;
     const w = pending[0];
     wantTried.add(wantKey(w.artist, w.title));
-    onStatus(`🔄 Buscando precios de lo que buscas… ${list.length - pending.length + 1} de ${list.length}`);
+    onStatus(`🔄 Buscando precios de lo que buscas… ${list.length - pending.length + 1} de ${list.length}`, {
+      current: list.length - pending.length + 1,
+      total: list.length,
+    });
     try {
       let masterId = w.masterId;
       if (!masterId) {
