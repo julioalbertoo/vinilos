@@ -34,8 +34,9 @@ export const cleanName = (name) => String(name || "").replace(/\s*\(\d+\)/g, "")
 // Para buscar en Spotify: "Beatles, The" → "The Beatles".
 const plainName = (name) => cleanName(name).replace(/^(.+),\s*(The|Los|Las|El|La)$/i, "$2 $1");
 
+// "Beatles, The" y "The Beatles" dan la misma clave.
 const key = (name) =>
-  cleanName(name).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  plainName(name).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 // "Various" no es un artista: no tiene ficha.
 export const hasArtistPage = (name) => Boolean(cleanName(name)) && !/^various$/i.test(cleanName(name));
