@@ -1366,6 +1366,29 @@ function showWantButton(release) {
 // ---------- Lo que busco (wantlist) ----------
 
 let wantlistScroll = 0;
+// Orden de «Lo que busco»: "recent" (último apuntado primero), "price" (más barato primero) o "artist".
+// Vale hasta cerrar la app, como el de «Mis discos».
+let wantSort = "recent";
+
+function sortWantlist(items) {
+  const list = [...items];
+  const time = (item) => Date.parse(item.date) || 0;
+  const artist = (a, b) => collator.compare(sortName(cleanArtistName(a.artist)), sortName(cleanArtistName(b.artist)));
+  const year = (item) => Number.parseInt(item.year, 10) || Infinity;
+  if (wantSort === "price") {
+    // Sin precio o sin vendedores, al final (por artista).
+    const value = (item) => {
+      const price = wantPrice(item);
+      return price && !price.unsold ? Number(price.value) : Infinity;
+    };
+    list.sort((a, b) => value(a) - value(b) || artist(a, b));
+  } else if (wantSort === "artist") {
+    list.sort((a, b) => artist(a, b) || year(a) - year(b));
+  } else {
+    list.sort((a, b) => time(b) - time(a));
+  }
+  return list;
+}
 
 function openWantlist() {
   wantlistScroll = window.scrollY;
@@ -1380,7 +1403,7 @@ function wantlistBack() {
 }
 
 function renderWantlist() {
-  const items = getWantlist();
+  const items = sortWantlist(getWantlist());
   const box = document.getElementById("wantlist-content");
   const title = el("h2", null, "⭐ Lo que busco");
   const nodes = [title];
@@ -1410,6 +1433,25 @@ function renderWantlist() {
   progress.id = "wantlist-progress";
   progress.hidden = !wantProgress;
   nodes.push(progress);
+  const sort = el("div", "segmented segmented--small");
+  sort.setAttribute("role", "group");
+  sort.setAttribute("aria-label", "Ordenar lo que buscas");
+  for (const [key, label] of [
+    ["recent", "Recientes"],
+    ["price", "Precio"],
+    ["artist", "Artista"],
+  ]) {
+    const button = el("button", wantSort === key ? "active" : null, label);
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(wantSort === key));
+    button.addEventListener("click", () => {
+      if (wantSort === key) return;
+      wantSort = key;
+      renderWantlist();
+    });
+    sort.append(button);
+  }
+  if (items.length > 1) nodes.push(sort);
   const list = el("div", "artist-albums");
   for (const item of items) {
     const line = el("div", "artist-album-line");
