@@ -273,23 +273,26 @@ async function findWantedMaster(w, token) {
   return findAlbumMaster(w.artist, w.title, token);
 }
 
-async function fillWantlist() {
-  while (active && latest.token) {
+// Busca, uno a uno, el precio de los álbumes de tu lista que aún no lo tienen.
+// isActive() false corta la búsqueda; onUpdate() repinta; onStatus(texto) cuenta por dónde va.
+// Devuelve false si la llave de Discogs no vale.
+export async function fillWantPrices(token, { isActive, onUpdate, onStatus = () => {} }) {
+  while (isActive() && token) {
     const list = getWantlist();
     const pending = list.filter(wantNeedsWork);
     if (!pending.length) return true;
     const w = pending[0];
     wantTried.add(wantKey(w.artist, w.title));
-    latest.onStatus(`🔄 Buscando precios de lo que buscas… ${list.length - pending.length + 1} de ${list.length}`);
+    onStatus(`🔄 Buscando precios de lo que buscas… ${list.length - pending.length + 1} de ${list.length}`);
     try {
       let masterId = w.masterId;
       if (!masterId) {
-        masterId = await findWantedMaster(w, latest.token);
+        masterId = await findWantedMaster(w, token);
         updateWanted(w.artist, w.title, masterId ? { masterId } : { masterChecked: true });
       }
       if (masterId) {
-        const result = await cachedCheapest(masterId, latest.token, { stop: () => !active });
-        // Cortado al salir de la pestaña: se termina otra vez.
+        const result = await cachedCheapest(masterId, token, { stop: () => !isActive() });
+        // Cortado al salir de la pantalla: se termina otra vez.
         if (!result) {
           wantTried.delete(wantKey(w.artist, w.title));
           return true;
@@ -297,14 +300,29 @@ async function fillWantlist() {
         wantPrices.set(String(masterId), result);
       }
     } catch (err) {
-      if (err.authError) {
-        authFailed();
-        return false;
-      }
+      if (err.authError) return false;
     }
-    if (active) latest.onUpdate();
+    if (isActive()) onUpdate();
   }
   return true;
+}
+
+// Precio del vinilo más barato de un álbum de tu lista, si ya se sabe: { value, currency } o null.
+// unsold: true si se miró y nadie lo vende ahora.
+export function wantPrice(w) {
+  const cheapest = cheapestOf(w);
+  if (!cheapest) return null;
+  return cheapest.best ? { value: cheapest.best.value, currency: cheapest.best.currency || "EUR" } : { unsold: true };
+}
+
+async function fillWantlist() {
+  const ok = await fillWantPrices(latest.token, {
+    isActive: () => active && Boolean(latest.token),
+    onUpdate: () => latest.onUpdate(),
+    onStatus: (text) => latest.onStatus(text),
+  });
+  if (!ok) authFailed();
+  return ok;
 }
 
 // ---------- Discografías de tus artistas ----------
@@ -450,7 +468,7 @@ function compute(items, yearMode) {
 
 // ---------- Pintar ----------
 
-function money(value, currency = "EUR", digits = 0) {
+export function money(value, currency = "EUR", digits = 0) {
   try {
     return new Intl.NumberFormat("es-ES", {
       style: "currency",

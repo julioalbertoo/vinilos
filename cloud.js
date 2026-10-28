@@ -368,7 +368,20 @@ async function syncWantlist() {
   }
   const { data, error } = await client.from(wantlistTable).select("*");
   if (error) throw error;
-  const remote = new Map(data.map((row) => [row.key, wantFromRow(row)]));
+  // La clave se calcula otra vez: si cambió la forma de calcularla ("Beatles, The" = "The Beatles"),
+  // las filas con la clave antigua se borran y se suben con la nueva (y los repetidos quedan en uno).
+  const remote = new Map();
+  const staleKeys = [];
+  for (const row of data) {
+    const item = wantFromRow(row);
+    const key = wantKey(item.artist, item.title);
+    if (row.key !== key) staleKeys.push(row.key);
+    if (!remote.has(key)) remote.set(key, item);
+  }
+  if (staleKeys.length) {
+    const { error: staleError } = await client.from(wantlistTable).delete().in("key", staleKeys);
+    if (staleError) throw staleError;
+  }
 
   // Uno que está aquí, no está allí y ya se había subido → se quitó en otro móvil: también se quita aquí.
   const synced = readIds(WANT_SYNCED_KEY);

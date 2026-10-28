@@ -8,6 +8,9 @@ const norm = (text) =>
   String(text || "")
     .replace(/\s*\(\d+\)/g, "")
     .replace(/\*/g, "")
+    .trim()
+    // "Beatles, The" → "The Beatles", para que cuenten como el mismo artista.
+    .replace(/^(.+),\s*(The|Los|Las|El|La)$/i, "$2 $1")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")

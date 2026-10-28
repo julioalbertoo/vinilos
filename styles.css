@@ -3457,6 +3457,18 @@ button.artist-album.is-owned {
   font-size: 0.8rem;
 }
 
+.want-price {
+  color: var(--accent-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.wantlist-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 0.75rem;
+}
+
 .artist-album.is-owned .artist-album-year {
   color: var(--accent-text);
   font-weight: 800;

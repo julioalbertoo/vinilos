@@ -25,7 +25,7 @@ import { startScanner, describeCameraError } from "./barcode.js";
 import { getHistory, addToHistory, removeFromHistory, clearHistory, updateHistoryItem } from "./history.js";
 import { renderGallery, updateSlide } from "./gallery.js";
 import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest, fillDurations, DURATIONS_CHECK, cloudCached, WEEK_MS } from "./details.js";
-import { renderStats, setStatsActive, estimate, priceSource } from "./stats.js";
+import { renderStats, setStatsActive, estimate, priceSource, fillWantPrices, wantPrice, money } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { loadTrivia } from "./trivia.js";
@@ -1404,6 +1404,8 @@ function renderWantlist() {
     }
     const text = el("span", "artist-album-text");
     text.append(el("span", "artist-album-title", item.title), el("span", "artist-album-year", [cleanArtistName(item.artist), item.year].filter(Boolean).join(" · ")));
+    const price = wantPrice(item);
+    if (price) text.append(el("span", "want-price", price.unsold ? "Nadie lo vende ahora" : `🛒 desde ${money(price.value, price.currency)}`));
     row.append(img, text, el("span", "artist-row-go", "›"));
     row.addEventListener("click", () => openAlbum({ ...item }, item.artist, "wantlist"));
     const remove = el("button", "want-star is-on", "★");
@@ -1417,7 +1419,30 @@ function renderWantlist() {
     list.append(line);
   }
   nodes.push(list);
+  const { discogsToken } = getTokenState();
+  if (discogsToken) nodes.push(el("p", "wantlist-note", "Precio del vinilo más barato a la venta ahora entre sus ediciones más comunes, sin envío."));
   box.replaceChildren(...nodes);
+  fillWantlistPrices();
+}
+
+// Mientras se ve la lista, busca en segundo plano los precios que faltan (los ya buscados están guardados 7 días).
+let fillingWantPrices = false;
+async function fillWantlistPrices() {
+  const { discogsToken } = getTokenState();
+  if (fillingWantPrices || !discogsToken) return;
+  fillingWantPrices = true;
+  try {
+    await fillWantPrices(discogsToken, {
+      isActive: () => activeView() === "wantlist",
+      onUpdate: () => {
+        if (activeView() === "wantlist") renderWantlist();
+      },
+    });
+  } catch {
+    // Sin red: se vuelve a intentar la próxima vez que se abra la lista.
+  } finally {
+    fillingWantPrices = false;
+  }
 }
 
 function updateWantlistLink() {
