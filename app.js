@@ -31,7 +31,7 @@ import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { mbDiscogsMaster } from "./musicbrainz.js";
 import { loadTrivia } from "./trivia.js";
 import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
-import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease } from "./wantlist.js";
+import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease, wantKey } from "./wantlist.js";
 import { initAutoUpdate, currentVersion, latestVersion, reloadTo } from "./updater.js";
 import { initCloud, takeAuthError, onCloudStatus, onCloudHistoryChanged, onCloudWantlistChanged, onCloudTokensChanged, sendMagicLink, signInWithPassword, setPassword, signOut, syncAll, isCloudReady, hasSavedSession } from "./cloud.js";
 
@@ -1347,6 +1347,16 @@ function showWantButton(release) {
     const own = el("div", "detail-artists");
     own.append(top);
     content.querySelector("h2")?.after(own);
+  }
+  // Si ya tienes otra edición de este álbum, se avisa (puedes querer esta también, pero que lo sepas).
+  document.getElementById("detail-want-other")?.remove();
+  const key = wantKey(entry.artist, entry.title);
+  const other = getHistory().find((item) => wantKey(item.artist, item.title) === key);
+  if (other) {
+    const year = other.year && other.year !== "0" ? ` (${other.year})` : "";
+    const hint = el("p", "detail-want-other", `💿 Ya tienes otra edición de este álbum${year}`);
+    hint.id = "detail-want-other";
+    top.parentElement.after(hint);
   }
   const paint = () => {
     const on = isWanted(entry.artist, entry.title);
