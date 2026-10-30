@@ -288,6 +288,11 @@ let filter = { page: null, kind: null };
 export async function renderArtistPage(container, target, ctx) {
   const current = ++request;
   const stale = () => current !== request || !container.isConnected;
+  // «Various» (recopilatorios) no tiene ficha en Discogs: solo se enseñan tus discos.
+  if (!hasArtistPage(target.name)) {
+    container.replaceChildren(...variousNodes(cleanName(target.name), ownedBy(ctx.items, [target.name]), ctx));
+    return;
+  }
   let entry = target.id && fresh(cache.artists[target.id]) ? cache.artists[target.id] : null;
   let status = entry ? "" : "loading";
   // El filtro se recuerda mientras sigas en la ficha del mismo artista (al volver de un disco).
@@ -341,6 +346,30 @@ function wantStar(album) {
   });
   paint();
   return star;
+}
+
+function variousNodes(name, owned, ctx) {
+  const head = el("div", "artist-hero");
+  const cover = owned.find((d) => d.cover || d.thumb);
+  if (cover) {
+    const img = el("img", "artist-photo artist-photo--cover");
+    img.src = cover.cover || cover.thumb;
+    img.alt = "";
+    head.append(img);
+  } else {
+    head.append(el("span", "artist-photo artist-photo--empty", "💿"));
+  }
+  head.append(el("h2", "artist-name", name), el("p", "artist-realname", "Recopilatorios de varios artistas"));
+  const nodes = [head];
+  if (owned.length) {
+    nodes.push(
+      card(
+        { icon: "💿", title: "En tu colección", sub: `${plural(owned.length, "disco", "discos")} · toca una portada para abrir su ficha`, accent: "lilac" },
+        coverStrip(owned, ctx.onOpenItem)
+      )
+    );
+  }
+  return nodes;
 }
 
 function pageNodes({ artist, name, owned, entry, status, ctx, redraw }) {

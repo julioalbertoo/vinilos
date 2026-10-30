@@ -1885,7 +1885,8 @@ function pushArtist(state) {
 
 // target: { name, id? }
 function openArtist(target) {
-  if (!hasArtistPage(target.name)) return;
+  // «Various» solo se abre desde tu lista de artistas (enseña tus recopilatorios).
+  if (!hasArtistPage(target.name) && !(cleanArtistName(target.name) && activeView() === "artist")) return;
   const top = artistStack[artistStack.length - 1];
   // Desde un disco abierto desde esta misma ficha: se vuelve a ella.
   if (activeView() === "detail" && detailReturnView === "artist" && top && sameArtist(top.state, target)) {
