@@ -96,7 +96,7 @@ Al tocar un género, una década, un año, un país, un artista o un sello salen
 - **🎤 Botón del artista**: abre su ficha.
 - **💿 Ver las distintas ediciones del disco**: todas las ediciones en vinilo del álbum, de la más común a la menos, con color y gramaje como pastillas.
 - **🖼️ Cambiar portada**: si la foto principal es mala, eliges otra de la edición (o de las ediciones más populares).
-- **📰 La crítica**: las notas de la prensa (p. ej. 76/100 en Metacritic, 7,5/10 en Pitchfork, 7/10 en NME), sacadas de la tabla de críticas del artículo del álbum en la Wikipedia en inglés. Si el álbum no la tiene, no sale.
+- **📰 La crítica**: las notas de la prensa (p. ej. 76/100 en Metacritic, 7,5/10 en Pitchfork, 7/10 en NME), sacadas de la tabla de críticas del artículo del álbum en la Wikipedia en inglés. Si el álbum no la tiene, no sale. Cada nota sale con color según lo alta que sea: 🟢 verde (8/10 o más), 🟡 amarilla (6,5 a 8), 🟠 naranja (5 a 6,5) y 🔴 rosa (menos de 5). Las medias (Metacritic) llevan borde.
 - **💡 ¿Sabías que…?**: un dato curioso (ver abajo).
 - **☆ Añadir a lo que busco** (si no lo tienes) o **🗑️ Borrar de mis discos** (si lo tienes).
 

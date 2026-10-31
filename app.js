@@ -30,7 +30,7 @@ import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanA
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { mbDiscogsMaster } from "./musicbrainz.js";
 import { loadTrivia } from "./trivia.js";
-import { loadRatings } from "./ratings.js";
+import { loadRatings, scoreLevel } from "./ratings.js";
 import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
 import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease, wantKey } from "./wantlist.js";
 import { initAutoUpdate, currentVersion, latestVersion, reloadTo } from "./updater.js";
@@ -1072,8 +1072,10 @@ async function loadRatingsBox(release, request) {
   box.replaceChildren(el("p", "detail-ratings-title", "📰 La crítica"), list, source);
 }
 
+// El color de la pastilla va según la nota: verde alta, amarilla buena, naranja regular, rosa baja.
 function ratingChip(rating, className) {
-  const chip = el("span", className);
+  const level = scoreLevel(rating.score);
+  const chip = el("span", level ? `${className} detail-rating-${level}` : className);
   chip.append(el("strong", null, rating.score), ` ${rating.name}`);
   return chip;
 }

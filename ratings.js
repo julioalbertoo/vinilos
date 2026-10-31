@@ -82,6 +82,30 @@ export function cleanScore(text) {
   return s.length > 0 && s.length <= 25 ? s : "";
 }
 
+// Nota de 0 a 1: «7,5/10» → 0,75; «A−» → 0,9. null si no se entiende.
+const LETTERS = { A: 0.95, B: 0.8, C: 0.65, D: 0.5, E: 0.35, F: 0.2 };
+export function scoreValue(score) {
+  const fraction = /^([\d,]+)\/(\d+)$/.exec(String(score || ""));
+  if (fraction) {
+    const value = Number(fraction[1].replace(",", ".")) / Number(fraction[2]);
+    return value >= 0 && value <= 1 ? value : null;
+  }
+  const letter = /^([A-F])\s*([+\-−–]?)$/.exec(String(score || "").trim());
+  if (!letter) return null;
+  const sign = letter[2] === "+" ? 0.05 : letter[2] ? -0.05 : 0;
+  return Math.min(1, LETTERS[letter[1]] + sign);
+}
+
+// Nivel de la nota para su color: alta, buena, regular o baja. "" si no se entiende.
+export function scoreLevel(score) {
+  const value = scoreValue(score);
+  if (value === null) return "";
+  if (value >= 0.8) return "high";
+  if (value >= 0.65) return "good";
+  if (value >= 0.5) return "mid";
+  return "low";
+}
+
 // Nombres de los agregadores en los campos cortos de la plantilla.
 const AGGREGATORS = { MC: "Metacritic", ADM: "AnyDecentMusic?", AOTY: "Album of the Year" };
 

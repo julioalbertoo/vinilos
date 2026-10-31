@@ -902,9 +902,30 @@ input[type="text"]:focus {
   color: var(--text);
 }
 
+/* Las medias (Metacritic…) llevan borde, para distinguirlas de las revistas. */
 .detail-rating-agg {
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+/* Color según la nota. */
+.detail-rating-high {
+  background: var(--mint);
+  color: var(--mint-text);
+}
+
+.detail-rating-good {
   background: var(--butter);
   color: var(--butter-text);
+}
+
+.detail-rating-mid {
+  background: var(--peach);
+  color: var(--peach-text);
+}
+
+.detail-rating-low {
+  background: var(--pink);
+  color: var(--rose-text);
 }
 
 .view .detail-ratings-source {
