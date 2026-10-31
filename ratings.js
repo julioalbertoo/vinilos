@@ -3,13 +3,69 @@
 // búsqueda de Google de Gemini: solo vale si Google la respalda con una página de mondosonoro.com.
 // Salen de la tabla de críticas del artículo del álbum en la Wikipedia en inglés (la plantilla
 // «Music ratings», antes «Album ratings»), que cita cada nota. El artículo se localiza con Wikidata
-// por el número del álbum en Discogs y, si no, buscando. Se guarda un mes en la nube.
+// por el número del álbum en Discogs y, si no, buscando.
 import { wikiJson, wikiUrl, wikidataArticles, searchArticle, cleanArtist, coreTitle, coreArtist, plain } from "./trivia.js";
-import { cloudCached, MONTH_MS } from "./details.js";
+import { readCloud, writeCloud, MONTH_MS } from "./details.js";
 import { askWithGoogleSearch } from "./ai.js";
 
 // Sube si cambia la forma de lo guardado: lo antiguo se vuelve a pedir.
 const RATINGS_VERSION = 1;
+
+// ---------- Guardado ----------
+// Las notas de una crítica no cambian: una vez encontradas se guardan para siempre en la nube
+// (Supabase, con sesión iniciada) y en el móvil. Si no se encontró nada, se vuelve a mirar al mes
+// (el disco puede ser nuevo y salir la crítica más tarde). Si la consulta falla, no se guarda.
+
+const LOCAL_KEY = "vinilos_ratings";
+const LOCAL_MAX = 800;
+
+function readLocal() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLocal(id, entry) {
+  const all = readLocal();
+  delete all[id];
+  all[id] = entry;
+  // Se olvidan los más antiguos para no llenar el móvil (siguen en la nube).
+  const keys = Object.keys(all);
+  for (const old of keys.slice(0, Math.max(0, keys.length - LOCAL_MAX))) delete all[old];
+  try {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
+  } catch {
+    // Sin espacio: se mirará en la nube o se volverá a buscar.
+  }
+}
+
+// Vale para siempre si tiene nota (found); si no, un mes.
+const usable = (entry, valid, found) =>
+  Boolean(entry) && valid(entry.value) && (found(entry.value) || Date.now() - new Date(entry.at).getTime() < MONTH_MS);
+
+async function savedOrFetch(kind, key, fetcher, valid, found) {
+  const id = `${kind}|${key}`;
+  const local = readLocal()[id];
+  if (usable(local, valid, found)) return local.value;
+  const cloud = await readCloud(kind, key);
+  if (usable(cloud, valid, found)) {
+    writeLocal(id, cloud);
+    return cloud.value;
+  }
+  try {
+    const value = await fetcher();
+    writeCloud(kind, key, value);
+    writeLocal(id, { value, at: new Date().toISOString() });
+    return value;
+  } catch (err) {
+    // Si falla pero había algo guardado (aunque sea antiguo), se usa eso.
+    const old = [local, cloud].find((e) => e && valid(e.value));
+    if (old) return old.value;
+    throw err;
+  }
+}
 
 // Quita notas al pie, comentarios y etiquetas HTML.
 const stripRefs = (text) =>
@@ -170,7 +226,7 @@ async function fetchRatings(release) {
 // Devuelve { aggregates, reviews, source: { title, url } } o null.
 export async function loadRatings(release) {
   const key = release.masterId ? `m${release.masterId}` : `r${release.id}`;
-  const value = await cloudCached("ratings", key, MONTH_MS, () => fetchRatings(release), (v) => v && v.v === RATINGS_VERSION);
+  const value = await savedOrFetch("ratings", key, () => fetchRatings(release), (v) => Boolean(v) && v.v === RATINGS_VERSION, (v) => Boolean(v.ratings));
   return (value && value.ratings) || null;
 }
 
@@ -210,7 +266,7 @@ export async function loadMondoSonoro(release, aiKey) {
   const artist = cleanArtist(release.artist);
   if (!artist || /^various$/i.test(artist)) return null;
   const key = release.masterId ? `m${release.masterId}` : `r${release.id}`;
-  const value = await cloudCached("mondosonoro", key, MONTH_MS, () => fetchMondo(release, aiKey), (v) => v && v.v === MONDO_VERSION);
+  const value = await savedOrFetch("mondosonoro", key, () => fetchMondo(release, aiKey), (v) => Boolean(v) && v.v === MONDO_VERSION, (v) => Boolean(v.score));
   if (!value || !value.score) return null;
   const query = encodeURIComponent(`${artist} ${coreTitle(release.title)}`);
   return { name: "Mondo Sonoro", score: value.score, url: `https://www.mondosonoro.com/?s=${query}` };
