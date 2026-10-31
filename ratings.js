@@ -96,10 +96,11 @@ export function scoreValue(score) {
   return Math.min(1, LETTERS[letter[1]] + sign);
 }
 
-// Nivel de la nota para su color: alta, buena, regular o baja. "" si no se entiende.
+// Nivel de la nota para su color: sobresaliente, alta, buena, regular o baja. "" si no se entiende.
 export function scoreLevel(score) {
   const value = scoreValue(score);
   if (value === null) return "";
+  if (value >= 0.9) return "top";
   if (value >= 0.8) return "high";
   if (value >= 0.65) return "good";
   if (value >= 0.5) return "mid";

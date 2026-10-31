@@ -1072,7 +1072,7 @@ async function loadRatingsBox(release, request) {
   box.replaceChildren(el("p", "detail-ratings-title", "📰 La crítica"), list, source);
 }
 
-// El color de la pastilla va según la nota: verde alta, amarilla buena, naranja regular, rosa baja.
+// El color de la pastilla va según la nota: verde intenso sobresaliente, verde alta, amarilla buena, naranja regular, rosa baja.
 function ratingChip(rating, className) {
   const level = scoreLevel(rating.score);
   const chip = el("span", level ? `${className} detail-rating-${level}` : className);

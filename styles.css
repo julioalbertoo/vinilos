@@ -16,6 +16,8 @@
   --peach-text: #9a4f2c;
   --mint: #d8f3e6;
   --mint-text: #2f7a58;
+  --green: #2f9e6b;
+  --green-text: #ffffff;
   --pink: #ffdfec;
   --butter: #fff3cc;
   --butter-text: #7a5d10;
@@ -48,6 +50,8 @@
   --peach-text: #ffbe9c;
   --mint: #1e3a2e;
   --mint-text: #93e2bb;
+  --green: #3fbf85;
+  --green-text: #0f2a1e;
   --pink: #3d2333;
   --butter: #3b3420;
   --butter-text: #f3d68e;
@@ -908,6 +912,11 @@ input[type="text"]:focus {
 }
 
 /* Color según la nota. */
+.detail-rating-top {
+  background: var(--green);
+  color: var(--green-text);
+}
+
 .detail-rating-high {
   background: var(--mint);
   color: var(--mint-text);
