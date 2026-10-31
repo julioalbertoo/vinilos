@@ -30,7 +30,7 @@ import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanA
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { mbDiscogsMaster } from "./musicbrainz.js";
 import { loadTrivia } from "./trivia.js";
-import { loadRatings, scoreLevel } from "./ratings.js";
+import { loadRatings, loadMondoSonoro, scoreLevel } from "./ratings.js";
 import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
 import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease, wantKey } from "./wantlist.js";
 import { initAutoUpdate, currentVersion, latestVersion, reloadTo } from "./updater.js";
@@ -1050,26 +1050,46 @@ async function loadPrices(release, request) {
   if (release.masterId && request === detailRequest) loadCheapest(release, prices, request);
 }
 
-// Notas de la crítica (Metacritic, Pitchfork, NME…), de la Wikipedia en inglés. Si no hay, no sale nada.
-async function loadRatingsBox(release, request) {
-  let ratings = null;
-  try {
-    ratings = await loadRatings(release);
-  } catch {
-    ratings = null;
-  }
-  const box = document.getElementById("detail-ratings");
-  if (!box || request !== detailRequest || !ratings) return;
-  const list = el("div", "detail-ratings-list");
-  for (const r of ratings.aggregates) list.append(ratingChip(r, "detail-rating detail-rating-agg"));
-  for (const r of ratings.reviews) list.append(ratingChip(r, "detail-rating"));
-  const source = el("p", "detail-ratings-source", "Fuente: ");
-  const link = el("a", null, `Wikipedia: ${ratings.source.title}`);
-  link.href = `${ratings.source.url}#Critical_reception`;
-  link.target = "_blank";
-  link.rel = "noopener";
-  source.append(link);
-  box.replaceChildren(el("p", "detail-ratings-title", "📰 La crítica"), list, source);
+// Notas de la crítica (Metacritic, Pitchfork, NME…) de la Wikipedia en inglés, y la de Mondo Sonoro
+// (con la búsqueda de Google de Gemini). Cada una se pinta al llegar; si no hay ninguna, no sale nada.
+function loadRatingsBox(release, request) {
+  let wiki = null;
+  let mondo = null;
+  const paint = () => {
+    const box = document.getElementById("detail-ratings");
+    if (!box || request !== detailRequest || (!wiki && !mondo)) return;
+    const list = el("div", "detail-ratings-list");
+    for (const r of (wiki && wiki.aggregates) || []) list.append(ratingChip(r, "detail-rating detail-rating-agg"));
+    // Si Wikipedia ya trae la de Mondo Sonoro, no se repite.
+    const reviews = (wiki && wiki.reviews) || [];
+    if (mondo && !reviews.some((r) => /mondo\s*sonoro/i.test(r.name))) list.append(ratingChip(mondo, "detail-rating"));
+    for (const r of reviews) list.append(ratingChip(r, "detail-rating"));
+    const source = el("p", "detail-ratings-source", "Fuentes: ");
+    const links = [];
+    if (wiki) links.push([`Wikipedia: ${wiki.source.title}`, `${wiki.source.url}#Critical_reception`]);
+    if (mondo) links.push(["Mondo Sonoro", mondo.url]);
+    links.forEach(([text, url], i) => {
+      const link = el("a", null, text);
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      if (i) source.append(" · ");
+      source.append(link);
+    });
+    box.replaceChildren(el("p", "detail-ratings-title", "📰 La crítica"), list, source);
+  };
+  loadRatings(release)
+    .then((value) => {
+      wiki = value;
+      paint();
+    })
+    .catch(() => {});
+  loadMondoSonoro(release, getAiKey())
+    .then((value) => {
+      mondo = value;
+      paint();
+    })
+    .catch(() => {});
 }
 
 // El color de la pastilla va según la nota: verde intenso sobresaliente, verde alta, amarilla buena, naranja regular, rosa baja.

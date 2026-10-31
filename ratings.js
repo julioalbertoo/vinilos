@@ -1,9 +1,12 @@
 // Notas de la crítica de un álbum («76/100 en Metacritic, 7,5/10 en Pitchfork…»).
+// La de Mondo Sonoro (revista española, que Wikipedia casi nunca recoge) se busca aparte con la
+// búsqueda de Google de Gemini: solo vale si Google la respalda con una página de mondosonoro.com.
 // Salen de la tabla de críticas del artículo del álbum en la Wikipedia en inglés (la plantilla
 // «Music ratings», antes «Album ratings»), que cita cada nota. El artículo se localiza con Wikidata
 // por el número del álbum en Discogs y, si no, buscando. Se guarda un mes en la nube.
 import { wikiJson, wikiUrl, wikidataArticles, searchArticle, cleanArtist, coreTitle, coreArtist, plain } from "./trivia.js";
 import { cloudCached, MONTH_MS } from "./details.js";
+import { askWithGoogleSearch } from "./ai.js";
 
 // Sube si cambia la forma de lo guardado: lo antiguo se vuelve a pedir.
 const RATINGS_VERSION = 1;
@@ -169,4 +172,46 @@ export async function loadRatings(release) {
   const key = release.masterId ? `m${release.masterId}` : `r${release.id}`;
   const value = await cloudCached("ratings", key, MONTH_MS, () => fetchRatings(release), (v) => v && v.v === RATINGS_VERSION);
   return (value && value.ratings) || null;
+}
+
+// ---------- Mondo Sonoro ----------
+
+const MONDO_VERSION = 1;
+const NO_REVIEW = "SIN CRÍTICA";
+
+function mondoPrompt(release) {
+  return [
+    `Busca en mondosonoro.com la crítica del disco «${coreTitle(release.title)}» de ${cleanArtist(release.artist)}${release.originalYear ? ` (${release.originalYear})` : ""}.`,
+    "Si la encuentras, responde solo una frase, sin markdown: «Mondo Sonoro le puso un N/10 a este disco.», con la nota exacta que da la crítica.",
+    `Si Mondo Sonoro no tiene crítica de este disco o no da nota, responde solo: ${NO_REVIEW}`,
+  ].join("\n");
+}
+
+const isMondo = (chunk) => Boolean(chunk && chunk.web && /mondo\s*sonoro/i.test(`${chunk.web.title || ""} ${chunk.web.domain || ""} ${chunk.web.uri || ""}`));
+
+// { v, score } (score null si no hay crítica). Si Gemini no responde, da error y no se guarda.
+async function fetchMondo(release, aiKey) {
+  const answer = await askWithGoogleSearch(mondoPrompt(release), aiKey);
+  if (!answer.ok) throw new Error(answer.detail || "Gemini no respondió");
+  const candidate = answer.candidate || {};
+  const text = ((candidate.content && candidate.content.parts) || []).filter((p) => p.text && !p.thought).map((p) => p.text).join(" ");
+  const match = /(\d+(?:[.,]\d)?)\s*\/\s*10\b/.exec(text);
+  const chunks = (candidate.groundingMetadata && candidate.groundingMetadata.groundingChunks) || [];
+  // La nota solo vale si Google ha leído alguna página de Mondo Sonoro para darla.
+  if (text.includes(NO_REVIEW) || !match || !chunks.some(isMondo)) return { v: MONDO_VERSION, score: null };
+  const value = Number(match[1].replace(",", "."));
+  if (!(value >= 0 && value <= 10)) return { v: MONDO_VERSION, score: null };
+  return { v: MONDO_VERSION, score: `${decimal(match[1])}/10` };
+}
+
+// Nota de Mondo Sonoro: { name, score, url } o null. Sin llave de Gemini, null.
+export async function loadMondoSonoro(release, aiKey) {
+  if (!aiKey) return null;
+  const artist = cleanArtist(release.artist);
+  if (!artist || /^various$/i.test(artist)) return null;
+  const key = release.masterId ? `m${release.masterId}` : `r${release.id}`;
+  const value = await cloudCached("mondosonoro", key, MONTH_MS, () => fetchMondo(release, aiKey), (v) => v && v.v === MONDO_VERSION);
+  if (!value || !value.score) return null;
+  const query = encodeURIComponent(`${artist} ${coreTitle(release.title)}`);
+  return { name: "Mondo Sonoro", score: value.score, url: `https://www.mondosonoro.com/?s=${query}` };
 }
