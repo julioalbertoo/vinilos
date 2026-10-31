@@ -9,7 +9,8 @@ import { readCloud, writeCloud, MONTH_MS } from "./details.js";
 import { askWithGoogleSearch } from "./ai.js";
 
 // Sube si cambia la forma de lo guardado: lo antiguo se vuelve a pedir.
-const RATINGS_VERSION = 1;
+// 2: notas con enlaces, paréntesis o en palabras bien limpiadas.
+const RATINGS_VERSION = 2;
 
 // ---------- Guardado ----------
 // Las notas de una crítica no cambian: una vez encontradas se guardan para siempre en la nube
@@ -73,6 +74,7 @@ const stripRefs = (text) =>
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<ref[^>]*\/>/gi, "")
     .replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, "")
+    .replace(/<br\s*\/?>/gi, " ")
     .replace(/<[^>]+>/g, "");
 
 // Trozo de texto de una plantilla «{{…}}» que empieza en start, respetando las anidadas.
@@ -137,9 +139,33 @@ export function cleanScore(text) {
   s = s.replace(/\{\{\s*rating\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*(?:\|[^{}]*)?\}\}/gi, (_, n, max) => `${decimal(n)}/${max}`);
   s = s.replace(/\{\{\s*(?:nowrap|nobr)\s*\|([^{}]*)\}\}/gi, "$1");
   s = s.replace(/\{\{[^{}]*\}\}/g, "");
+  // Fuera los enlaces externos («[http://… link]»).
+  s = s.replace(/\[https?:\/\/[^\]]*\]/gi, " ");
   s = cleanName(s).replace(/(\d)\.(\d)/g, "$1,$2").replace(/\s*\/\s*/g, "/");
+  // Si hay una nota con cifras («(7/10)», «3,5/5 link»), se queda solo esa (la primera).
+  const fraction = /\d+(?:,\d+)?\/\d+/.exec(s);
+  if (fraction) return fraction[0];
+  s = s.replace(/^[(\[]\s*|\s*[)\]]$/g, "").trim();
+  const word = WORDS[s.toLowerCase()];
+  if (word) return word;
   return s.length > 0 && s.length <= 25 ? s : "";
 }
+
+// Notas en palabras (algunas revistas no dan cifra), en castellano.
+const WORDS = {
+  "very favorable": "Muy favorable",
+  "very favourable": "Muy favorable",
+  favorable: "Favorable",
+  favourable: "Favorable",
+  positive: "Positiva",
+  mixed: "Mixta",
+  average: "Regular",
+  unfavorable: "Desfavorable",
+  unfavourable: "Desfavorable",
+  negative: "Negativa",
+};
+// Valor de 0 a 1 de las notas en palabras, para su color.
+const WORD_VALUES = { "Muy favorable": 0.9, Favorable: 0.8, Positiva: 0.8, Mixta: 0.6, Regular: 0.6, Desfavorable: 0.4, Negativa: 0.4 };
 
 // Nota de 0 a 1: «7,5/10» → 0,75; «A−» → 0,9. null si no se entiende.
 const LETTERS = { A: 0.95, B: 0.8, C: 0.65, D: 0.5, E: 0.35, F: 0.2 };
@@ -149,6 +175,7 @@ export function scoreValue(score) {
     const value = Number(fraction[1].replace(",", ".")) / Number(fraction[2]);
     return value >= 0 && value <= 1 ? value : null;
   }
+  if (WORD_VALUES[score] !== undefined) return WORD_VALUES[score];
   const letter = /^([A-F])\s*([+\-−–]?)$/.exec(String(score || "").trim());
   if (!letter) return null;
   const sign = letter[2] === "+" ? 0.05 : letter[2] ? -0.05 : 0;
