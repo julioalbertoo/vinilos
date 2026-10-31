@@ -207,7 +207,9 @@ function takeFromPool(release, seen) {
 
 // ---------- Plan B: textos que lee la propia app ----------
 
+// Textos que se leen como mucho: del disco y, si ninguno da un dato, del artista y el sello.
 const DOC_ATTEMPTS = 4;
+const ARTIST_ATTEMPTS = 2;
 const DOC_WINDOW = 9000;
 
 // Minúsculas, sin acentos, comillas ni signos raros y con los espacios juntos, para comparar textos.
@@ -405,7 +407,13 @@ function documentPlans(release, { discogsToken, geniusToken }) {
       return found && enough(found.text, 200) && { name: `Discogs: sello ${cleanArtist(found.name)}`, url: found.url, text: found.text, topic: `el sello ${cleanArtist(found.name)}, que publicó esta edición` };
     });
   }
-  return [...ordered, ...shuffle(artistPlans)];
+  // Del artista, casi siempre primero su Wikipedia (la más completa).
+  const [mainArtistArticle, ...otherArtistPlans] = artistPlans;
+  const artistOrdered = mainArtistArticle && Math.random() < 0.7 ? [mainArtistArticle, ...shuffle(otherArtistPlans)] : shuffle(artistPlans);
+  return [
+    { plans: ordered, max: DOC_ATTEMPTS },
+    { plans: artistOrdered, max: ARTIST_ATTEMPTS },
+  ];
 }
 
 // Trozo al azar del texto (empezando en un párrafo), para que cada vez salga un dato distinto.
@@ -498,25 +506,28 @@ function quoteLink(url, quote) {
 
 // Devuelve { ok: true, facts } o { ok: false, quota, stop, detail, tried }.
 async function documentTrivia(release, aiKey, keys, seen, onStep) {
-  let calls = 0;
   const tried = [];
-  for (const plan of documentPlans(release, keys)) {
-    if (calls >= DOC_ATTEMPTS) break;
-    let doc = null;
-    try {
-      doc = await plan();
-    } catch {
-      doc = null;
-    }
-    if (!doc) continue;
-    const excerpt = randomWindow(doc.text, doc.focus);
-    calls += 1;
-    tried.push(doc.name);
-    const answer = await askPlain(docPrompt(release, doc, excerpt, seen), aiKey, (model) => onStep(`Leyendo ${doc.name} con ${model}…`));
-    if (!answer.ok) return { ok: false, quota: answer.quota, stop: answer.stop, detail: answer.detail, tried };
-    const facts = verifiedFacts(parseJson(rawAnswer(answer.candidate)), excerpt).filter((f) => !seen.includes(f.text.slice(0, 220)));
-    if (facts.length) {
-      return { ok: true, facts: facts.map((f) => ({ text: f.text, sources: [{ title: doc.name, url: quoteLink(doc.url, f.quote) }] })) };
+  // Si los textos del disco no dan un dato, se sigue con los del artista, con su propio tope.
+  for (const group of documentPlans(release, keys)) {
+    let calls = 0;
+    for (const plan of group.plans) {
+      if (calls >= group.max) break;
+      let doc = null;
+      try {
+        doc = await plan();
+      } catch {
+        doc = null;
+      }
+      if (!doc) continue;
+      const excerpt = randomWindow(doc.text, doc.focus);
+      calls += 1;
+      tried.push(doc.name);
+      const answer = await askPlain(docPrompt(release, doc, excerpt, seen), aiKey, (model) => onStep(`Leyendo ${doc.name} con ${model}…`));
+      if (!answer.ok) return { ok: false, quota: answer.quota, stop: answer.stop, detail: answer.detail, tried };
+      const facts = verifiedFacts(parseJson(rawAnswer(answer.candidate)), excerpt).filter((f) => !seen.includes(f.text.slice(0, 220)));
+      if (facts.length) {
+        return { ok: true, facts: facts.map((f) => ({ text: f.text, sources: [{ title: doc.name, url: quoteLink(doc.url, f.quote) }] })) };
+      }
     }
   }
   return { ok: false, tried };
