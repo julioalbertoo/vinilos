@@ -30,6 +30,7 @@ import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanA
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
 import { mbDiscogsMaster } from "./musicbrainz.js";
 import { loadTrivia } from "./trivia.js";
+import { loadRatings } from "./ratings.js";
 import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
 import { getWantlist, isWanted, toggleWanted, removeWanted, removeWantedRelease, wantKey } from "./wantlist.js";
 import { initAutoUpdate, currentVersion, latestVersion, reloadTo } from "./updater.js";
@@ -709,6 +710,12 @@ function renderDetail(release) {
     if (release.title) chips.append(spotifyLink(release));
     nodes.push(chips);
   }
+  // Notas de la crítica: solo con la ficha completa; se rellena al llegar (loadRatingsBox).
+  if (release.id) {
+    const ratings = el("div", "detail-ratings");
+    ratings.id = "detail-ratings";
+    nodes.push(ratings);
+  }
   // La caja del precio solo se pone con la ficha completa (tiene id); se rellena al llegar los datos.
   if (release.id) {
     const price = el("div", "detail-price");
@@ -1043,6 +1050,34 @@ async function loadPrices(release, request) {
   if (release.masterId && request === detailRequest) loadCheapest(release, prices, request);
 }
 
+// Notas de la crítica (Metacritic, Pitchfork, NME…), de la Wikipedia en inglés. Si no hay, no sale nada.
+async function loadRatingsBox(release, request) {
+  let ratings = null;
+  try {
+    ratings = await loadRatings(release);
+  } catch {
+    ratings = null;
+  }
+  const box = document.getElementById("detail-ratings");
+  if (!box || request !== detailRequest || !ratings) return;
+  const list = el("div", "detail-ratings-list");
+  for (const r of ratings.aggregates) list.append(ratingChip(r, "detail-rating detail-rating-agg"));
+  for (const r of ratings.reviews) list.append(ratingChip(r, "detail-rating"));
+  const source = el("p", "detail-ratings-source", "Fuente: ");
+  const link = el("a", null, `Wikipedia: ${ratings.source.title}`);
+  link.href = `${ratings.source.url}#Critical_reception`;
+  link.target = "_blank";
+  link.rel = "noopener";
+  source.append(link);
+  box.replaceChildren(el("p", "detail-ratings-title", "📰 La crítica"), list, source);
+}
+
+function ratingChip(rating, className) {
+  const chip = el("span", className);
+  chip.append(el("strong", null, rating.score), ` ${rating.name}`);
+  return chip;
+}
+
 // «¿Sabías que…?»: un dato curioso nuevo cada vez que se abre la ficha, con enlaces a sus fuentes.
 async function loadTriviaBox(release, request) {
   const box = document.getElementById("detail-trivia");
@@ -1155,6 +1190,7 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
       const saved = fromHistory && getHistory().find((i) => String(i.release_id) === String(release.id));
       renderDetail(saved && saved.cover ? { ...release, image: saved.cover } : release);
       loadPrices(release, request).then(() => loadDurations(release, request));
+      loadRatingsBox(release, request);
       loadTriviaBox(release, request);
       if (fromHistory) {
         addCoverPicker(release);

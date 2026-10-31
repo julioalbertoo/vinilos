@@ -213,7 +213,7 @@ const ARTIST_ATTEMPTS = 2;
 const DOC_WINDOW = 9000;
 
 // Minúsculas, sin acentos, comillas ni signos raros y con los espacios juntos, para comparar textos.
-const plain = (text) =>
+export const plain = (text) =>
   String(text || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -227,13 +227,13 @@ const plain = (text) =>
 const words = (text) => plain(text).match(/[a-z0-9]+/g) || [];
 
 // «Prince (2)» o «Siouxsie*» en Discogs → «Prince», «Siouxsie».
-const cleanArtist = (name) => String(name || "").replace(/\s*\(\d+\)/g, "").replace(/\*/g, "").trim();
+export const cleanArtist = (name) => String(name || "").replace(/\s*\(\d+\)/g, "").replace(/\*/g, "").trim();
 // Título sin lo que va entre paréntesis («Abbey Road (Remastered)» → «Abbey Road»).
-const coreTitle = (title) => String(title || "").replace(/\s*[([].*?[)\]]/g, "").trim() || String(title || "");
+export const coreTitle = (title) => String(title || "").replace(/\s*[([].*?[)\]]/g, "").trim() || String(title || "");
 // Nombre del artista sin «The» delante, para que «The Beatles» y «Beatles» cuenten igual.
-const coreArtist = (name) => cleanArtist(name).replace(/^(the|los|las|el|la)\s+/i, "").replace(/,\s*(the|los|las|el|la)$/i, "");
+export const coreArtist = (name) => cleanArtist(name).replace(/^(the|los|las|el|la)\s+/i, "").replace(/,\s*(the|los|las|el|la)$/i, "");
 
-async function wikiJson(host, params) {
+export async function wikiJson(host, params) {
   const query = new URLSearchParams({ ...params, format: "json", origin: "*" });
   const response = await fetch(`https://${host}/w/api.php?${query}`);
   if (!response.ok) throw new Error(`${host} respondió ${response.status}`);
@@ -246,7 +246,7 @@ async function wikiText(lang, params) {
   return page && page.extract && !("missing" in page) ? { title: page.title, text: page.extract } : null;
 }
 
-const wikiUrl = (lang, title) => `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
+export const wikiUrl = (lang, title) => `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 
 // Idiomas de Wikipedia que se leen. Además del castellano y el inglés, otros donde muchos grupos
 // están mejor contados (los de su país). Gemini traduce el dato al castellano.
@@ -256,7 +256,7 @@ const LANG_NAMES = { de: "alemán", fr: "francés", it: "italiano", pt: "portugu
 
 // Artículos de Wikipedia de una ficha de Wikidata localizada por un número de Discogs:
 // del álbum (P1954, master), de una edición (P2206) o del artista (P1953). [{ lang, title }].
-async function wikidataArticles(claims) {
+export async function wikidataArticles(claims) {
   for (const claim of claims.filter(Boolean)) {
     const found = await wikiJson("www.wikidata.org", { action: "query", list: "search", srsearch: `haswbstatement:${claim}`, srlimit: "1" });
     const hit = found.query && found.query.search && found.query.search[0];
@@ -270,7 +270,7 @@ async function wikidataArticles(claims) {
 }
 
 // Primer artículo de una búsqueda que hable de verdad de ese disco o canción (nombra al artista y el título).
-async function searchArticle(lang, search, mustHave) {
+export async function searchArticle(lang, search, mustHave) {
   const found = await wikiJson(`${lang}.wikipedia.org`, { action: "query", list: "search", srsearch: search, srlimit: "3" });
   for (const hit of (found.query && found.query.search) || []) {
     const page = await wikiText(lang, { pageids: String(hit.pageid) });

@@ -14,7 +14,7 @@ Web publicada: **https://julioalbertoo.github.io/vinilos/**
 
 - **📷 Identificar**: foto, galería o código de barras → candidatos de Discogs → eliges el tuyo.
 - **💿 Mis discos**: Galería (discos que salen de la funda y giran), Cuadrícula y Datos (estadísticas).
-- **📄 Ficha de cada disco**: canciones con duración, precios, color del vinilo, dato curioso, ediciones, Spotify.
+- **📄 Ficha de cada disco**: canciones con duración, precios, notas de la crítica, color del vinilo, dato curioso, ediciones, Spotify.
 - **🎤 Ficha del artista**: foto, biografía y discografía (clasificada por MusicBrainz).
 - **⭐ Lo que busco**: tu lista de deseos.
 - **🧭 Modo explorador**: identificar discos (en una tienda, en casa de un amigo) sin guardarlos.
@@ -96,6 +96,7 @@ Al tocar un género, una década, un año, un país, un artista o un sello salen
 - **🎤 Botón del artista**: abre su ficha.
 - **💿 Ver las distintas ediciones del disco**: todas las ediciones en vinilo del álbum, de la más común a la menos, con color y gramaje como pastillas.
 - **🖼️ Cambiar portada**: si la foto principal es mala, eliges otra de la edición (o de las ediciones más populares).
+- **📰 La crítica**: las notas de la prensa (p. ej. 76/100 en Metacritic, 7,5/10 en Pitchfork, 7/10 en NME), sacadas de la tabla de críticas del artículo del álbum en la Wikipedia en inglés. Si el álbum no la tiene, no sale.
 - **💡 ¿Sabías que…?**: un dato curioso (ver abajo).
 - **☆ Añadir a lo que busco** (si no lo tienes) o **🗑️ Borrar de mis discos** (si lo tienes).
 
@@ -286,6 +287,7 @@ Web estática (HTML + CSS + JavaScript sin frameworks) que habla directamente de
 | `wantlist.js` | «Lo que busco». |
 | `quota.js` | Cupo de Gemini por modelo para Ajustes. |
 | `trivia.js` | «¿Sabías que…?»: dato curioso con fuentes comprobadas. |
+| `ratings.js` | Notas de la crítica del álbum (Metacritic, Pitchfork…), de Wikipedia. |
 | `genius.js` / `audiodb.js` | Textos de Genius y TheAudioDB para el dato curioso. |
 | `gallery.js` | Galería horizontal: funda, giro, animaciones al azar y dado. |
 | `labels.js` | Busca en segundo plano la foto de la galleta de cada disco y la recorta (a través de [wsrv.nl](https://wsrv.nl), porque Discogs no deja que una web lea sus fotos). |

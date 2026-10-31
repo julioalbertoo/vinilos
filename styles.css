@@ -874,6 +874,51 @@ input[type="text"]:focus {
   margin-top: 16px;
 }
 
+/* Notas de la crítica (Metacritic, Pitchfork…). */
+.detail-ratings {
+  margin: 12px 0 4px;
+}
+
+.detail-ratings:empty {
+  display: none;
+}
+
+.view .detail-ratings-title {
+  margin: 0 0 6px;
+  font-weight: 800;
+}
+
+.detail-ratings-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-rating {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  background: var(--lilac);
+  color: var(--text);
+}
+
+.detail-rating-agg {
+  background: var(--butter);
+  color: var(--butter-text);
+}
+
+.view .detail-ratings-source {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+.view .detail-ratings-source a {
+  color: inherit;
+  font-weight: 700;
+}
+
 /* «¿Sabías que…?»: dato curioso con sus fuentes. */
 .detail-trivia {
   margin: 12px 0 4px;
