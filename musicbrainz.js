@@ -153,7 +153,30 @@ export async function mbDiscography(mbid, onProgress = () => {}) {
   return { albums: sortByYear(albums), more };
 }
 
-const sortByYear = (list) => [...list].sort((a, b) => (Number(a.year) || 9999) - (Number(b.year) || 9999));
+const byYear = (list) => [...list].sort((a, b) => (Number(a.year) || 9999) - (Number(b.year) || 9999));
+
+// «Alchemy: Dire Straits Live, Part One» → la parte que va detrás del título del álbum completo.
+const PART = /^[\s,:.\-–—(\[/]*(?:(?:part|pt\.?|vol\.?|volume|disc|parte|volumen|teil)\s*(?:\d+|one|two|three|four|i{1,3}|iv|uno|dos|tres)|(?:primera|segunda|tercera)\s+parte|(?:first|second|third)\s+part)\s*[)\]]?\s*$/i;
+const plain = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+// MusicBrainz guarda a veces cada parte de un disco doble como otro álbum («Alchemy… Part One», «… Part Two»).
+// Si está el álbum completo del mismo tipo, sus partes (y los títulos repetidos) no se enseñan.
+function withoutParts(list) {
+  const titles = new Set(list.map((a) => `${a.kind}|${plain(a.title)}`));
+  const seen = new Set();
+  return list.filter((a) => {
+    const t = plain(a.title);
+    const k = `${a.kind}|${t}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    for (let i = 3; i < t.length; i++) {
+      if (titles.has(`${a.kind}|${t.slice(0, i).trim()}`) && PART.test(t.slice(i))) return false;
+    }
+    return true;
+  });
+}
+
+const sortByYear = (list) => withoutParts(byYear(list));
 
 // Nota libre («annotation») del álbum en MusicBrainz, localizado por su master de Discogs.
 // Devuelve { title, url, text } o null si no hay álbum enlazado o no tiene nota.

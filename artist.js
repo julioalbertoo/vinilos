@@ -13,7 +13,7 @@ const MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 const ALBUMS_SHOWN = 12;
 // Sube cuando la discografía guardada cambia de forma (7: los piratas, aparte;
 // 9: en Discogs, los firmados con variante del nombre y sin los de otro artista con el mismo nombre).
-const ALBUMS_VERSION = 10;
+const ALBUMS_VERSION = 11;
 
 // Filtros de la discografía, en este orden. Por defecto, solo los LP.
 const KINDS = [
