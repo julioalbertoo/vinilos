@@ -18,7 +18,7 @@ import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify, geminiModels, probeModel } from "./ai.js";
 import { quotaReport, nextPacificMidnight } from "./quota.js";
-import { testDiscogsConnection, vinylVersions, findCandidates, searchByText, searchArtistsAndAlbums, getMasterYear, masterMainRelease, popularVinylVersions, findAlbumRelease, bothYears, countryWithFlag, vinylColor, COLOR_REV, releaseWeight, releaseDiscs } from "./discogs.js";
+import { testDiscogsConnection, vinylVersions, findCandidates, searchByText, searchArtistsAndAlbums, getMasterYear, masterMainRelease, popularVinylVersions, mainMaster, findAlbumRelease, bothYears, countryWithFlag, vinylColor, COLOR_REV, releaseWeight, releaseDiscs } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -28,7 +28,7 @@ import { cachedRelease, rememberRelease, cachedPrices, cachedCheapest, fillDurat
 import { renderStats, setStatsActive, estimate, priceSource, fillWantPrices, wantPrice, money } from "./stats.js";
 import { renderArtistIndex, renderArtistPage, hasArtistPage, cleanName as cleanArtistName } from "./artist.js";
 import { fillMissingLabels, stopLabelSearch, retryLabel } from "./labels.js";
-import { mbDiscogsMaster } from "./musicbrainz.js";
+import { mbDiscogsMasters } from "./musicbrainz.js";
 import { loadTrivia } from "./trivia.js";
 import { loadRatings, loadMondoSonoro, scoreLevel } from "./ratings.js";
 import { getExplored, addExplored, removeExplored, clearExplored } from "./explored.js";
@@ -1874,7 +1874,7 @@ async function openAlbum(album, name, returnView = "artist") {
         // y si no, se busca por artista y título (que falla si Discogs lo llama distinto: «El patio» es «Triana»).
         if (!album.masterId && album.mbid) {
           try {
-            const masterId = await mbDiscogsMaster(album.mbid);
+            const masterId = await mainMaster(await mbDiscogsMasters(album.mbid), getDiscogsToken());
             if (masterId) album.masterId = masterId;
           } catch {
             // Se busca por título.

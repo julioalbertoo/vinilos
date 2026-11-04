@@ -170,14 +170,17 @@ export async function mbAlbumAnnotation(masterId) {
 }
 
 // Álbum (master) de Discogs al que enlaza un álbum de MusicBrainz, o null si no enlaza a ninguno.
-export async function mbDiscogsMaster(mbid) {
-  if (!mbid) return null;
+// Masters de Discogs enlazados a un álbum de MusicBrainz. Puede haber varios: el de «Alchemy» y los dos LP
+// sueltos de Argentina. Para quedarse con uno, mainMaster() de discogs.js.
+export async function mbDiscogsMasters(mbid) {
+  if (!mbid) return [];
   const group = await mbGet(`/release-group/${mbid}`, { inc: "url-rels" });
+  const ids = [];
   for (const rel of (group && group.relations) || []) {
     const match = /discogs\.com\/master\/(\d+)/.exec((rel.url && rel.url.resource) || "");
-    if (match) return Number(match[1]);
+    if (match && !ids.includes(Number(match[1]))) ids.push(Number(match[1]));
   }
-  return null;
+  return ids;
 }
 
 // Título para emparejar canciones entre fuentes: sin acentos, sin «(Live)», «[Remastered]»… ni signos.

@@ -372,6 +372,7 @@ export async function getArtistAlbums(id, name, discogsToken, onProgress = () =>
   const albums = [];
   const more = {};
   const seen = new Set();
+  const byTitle = new Map();
   const toCheck = [];
   for (const [kind, format, maxPages] of KIND_SEARCHES) {
     for (let page = 1; page <= maxPages; page++) {
@@ -387,11 +388,19 @@ export async function getArtistAlbums(id, name, discogsToken, onProgress = () =>
         if (!isMine(String(x.title || "").split(" - ")[0])) continue;
         const k = searchKind(kind, x.format, title);
         // Un mismo título solo una vez por tipo (hay singles con varios masters casi iguales).
+        // Si se repite, se queda el que más gente tiene: Argentina partió «Alchemy» en dos LP con su propio
+        // master, y sin esto se abría uno de esos en vez del álbum de siempre.
         const same = `${k}|${title.toLowerCase()}`;
-        if (seen.has(x.id) || seen.has(same)) continue;
+        if (seen.has(x.id)) continue;
         seen.add(x.id);
-        seen.add(same);
-        const album = { id: null, masterId: x.id, title, year: x.year ? String(x.year) : "", thumb: x.thumb || "", kind: k };
+        const have = (x.community && x.community.have) || 0;
+        const twin = byTitle.get(same);
+        if (twin) {
+          if (have > twin.have) Object.assign(twin, { masterId: x.id, year: x.year ? String(x.year) : twin.year, thumb: x.thumb || twin.thumb, have });
+          continue;
+        }
+        const album = { id: null, masterId: x.id, title, year: x.year ? String(x.year) : "", thumb: x.thumb || "", kind: k, have };
+        byTitle.set(same, album);
         // El formato que da el buscador es solo el de la edición principal: un LP cuya edición
         // principal es un CD («Punk In Drublic») queda en «otros» hasta mirar sus demás ediciones.
         if (kind === "album" && k === "other") toCheck.push(album);
@@ -524,6 +533,24 @@ export async function masterMainRelease(masterId, discogsToken) {
   if (!vinyls.length || vinyls.some((v) => v.id === master.main_release)) return master.main_release || null;
   const have = (v) => v.stats?.community?.in_collection || 0;
   return vinyls.reduce((best, v) => (have(v) > have(best) ? v : best)).id;
+}
+
+// De varios masters del mismo álbum, el de verdad: el que tiene más ediciones (los LP sueltos
+// de un país suelen tener una sola). null si no hay ninguno.
+export async function mainMaster(ids, discogsToken) {
+  if (ids.length < 2) return ids[0] || null;
+  let best = ids[0];
+  let most = -1;
+  for (const id of ids.slice(0, 4)) {
+    try {
+      const r = await discogsGet(`/masters/${id}/versions`, { per_page: "1" }, discogsToken);
+      const n = (r.pagination && r.pagination.items) || 0;
+      if (n > most) [best, most] = [id, n];
+    } catch {
+      // Se prueba el siguiente.
+    }
+  }
+  return best;
 }
 
 // Todas las ediciones en vinilo de un álbum (master), como candidatos, de la que más gente tiene a la que menos.

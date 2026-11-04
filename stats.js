@@ -4,10 +4,10 @@
 // y lo que falte se pide a Discogs poco a poco, en segundo plano, mientras la pestaña está abierta.
 import { CONFIG } from "./config.js";
 import { cachedRelease, cachedPrices, fillDurations, DURATIONS_CHECK, cachedCheapest, savedCheapest } from "./details.js";
-import { RELEASE_VERSION, findAlbumMaster } from "./discogs.js";
+import { RELEASE_VERSION, findAlbumMaster, mainMaster } from "./discogs.js";
 import { loadDetailSummaries, cloudUser } from "./cloud.js";
 import { releaseWeight, isHeavy, countryFlag, countryCodes } from "./discogs.js";
-import { mbDiscogsMaster } from "./musicbrainz.js";
+import { mbDiscogsMasters } from "./musicbrainz.js";
 import { getWantlist, updateWanted, wantKey } from "./wantlist.js";
 import { savedDiscography, ensureDiscography, discographyProgress, hasArtistPage } from "./artist.js";
 import {
@@ -264,7 +264,7 @@ async function findWantedMaster(w, token) {
   }
   if (w.mbid) {
     try {
-      const id = await mbDiscogsMaster(w.mbid);
+      const id = await mainMaster(await mbDiscogsMasters(w.mbid), token);
       if (id) return id;
     } catch {
       // Se busca en Discogs.
