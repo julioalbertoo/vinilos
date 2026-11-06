@@ -264,6 +264,7 @@ export function renderGallery(items, onOpen) {
   const title = document.getElementById("gallery-title");
   const meta = document.getElementById("gallery-meta");
   const count = document.getElementById("gallery-count");
+  const speed = document.getElementById("gallery-speed");
   const slides = items.map(renderSlide);
   track.replaceChildren(...slides);
   document.getElementById("gallery-random").hidden = items.length < 2;
@@ -285,7 +286,8 @@ export function renderGallery(items, onOpen) {
     const item = items[index];
     selectedId = item.release_id;
     title.textContent = item.title;
-    meta.textContent = [artistName(item.artist), bothYears(item), discCount(item) > 1 && `${discCount(item)} LP`, isHeavy(item.weight || "") && item.weight, item.speed].filter(Boolean).join(" · ");
+    meta.textContent = [artistName(item.artist), bothYears(item), discCount(item) > 1 && `${discCount(item)} LP`, isHeavy(item.weight || "") && item.weight].filter(Boolean).join(" · ");
+    speed.textContent = item.speed || "";
     count.textContent = `${index + 1} de ${items.length}`;
   }
 

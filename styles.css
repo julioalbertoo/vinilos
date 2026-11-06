@@ -874,6 +874,25 @@ input[type="text"]:focus {
   color: var(--text);
 }
 
+.detail-speed-row {
+  margin: 8px 0 2px;
+}
+
+.detail-speed {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: #e3efff;
+  color: #2f5c96;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+:root[data-theme="dark"] .detail-speed {
+  background: #1e2c45;
+  color: #9ec3f5;
+}
+
 .detail-fold {
   margin-top: 16px;
 }
@@ -1599,6 +1618,26 @@ input[type="text"]:focus {
 }
 
 .gallery-weight:empty {
+  display: none;
+}
+
+.gallery-speed-row {
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.gallery-speed {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.gallery-speed:empty {
   display: none;
 }
 

@@ -704,7 +704,11 @@ function renderDetail(release) {
     if (format.text) nodes.push(el("p", "detail-meta detail-color", `Edición: ${format.text}`));
   }
   const speed = releaseSpeed(release);
-  if (speed) nodes.push(el("p", "detail-meta", `💿 Se pone a ${speed}`));
+  if (speed) {
+    const row = el("p", "detail-speed-row");
+    row.append(el("span", "detail-speed", `💿 Se pone a ${speed}`));
+    nodes.push(row);
+  }
   // Géneros, estilos y el botón de Spotify van en la misma fila, con el mismo tamaño.
   const genres = [...(release.genres || []), ...(release.styles || [])];
   if (genres.length || release.title) {
