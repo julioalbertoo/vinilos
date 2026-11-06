@@ -3076,6 +3076,28 @@ button.stats-fact:active {
 
 .stats-vinyls.is-tiles .stats-vinyls-label { opacity: 0; }
 
+/* Los negros, juntos: un disco con el total en la galleta. */
+.stats-vinyls-black {
+  background: repeating-radial-gradient(circle, #1b1b1f 0 1px, #2c2c33 1px 2.5px);
+}
+
+.stats-vinyls-count {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 44%;
+  height: 44%;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 800;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 /* Mapa */
 .stats-map {
   display: block;

@@ -688,17 +688,23 @@ function vinylSortColor(text) {
   return { hex, h, s, l };
 }
 
-// Vinilos de color ordenados del rojo al violeta, como las portadas. Un doble o triple LP con un
-// color por vinilo sale una vez por cada vinilo.
-export function vinylRainbowCard(colored, onOpen) {
+// Vinilos de color ordenados del rojo al violeta, como las portadas. Un doble o triple LP sale una
+// vez por cada vinilo, cada uno con su color. Los negros van juntos al final: un disco negro con el total.
+// items: los discos de los que ya se sabe el color ("" = negro).
+export function vinylRainbowCard(items, onOpen) {
   const head = {
     icon: "💿", title: "Tus vinilos por colores", accent: "lilac", nav: "vinyls",
     sub: "Del rojo al violeta; toca para ver solo los colores y mantén pulsado uno para abrirlo",
   };
-  const vinyls = colored
-    .flatMap((item) => vinylColorsOf(item).map((text) => ({ item, text, color: vinylSortColor(text) })))
-    .filter((v) => vinylBackground(v.text)); // fuera los negros normales y los picture disc
-  if (!vinyls.length) return card({ ...head, sub: null }, note("Aún no tienes ninguno: todos son negros."));
+  const vinyls = [];
+  let blacks = 0;
+  for (const item of items) {
+    for (const text of vinylColorsOf(item)) {
+      if (vinylBackground(text)) vinyls.push({ item, text, color: vinylSortColor(text) });
+      else if (!/picture/i.test(text)) blacks++; // los picture disc no son ni de color ni negros
+    }
+  }
+  if (!vinyls.length && !blacks) return card({ ...head, sub: null }, note("Aún no se sabe el color de tus vinilos."));
   const sorted = vinyls.sort(rainbowOrder);
 
   // Paleta: una franja por vinilo; los de varios colores, con todos ellos.
@@ -712,6 +718,7 @@ export function vinylRainbowCard(colored, onOpen) {
 
   // Mosaico de discos con la portada como galleta; tocar la quita para ver solo el color.
   const mosaic = el("div", vinylTiles ? "stats-vinyls is-tiles" : "stats-vinyls");
+  const toggle = () => (vinylTiles = mosaic.classList.toggle("is-tiles"));
   for (const v of sorted) {
     const cell = el("button", "stats-vinyls-cell");
     cell.type = "button";
@@ -721,15 +728,22 @@ export function vinylRainbowCard(colored, onOpen) {
     const label = el("span", "stats-vinyls-label");
     label.append(coverImg(v.item, "stats-vinyls-img"));
     cell.append(label, el("span", "stats-vinyls-hole"));
-    onTapOrHold(
-      cell,
-      () => (vinylTiles = mosaic.classList.toggle("is-tiles")),
-      () => onOpen(v.item),
-    );
+    onTapOrHold(cell, toggle, () => onOpen(v.item));
     mosaic.append(cell);
   }
-  const count = el("p", "stats-big-note", `${plural(vinyls.length, "vinilo de color", "vinilos de color")}`);
-  return card(head, count, strip, mosaic);
+  // Todos los negros en un solo disco, con cuántos son en la galleta.
+  if (blacks) {
+    const cell = el("button", "stats-vinyls-cell stats-vinyls-black");
+    cell.type = "button";
+    cell.title = plural(blacks, "vinilo negro", "vinilos negros");
+    cell.setAttribute("aria-label", cell.title);
+    cell.append(el("span", "stats-vinyls-count", String(blacks)));
+    cell.addEventListener("click", toggle);
+    mosaic.append(cell);
+  }
+  const parts = [vinyls.length && plural(vinyls.length, "vinilo de color", "vinilos de color"), blacks && plural(blacks, "negro", "negros")];
+  const count = el("p", "stats-big-note", parts.filter(Boolean).join(" · "));
+  return card(head, count, ...(sorted.length ? [strip] : []), mosaic);
 }
 
 // ---------- 3. Cuánto dura tu colección ----------

@@ -148,10 +148,9 @@ function discColors(text, count) {
   return Array.from({ length: count }, (_, i) => parts[i % parts.length]);
 }
 
-// Colores distintos de los vinilos de un disco (uno por vinilo si cada uno es de un color). Para «Datos».
+// Color de cada vinilo de un disco, uno por vinilo (un doble LP da dos). "" = negro. Para «Datos».
 export function vinylColorsOf(item) {
-  const all = discColors(item.color, 12);
-  return all.filter((c, i) => c && all.indexOf(c) === i);
+  return discColors(item.color, discCount(item));
 }
 
 // Colores (hex) con que se pinta un texto de color de Discogs, para ordenarlos y dibujar la paleta.

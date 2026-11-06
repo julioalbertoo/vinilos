@@ -1442,7 +1442,7 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl, 
     });
     const pendingColors = items.filter(needsColor).length;
     nodes.push(rainbowCard(colorEntries, onOpen, pendingColors));
-    nodes.push(vinylRainbowCard(items.filter((i) => i.color), onOpen));
+    nodes.push(vinylRainbowCard(items.filter((i) => typeof i.color === "string"), onOpen));
 
     // 🌍 Mapa.
     if (countries.length) {
