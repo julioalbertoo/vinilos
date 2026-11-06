@@ -843,6 +843,18 @@ input[type="text"]:focus {
   text-decoration: none;
 }
 
+/* Botón que abre Claude con el prompt de guía musical del disco. */
+.view .detail-claude {
+  display: inline-block;
+  margin: 4px 0 10px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #d97757;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .detail-spotify svg {
   width: 1.15em;
   height: 1.15em;

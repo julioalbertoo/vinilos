@@ -718,6 +718,7 @@ function renderDetail(release) {
     if (release.title) chips.append(spotifyLink(release));
     nodes.push(chips);
   }
+  if (release.title) nodes.push(claudeLink(release));
   // Notas de la crítica: solo con la ficha completa; se rellena al llegar (loadRatingsBox).
   if (release.id) {
     const ratings = el("div", "detail-ratings");
@@ -879,6 +880,98 @@ function spotifyLink(release) {
   link.title = "Escuchar en Spotify";
   link.innerHTML = SPOTIFY_ICON;
   link.href = `spotify:search:${encodeURIComponent(query)}`;
+  return link;
+}
+
+// Datos de esta edición para el prompt de Claude: año, país, sello, nº de catálogo, formato y matriz.
+function editionFacts(release) {
+  const lines = [];
+  const years = detailYears(release);
+  if (years) lines.push(`Año: ${years}`);
+  if (release.country) lines.push(`País: ${release.country}`);
+  for (const label of release.labels || []) {
+    lines.push(`Sello: ${label.name || "?"} · Nº de catálogo: ${label.catno || "?"}`);
+  }
+  for (const format of release.formats || []) {
+    lines.push(`Formato: ${formatLine(format)}${format.text ? ` (${format.text})` : ""}`);
+  }
+  for (const id of release.identifiers || []) {
+    if (!["Matrix / Runout", "Barcode"].includes(id.type)) continue;
+    const type = IDENTIFIER_TYPES[id.type];
+    lines.push(`${id.description ? `${type} (${id.description})` : type}: ${id.value}`);
+  }
+  if (release.id) lines.push(`Discogs: ${release.url || `https://www.discogs.com/release/${release.id}`}`);
+  return lines;
+}
+
+// Prompt de «guía musical» adaptado a este disco y a esta edición.
+function claudePrompt(release) {
+  const artist = plainArtist(release.artist) || "?";
+  const facts = editionFacts(release);
+  const mine = facts.length > 0;
+  const intro = mine
+    ? `El disco es «${release.title}» de ${artist}. Estos son los datos de mi edición concreta:\n${facts.map((f) => `- ${f}`).join("\n")}\n\nCon eso, prepárame una ficha siguiendo SIEMPRE esta estructura:`
+    : `El disco es «${release.title}» de ${artist}. Prepárame una ficha siguiendo SIEMPRE esta estructura:`;
+  return `Actúa como mi guía musical mientras escucho vinilos: un amigo melómano y riguroso que me cuenta lo interesante de cada disco mientras suena.
+
+${intro}
+
+1. FICHA RÁPIDA
+- Artista, título, año de publicación original, sello, productor, género y duración total
+${mine ? `
+2. MI EDICIÓN
+- Identifícala en Discogs: país, sello, número de catálogo y año del prensaje
+- ¿Es original, reedición o remaster? ¿De qué año es el master?
+- Quién la masterizó y cortó (si consta) y si viene de cintas analógicas o de fuente digital
+- Diferencias con la edición original: orden de canciones, temas extra, mezcla, portada, encartes
+- Cómo la valoran los coleccionistas: calidad de sonido y rareza
+- Si no puedes identificarla con seguridad, dime las candidatas y qué dato debo mirar para distinguirlas
+` : ""}
+${mine ? 3 : 2}. CONTEXTO (máx. 5 bullets)
+- En qué momento de su carrera estaba el artista
+- Dónde y cómo se grabó, y quién participó
+- Qué buscaban con el disco y si rompió con lo anterior
+
+${mine ? 4 : 3}. CANCIÓN A CANCIÓN, por Cara A y Cara B y en el orden de ${mine ? "MI edición" : "el vinilo original"}
+Para cada canción:
+- Título y duración
+- De qué va (2-3 frases con tus palabras)
+- Dato curioso contrastado (si no hay ninguno, dilo y pasa a la siguiente)
+- Fíjate en… (un detalle musical para escuchar con atención)
+
+${mine ? 5 : 4}. RECEPCIÓN Y LEGADO
+- Cómo se recibió entonces y cómo se ve hoy
+- Singles, listas o premios destacables
+- A quién influyó
+
+${mine ? 6 : 5}. SI TE GUSTA, ESCUCHA…
+- 3 discos relacionados, con una frase sobre por qué
+
+${mine ? 7 : 6}. EN UNA FRASE
+- El disco resumido en una sola frase
+
+${mine ? 8 : 7}. FUENTES
+- Enlaces a las fuentes que has usado
+
+VERIFICACIÓN (lo más importante)
+- Busca siempre en la web antes de responder. No contestes de memoria.
+- Fuentes fiables: Discogs para ediciones; entrevistas, notas interiores, libros y prensa musical reconocida para la historia y las anécdotas. Wikipedia vale como punto de partida, no como única fuente.
+- Una anécdota solo vale si aparece en al menos dos fuentes independientes o en una fuente primaria (el artista, el productor o los créditos del disco).
+- Distingue los hechos de las leyendas: si algo es un rumor muy repetido, di que es una leyenda.
+- Si no puedes confirmar algo, márcalo como (sin confirmar) u omítelo. Prefiero una ficha más corta a un dato inventado.
+- No des minutos concretos salvo que estén verificados.
+
+ESTILO
+- No copies letras: explica de qué va cada canción con tus palabras.
+- Español, lenguaje sencillo y bullets cortos, porque lo leeré mientras suena el disco.`;
+}
+
+// Abre la app de Claude (o claude.ai) con el prompt de guía musical ya escrito para este disco.
+function claudeLink(release) {
+  const link = el("a", "detail-claude", "🎧 Escúchalo con Claude ↗");
+  link.href = `https://claude.ai/new?q=${encodeURIComponent(claudePrompt(release))}`;
+  link.target = "_blank";
+  link.rel = "noopener";
   return link;
 }
 
