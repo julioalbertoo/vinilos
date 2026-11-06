@@ -96,6 +96,27 @@ export function releaseWeight(release) {
   return vinylWeight(release.formats.flatMap((f) => [f.text, ...f.descriptions]));
 }
 
+// Velocidad del vinilo: "33⅓ rpm", "45 rpm", "78 rpm" o "33⅓ y 45 rpm" si trae de las dos.
+// Discogs la pone en las descripciones ("33 ⅓ RPM"); si no la dice, un LP va a 33⅓ y un 7" a 45. "" si no se sabe.
+const SPEEDS = { 16: "16⅔", 33: "33⅓", 45: "45", 78: "78" };
+export function vinylSpeed(texts) {
+  const words = texts.map((t) => String(t || "").trim().toLowerCase()).filter(Boolean);
+  const found = [];
+  for (const w of words) {
+    if (!/rpm/.test(w)) continue;
+    for (const [, n] of w.matchAll(/\b(16|33|45|78)\b/g)) if (!found.includes(SPEEDS[n])) found.push(SPEEDS[n]);
+  }
+  if (!found.length && words.includes("lp")) found.push(SPEEDS[33]);
+  if (!found.length && words.includes('7"')) found.push(SPEEDS[45]);
+  return found.length ? `${found.join(" y ")} rpm` : "";
+}
+
+// Velocidad de una ficha completa, mirando solo los vinilos (no el CD de una caja).
+export function releaseSpeed(release) {
+  const vinyl = (release.formats || []).filter((f) => /vinyl|lp/i.test(f.name || ""));
+  return vinylSpeed(vinyl.flatMap((f) => [f.text, ...(f.descriptions || [])]));
+}
+
 // Número de vinilos de una ficha completa (2 en un doble LP, 3 en un triple…). 1 si no lo dice.
 export function releaseDiscs(release) {
   const vinyl = (release.formats || []).filter((f) => /vinyl|lp/i.test(f.name || ""));
@@ -119,6 +140,7 @@ function fromSearchResult(r) {
     formats: r.format || [],
     color: vinylColor([...(r.formats || []).map((f) => f.text), ...(r.format || [])]),
     weight: vinylWeight([...(r.formats || []).flatMap((f) => [f.text, ...(f.descriptions || [])]), ...(r.format || [])]),
+    speed: vinylSpeed(r.format || []),
     barcodes: r.barcode || [],
     thumb: r.cover_image || r.thumb || "",
     have: r.community?.have || 0,
@@ -137,6 +159,7 @@ function fromMasterVersion(v) {
     formats: [...(v.major_formats || []), ...(v.format || "").split(", ").filter(Boolean)],
     color: vinylColor((v.format || "").split(", ")),
     weight: vinylWeight((v.format || "").split(", ")),
+    speed: vinylSpeed((v.format || "").split(", ")),
     barcodes: [],
     thumb: v.thumb || "",
     have: v.stats?.community?.in_collection || 0,

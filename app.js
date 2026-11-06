@@ -18,7 +18,7 @@ import { CONFIG } from "./config.js";
 import { GUIDE_TEXT, isValidAiKeyFormat } from "./guide.js";
 import { testAiConnection, identify, geminiModels, probeModel } from "./ai.js";
 import { quotaReport, nextPacificMidnight } from "./quota.js";
-import { testDiscogsConnection, vinylVersions, findCandidates, searchByText, searchArtistsAndAlbums, getMasterYear, masterMainRelease, popularVinylVersions, mainMaster, findAlbumRelease, bothYears, countryWithFlag, vinylColor, COLOR_REV, releaseWeight, releaseDiscs } from "./discogs.js";
+import { testDiscogsConnection, vinylVersions, findCandidates, searchByText, searchArtistsAndAlbums, getMasterYear, masterMainRelease, popularVinylVersions, mainMaster, findAlbumRelease, bothYears, countryWithFlag, vinylColor, COLOR_REV, releaseWeight, releaseDiscs, releaseSpeed } from "./discogs.js";
 import { prepareImage } from "./imaging.js";
 import { rankCandidates } from "./scoring.js";
 import { startScanner, describeCameraError } from "./barcode.js";
@@ -498,10 +498,11 @@ function el(tag, className, text) {
   return node;
 }
 
-// Pills de color del vinilo y gramaje («🎨 Orange Translucent», «⚖️ 180 g»), sin repetir las que ya hay.
-function addVinylPills(pills, color, weight) {
+// Pills de color, gramaje y velocidad del vinilo («🎨 Orange Translucent», «⚖️ 180 g», «💿 33⅓ rpm»), sin repetir las que ya hay.
+function addVinylPills(pills, color, weight, speed) {
   if (color && !pills.querySelector(".card-color")) pills.append(el("span", "card-color", `🎨 ${color}`));
   if (weight && !pills.querySelector(".card-weight")) pills.append(el("span", "card-weight", `⚖️ ${weight}`));
+  if (speed && !pills.querySelector(".card-speed")) pills.append(el("span", "card-speed", `💿 ${speed}`));
 }
 
 // La lista de ediciones de Discogs no trae el color ni el gramaje: se mira la ficha de cada
@@ -517,7 +518,8 @@ async function fillVersionPills(cards, isCurrent) {
       candidate.pillsChecked = true;
       candidate.color = candidate.color || vinylColor(release.formats.map((f) => f.text));
       candidate.weight = candidate.weight || releaseWeight(release);
-      addVinylPills(card.querySelector(".card-pills"), candidate.color, candidate.weight);
+      candidate.speed = releaseSpeed(release) || candidate.speed;
+      addVinylPills(card.querySelector(".card-pills"), candidate.color, candidate.weight, candidate.speed);
     } catch {
       return; // Discogs no responde o se pasó del límite: se queda como estaba.
     }
@@ -550,7 +552,7 @@ function renderCard(candidate, index, owned, { versions = false, currentId = nul
   body.append(el("p", null, [candidate.label || "Sello ?", candidate.catno || "Nº cat. ?"].join(" · ")));
   body.append(el("p", null, candidate.formats.join(", ")));
   const pills = el("div", "card-pills");
-  addVinylPills(pills, candidate.color, candidate.weight);
+  addVinylPills(pills, candidate.color, candidate.weight, candidate.speed);
   body.append(pills);
   if (versions && candidate.have) body.append(el("p", null, `👥 ${candidate.have.toLocaleString("es-ES")} en colecciones de Discogs`));
   if (candidate.matches && candidate.matches.length) {
@@ -701,6 +703,8 @@ function renderDetail(release) {
     nodes.push(el("p", "detail-meta", formatLine(format)));
     if (format.text) nodes.push(el("p", "detail-meta detail-color", `Edición: ${format.text}`));
   }
+  const speed = releaseSpeed(release);
+  if (speed) nodes.push(el("p", "detail-meta", `💿 Se pone a ${speed}`));
   // Géneros, estilos y el botón de Spotify van en la misma fila, con el mismo tamaño.
   const genres = [...(release.genres || []), ...(release.styles || [])];
   if (genres.length || release.title) {
@@ -1278,6 +1282,8 @@ async function openDetail(candidate, { returnView = "results", reopen = false } 
         weight: release ? releaseWeight(release) : candidate.weight || undefined,
         // Cuántos vinilos trae (2 = doble LP); sin ficha se sabrá más tarde.
         discs: release ? releaseDiscs(release) : undefined,
+        // Velocidad («33⅓ rpm»; "" si no se sabe).
+        speed: release ? releaseSpeed(release) : candidate.speed || undefined,
       });
       if (request === detailRequest) savedNote.textContent = alreadyOwned ? "💿 Ya estaba en tu colección" : "✓ Guardado en tu historial";
       // Si estaba en «Lo que busco», ya no hace falta buscarlo.
