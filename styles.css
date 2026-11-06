@@ -2978,6 +2978,63 @@ button.stats-fact:active {
   .stats-disc-face { animation: none; }
 }
 
+/* Vinilos por colores: discos con la portada de galleta; en modo colores la galleta desaparece. */
+.stats-vinyls {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 4px;
+}
+
+.stats-vinyls-cell {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.stats-vinyls-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40%;
+  height: 40%;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--lilac);
+  transform: translate(-50%, -50%);
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.stats-vinyls-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  -webkit-touch-callout: none;
+  pointer-events: none;
+}
+
+.stats-vinyls-hole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--surface);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.stats-vinyls.is-tiles .stats-vinyls-label { opacity: 0; }
+
 /* Mapa */
 .stats-map {
   display: block;

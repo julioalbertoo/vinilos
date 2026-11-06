@@ -154,6 +154,18 @@ export function vinylColorsOf(item) {
   return all.filter((c, i) => c && all.indexOf(c) === i);
 }
 
+// Colores (hex) con que se pinta un texto de color de Discogs, para ordenarlos y dibujar la paleta.
+// Transparente sin color: cristal; arcoíris: todos. [] si no se reconoce ninguno.
+export function vinylHexes(text) {
+  const t = String(text || "").toLowerCase();
+  const colors = colorsIn(t);
+  if (/\b(rainbow|arco ?iris|multi-?colou?r(ed)?|tie-?dye)\b/.test(t) && colors.length < 2) {
+    return ["#c8202e", "#f07c1f", "#f2c530", "#2e9e5b", "#2c64b5", "#7a4bb5"];
+  }
+  if (!colors.length && /\b(clear|transparent|transparente|crystal)\b/.test(t)) return ["#c9d6dd"];
+  return colors;
+}
+
 // Número de vinilos que trae el disco (1 si no se sabe). Se pintan como mucho 4 para no tapar la funda.
 function discCount(item) {
   return Math.max(1, Number(item.discs) || 1);

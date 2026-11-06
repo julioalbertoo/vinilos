@@ -12,7 +12,7 @@ import { getWantlist, updateWanted, wantKey } from "./wantlist.js";
 import { savedDiscography, ensureDiscography, discographyProgress, hasArtistPage } from "./artist.js";
 import {
   el, card, tile, note, hint, pill, plural, level, legend, segmented, coverStrip, rankList, podium, factGrid, navBar,
-  genreVinylCard, decadeTagCard, rainbowCard, coverColor, durationCard, timelineCard, mapCard, stackCard, splitBar, compareTo,
+  genreVinylCard, decadeTagCard, rainbowCard, vinylRainbowCard, coverColor, durationCard, timelineCard, mapCard, stackCard, splitBar, compareTo,
 } from "./charts.js";
 
 const CACHE_KEY = CONFIG.STORAGE_KEYS.statsCache;
@@ -514,6 +514,7 @@ const NAV = [
   ["special", "🎛️ Ediciones"],
   ["years", "📅 Años"],
   ["colors", "🌈 Colores"],
+  ["vinyls", "💿 Vinilos"],
   ["map", "🌍 Mapa"],
   ["rare", "💎 Rareza"],
   ["people", "🎤 Artistas"],
@@ -1440,7 +1441,8 @@ export function renderStats(container, items, { discogsToken, onOpen, statusEl, 
       return { item, color: entry && entry.cc ? entry.cc : null };
     });
     const pendingColors = items.filter(needsColor).length;
-    nodes.push(rainbowCard(colorEntries, items.filter((i) => i.color), onOpen, pendingColors));
+    nodes.push(rainbowCard(colorEntries, onOpen, pendingColors));
+    nodes.push(vinylRainbowCard(items.filter((i) => i.color), onOpen));
 
     // 🌍 Mapa.
     if (countries.length) {

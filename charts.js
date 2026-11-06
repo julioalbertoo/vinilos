@@ -1,6 +1,6 @@
 // Piezas visuales de la pestaña «Datos»: el vinilo de géneros, el arcoíris de portadas, la duración,
 // la línea del tiempo y el mapa. stats.js calcula los datos y decide el orden.
-import { vinylBackground, vinylColorsOf } from "./gallery.js";
+import { vinylBackground, vinylColorsOf, vinylHexes } from "./gallery.js";
 
 // ---------- Utilidades compartidas ----------
 
@@ -633,7 +633,7 @@ function onTapOrHold(node, onTap, onHold) {
 }
 
 // entries: [{ item, color }] (color null si no se sabe).
-export function rainbowCard(entries, colored, onOpen, pending) {
+export function rainbowCard(entries, onOpen, pending) {
   const sorted = [...entries].sort(rainbowOrder);
   const known = sorted.filter((e) => e.color);
   const nodes = [];
@@ -670,30 +670,66 @@ export function rainbowCard(entries, colored, onOpen, pending) {
     nodes.push(note(`No se pudo leer el color de ${plural(entries.length - known.length, "portada", "portadas")}: van al final.`));
   }
 
-  // Vinilos de color, con su color de verdad.
-  // Un doble o triple LP con un color por vinilo sale una vez por cada vinilo.
-  const vinyls = colored.flatMap((item) => vinylColorsOf(item).map((color) => ({ item, color })));
-  nodes.push(el("p", "stats-sub", vinyls.length ? `💿 Tus vinilos de color (${vinyls.length})` : "💿 Tus vinilos de color"));
-  if (!vinyls.length) {
-    nodes.push(note("Aún no tienes ninguno: todos son negros."));
-  } else {
-    const row = el("div", "stats-discs");
-    for (const { item, color } of vinyls) {
-      const disc = el("button", "stats-disc");
-      disc.type = "button";
-      const face = el("span", "stats-disc-face");
-      face.style.background = vinylBackground(color) || "#1b1b1f";
-      face.append(el("span", "stats-disc-hole"));
-      disc.append(face, el("span", "stats-disc-title", item.title), el("span", "stats-disc-color", color));
-      disc.addEventListener("click", () => onOpen(item));
-      row.append(disc);
-    }
-    nodes.push(row);
-  }
   return card(
     { icon: "🌈", title: "Tus portadas por colores", sub: "Del rojo al violeta; toca para ver solo los colores y mantén pulsada una para abrirla", accent: "pink", nav: "colors" },
     ...nodes
   );
+}
+
+// Si la tarjeta de vinilos está en modo «solo colores» (sin la portada en el centro).
+let vinylTiles = false;
+
+// Color para ordenar un vinilo: el primero que nombra su texto (null si no se reconoce, p. ej. picture disc).
+function vinylSortColor(text) {
+  const [hex] = vinylHexes(text);
+  if (!hex) return null;
+  const n = parseInt(hex.slice(1), 16);
+  const [h, s, l] = rgbToHsl((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  return { hex, h, s, l };
+}
+
+// Vinilos de color ordenados del rojo al violeta, como las portadas. Un doble o triple LP con un
+// color por vinilo sale una vez por cada vinilo.
+export function vinylRainbowCard(colored, onOpen) {
+  const head = {
+    icon: "💿", title: "Tus vinilos por colores", accent: "lilac", nav: "vinyls",
+    sub: "Del rojo al violeta; toca para ver solo los colores y mantén pulsado uno para abrirlo",
+  };
+  const vinyls = colored
+    .flatMap((item) => vinylColorsOf(item).map((text) => ({ item, text, color: vinylSortColor(text) })))
+    .filter((v) => vinylBackground(v.text)); // fuera los negros normales y los picture disc
+  if (!vinyls.length) return card({ ...head, sub: null }, note("Aún no tienes ninguno: todos son negros."));
+  const sorted = vinyls.sort(rainbowOrder);
+
+  // Paleta: una franja por vinilo; los de varios colores, con todos ellos.
+  const strip = el("div", "stats-palette");
+  for (const v of sorted) {
+    const band = el("span");
+    const hexes = vinylHexes(v.text);
+    band.style.background = hexes.length > 1 ? `linear-gradient(${hexes.join(", ")})` : hexes[0] || "#1b1b1f";
+    strip.append(band);
+  }
+
+  // Mosaico de discos con la portada como galleta; tocar la quita para ver solo el color.
+  const mosaic = el("div", vinylTiles ? "stats-vinyls is-tiles" : "stats-vinyls");
+  for (const v of sorted) {
+    const cell = el("button", "stats-vinyls-cell");
+    cell.type = "button";
+    cell.title = `${v.item.title} · ${v.text}`;
+    cell.setAttribute("aria-label", cell.title);
+    cell.style.background = vinylBackground(v.text) || "#1b1b1f";
+    const label = el("span", "stats-vinyls-label");
+    label.append(coverImg(v.item, "stats-vinyls-img"));
+    cell.append(label, el("span", "stats-vinyls-hole"));
+    onTapOrHold(
+      cell,
+      () => (vinylTiles = mosaic.classList.toggle("is-tiles")),
+      () => onOpen(v.item),
+    );
+    mosaic.append(cell);
+  }
+  const count = el("p", "stats-big-note", `${plural(vinyls.length, "vinilo de color", "vinilos de color")}`);
+  return card(head, count, strip, mosaic);
 }
 
 // ---------- 3. Cuánto dura tu colección ----------
