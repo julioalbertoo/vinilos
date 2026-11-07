@@ -3,7 +3,7 @@
 // Se guarda un resumen pequeño en el móvil; con cuenta, se leen de golpe las fichas guardadas en la nube
 // y lo que falte se pide a Discogs poco a poco, en segundo plano, mientras la pestaña está abierta.
 import { CONFIG } from "./config.js";
-import { cachedRelease, cachedPrices, fillDurations, DURATIONS_CHECK, cachedCheapest, savedCheapest } from "./details.js";
+import { cachedRelease, cachedPrices, fillDurations, DURATIONS_CHECK, cachedCheapest, savedCheapest, oldCheapest } from "./details.js";
 import { RELEASE_VERSION, findAlbumMaster, mainMaster } from "./discogs.js";
 import { loadDetailSummaries, cloudUser } from "./cloud.js";
 import { releaseWeight, isHeavy, countryFlag, countryCodes } from "./discogs.js";
@@ -312,10 +312,15 @@ export async function fillWantPrices(token, { isActive, onUpdate, onStatus = () 
 
 // Precio del vinilo más barato de un álbum de tu lista, si ya se sabe: { value, currency } o null.
 // unsold: true si se miró y nadie lo vende ahora.
+// old: true si es el de hace más de una semana (se enseña mientras se busca el nuevo).
 export function wantPrice(w) {
-  const cheapest = cheapestOf(w);
+  let cheapest = cheapestOf(w);
+  const old = !cheapest && w.masterId ? oldCheapest(w.masterId) : null;
+  if (old) cheapest = old;
   if (!cheapest) return null;
-  return cheapest.best ? { value: cheapest.best.value, currency: cheapest.best.currency || "EUR" } : { unsold: true };
+  const price = cheapest.best ? { value: cheapest.best.value, currency: cheapest.best.currency || "EUR" } : { unsold: true };
+  if (old) price.old = true;
+  return price;
 }
 
 async function fillWantlist() {

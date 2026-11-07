@@ -177,7 +177,9 @@ export async function cloudCached(kind, key, maxAge, fetcher, valid = () => true
   }
 }
 
-// Vinilo más barato de un álbum (entre sus ediciones más comunes), guardado en el móvil 7 días.
+// Vinilo más barato de un álbum (entre sus ediciones más comunes), válido 7 días.
+// En el móvil se guarda hasta 60 días, para enseñar el precio anterior mientras se busca el nuevo.
+const CHEAPEST_KEEP = 60 * DAY_MS;
 const CHEAPEST_KEY = CONFIG.STORAGE_KEYS.cheapestCache;
 
 function readCheapest() {
@@ -192,6 +194,12 @@ function readCheapest() {
 export function savedCheapest(masterId) {
   const saved = masterId ? readCheapest()[masterId] : null;
   return saved && saved.community && isFresh(saved.at, PRICES_MAX_AGE) ? saved : null;
+}
+
+// El último precio guardado en el móvil aunque ya tenga más de una semana (hasta 60 días). null si no hay.
+export function oldCheapest(masterId) {
+  const saved = masterId ? readCheapest()[masterId] : null;
+  return saved && saved.community && isFresh(saved.at, CHEAPEST_KEEP) ? saved : null;
 }
 
 // Devuelve { best, checked, total, versions, community, at } o null si se cortó (stop).
@@ -210,8 +218,8 @@ export async function cachedCheapest(masterId, discogsToken, options = {}) {
     writeCloud("cheapest", masterId, entry);
   }
   const fresh = readCheapest();
-  // Solo se guardan los álbumes de la última semana, para no llenar el móvil.
-  for (const [key, value] of Object.entries(fresh)) if (!isFresh(value.at, PRICES_MAX_AGE)) delete fresh[key];
+  // Solo se guardan los álbumes de los últimos 60 días, para no llenar el móvil.
+  for (const [key, value] of Object.entries(fresh)) if (!isFresh(value.at, CHEAPEST_KEEP)) delete fresh[key];
   fresh[masterId] = entry;
   try {
     localStorage.setItem(CHEAPEST_KEY, JSON.stringify(fresh));

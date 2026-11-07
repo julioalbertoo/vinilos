@@ -1586,15 +1586,17 @@ function renderWantlist() {
   // Suma del vinilo más barato de cada uno (los que ya tienen precio), al lado del título.
   const totals = new Map();
   let priced = 0;
+  let anyOld = false;
   for (const item of items) {
     const price = wantPrice(item);
+    if (price && price.old) anyOld = true;
     if (!price || price.unsold) continue;
     priced += 1;
     totals.set(price.currency, (totals.get(price.currency) || 0) + Number(price.value));
   }
   if (priced) {
     const head = el("div", "wantlist-head");
-    head.append(title, el("span", "wantlist-total", [...totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ")));
+    head.append(title, el("span", "wantlist-total", [...totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ") + (anyOld ? "*" : "")));
     nodes[0] = head;
   }
   const count = `${items.length} ${items.length === 1 ? "disco" : "discos"}`;
@@ -1640,7 +1642,9 @@ function renderWantlist() {
     const text = el("span", "artist-album-text");
     text.append(el("span", "artist-album-title", item.title), el("span", "artist-album-year", [cleanArtistName(item.artist), item.year].filter(Boolean).join(" · ")));
     const price = wantPrice(item);
-    if (price) text.append(el("span", "want-price", price.unsold ? "Nadie lo vende ahora" : `🛒 desde ${money(price.value, price.currency)}`));
+    // * = precio de hace más de una semana, mientras se busca el nuevo.
+    const star = price && price.old ? "*" : "";
+    if (price) text.append(el("span", "want-price", price.unsold ? `Nadie lo vende ahora${star}` : `🛒 desde ${money(price.value, price.currency)}${star}`));
     row.append(img, text, el("span", "artist-row-go", "›"));
     row.addEventListener("click", () => openAlbum({ ...item }, item.artist, "wantlist"));
     const remove = el("button", "want-star is-on", "★");
@@ -1656,6 +1660,7 @@ function renderWantlist() {
   nodes.push(list);
   const { discogsToken } = getTokenState();
   if (discogsToken) nodes.push(el("p", "wantlist-note", "Precio del vinilo más barato a la venta ahora entre sus ediciones más comunes, sin envío."));
+  if (anyOld) nodes.push(el("p", "wantlist-note", "* Precio de hace más de una semana: se está buscando el nuevo."));
   box.replaceChildren(...nodes);
   // Después de que showView marque la lista como visible (si no, la búsqueda se cortaría al empezar).
   setTimeout(fillWantlistPrices, 0);
