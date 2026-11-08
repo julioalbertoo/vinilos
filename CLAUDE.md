@@ -1,5 +1,9 @@
 # vinilos
 
+## Publicar
+
+- Sube siempre los cambios a `main` (además de la rama de trabajo), sin preguntar ni abrir PR: el usuario prueba en el móvil desde GitHub Pages.
+
 ## Versionado (obligatorio en cada push)
 
 - La versión vive solo en `index.html`: en la cabecera (`.app-version`) y como `?v=` en `styles.css`, `app.js` y el import map. Al publicar, sustituye la versión en **todas** sus apariciones de ese archivo.
