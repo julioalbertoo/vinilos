@@ -4027,3 +4027,12 @@ button.artist-kind:active {
 .cover-picker-more {
   margin-top: 4px;
 }
+
+button.want-copy {
+  display: block;
+  width: auto;
+  min-height: 0;
+  margin: 0.5rem 0 0.75rem;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}

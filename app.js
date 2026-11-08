@@ -1623,6 +1623,7 @@ function renderWantlist() {
     sort.append(button);
   }
   if (items.length > 1) nodes.push(sort);
+  nodes.push(copyWantlistButton(items));
   const list = el("div", "artist-albums");
   for (const item of items) {
     const line = el("div", "artist-album-line");
@@ -1659,6 +1660,43 @@ function renderWantlist() {
   box.replaceChildren(...nodes);
   // Después de que showView marque la lista como visible (si no, la búsqueda se cortaría al empezar).
   setTimeout(fillWantlistPrices, 0);
+}
+
+// «Copiar lista»: una línea por disco, «Artista / Título», en el orden que se ve.
+function copyWantlistButton(items) {
+  const button = el("button", "secondary want-copy", "📋 Copiar lista");
+  button.type = "button";
+  button.addEventListener("click", async () => {
+    const text = items.map((item) => `${cleanArtistName(item.artist) || "?"} / ${item.title || "?"}`).join("\n");
+    const ok = await copyText(text);
+    button.textContent = ok ? `✓ Copiada (${items.length})` : "No se pudo copiar";
+    setTimeout(() => (button.textContent = "📋 Copiar lista"), 2000);
+  });
+  return button;
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Navegadores sin portapapeles moderno: se copia desde un cuadro de texto oculto.
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch {
+      ok = false;
+    }
+    area.remove();
+    return ok;
+  }
 }
 
 // Mientras se ve la lista, busca en segundo plano los precios que faltan (los ya buscados están guardados 7 días).
