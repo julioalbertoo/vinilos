@@ -580,6 +580,8 @@ let lastClues = {};
 const RESULTS_FIRST = 5;
 const RESULTS_STEP = 10;
 
+let resultsRun = 0;
+
 // ranked: todas las ediciones ordenadas de mejor a peor. Se enseñan 5 al principio y luego de 10 en 10 con «Ver 10 más».
 function renderResults(ranked, total, strategy, clues) {
   lastClues = clues;
@@ -590,10 +592,16 @@ function renderResults(ranked, total, strategy, clues) {
   // Ediciones que ya están en «Mis discos», para marcarlas con «Ya lo tienes».
   const owned = new Set(getHistory().map((item) => String(item.release_id)));
   let shown = 0;
+  let allCards = [];
+  const run = ++resultsRun;
   function showMore() {
     const next = ranked.slice(shown, shown + (shown ? RESULTS_STEP : RESULTS_FIRST));
-    list.append(...next.map((candidate, i) => renderCard(candidate, shown + i, owned)));
+    const cards = next.map((candidate, i) => ({ candidate, card: renderCard(candidate, shown + i, owned) }));
+    list.append(...cards.map((c) => c.card));
     shown += next.length;
+    // La búsqueda casi nunca trae el color: se mira la ficha de cada edición que se enseña.
+    allCards = allCards.concat(cards);
+    fillVersionPills(allCards, () => run === resultsRun && activeView() === "results");
     summary.textContent = `${total} ediciones encontradas ${how}. Las ${shown} que mejor encajan:`;
     const left = ranked.length - shown;
     more.hidden = left <= 0;
